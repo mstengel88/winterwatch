@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          address: string
+          city: string | null
+          client_id: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          geofence_radius: number | null
+          id: string
+          is_active: boolean
+          latitude: number | null
+          longitude: number | null
+          name: string
+          notes: string | null
+          priority: number | null
+          state: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address: string
+          city?: string | null
+          client_id?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          geofence_radius?: number | null
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          notes?: string | null
+          priority?: number | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string
+          city?: string | null
+          client_id?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          geofence_radius?: number | null
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          notes?: string | null
+          priority?: number | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           category: Database["public"]["Enums"]["employee_category"]
@@ -62,6 +125,60 @@ export type Database = {
         }
         Relationships: []
       }
+      equipment: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_maintenance_date: string | null
+          license_plate: string | null
+          make: string | null
+          model: string | null
+          name: string
+          next_maintenance_date: string | null
+          notes: string | null
+          status: string | null
+          type: string
+          updated_at: string
+          vin: string | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_maintenance_date?: string | null
+          license_plate?: string | null
+          make?: string | null
+          model?: string | null
+          name: string
+          next_maintenance_date?: string | null
+          notes?: string | null
+          status?: string | null
+          type: string
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_maintenance_date?: string | null
+          license_plate?: string | null
+          make?: string | null
+          model?: string | null
+          name?: string
+          next_maintenance_date?: string | null
+          notes?: string | null
+          status?: string | null
+          type?: string
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -101,6 +218,134 @@ export type Database = {
         }
         Relationships: []
       }
+      shovel_work_logs: {
+        Row: {
+          account_id: string
+          areas_cleared: string[] | null
+          check_in_latitude: number | null
+          check_in_longitude: number | null
+          check_in_time: string | null
+          check_out_latitude: number | null
+          check_out_longitude: number | null
+          check_out_time: string | null
+          created_at: string
+          employee_id: string | null
+          ice_melt_used_lbs: number | null
+          id: string
+          notes: string | null
+          photo_urls: string[] | null
+          service_type: Database["public"]["Enums"]["service_type"]
+          status: Database["public"]["Enums"]["work_status"]
+          updated_at: string
+          weather_conditions: string | null
+        }
+        Insert: {
+          account_id: string
+          areas_cleared?: string[] | null
+          check_in_latitude?: number | null
+          check_in_longitude?: number | null
+          check_in_time?: string | null
+          check_out_latitude?: number | null
+          check_out_longitude?: number | null
+          check_out_time?: string | null
+          created_at?: string
+          employee_id?: string | null
+          ice_melt_used_lbs?: number | null
+          id?: string
+          notes?: string | null
+          photo_urls?: string[] | null
+          service_type?: Database["public"]["Enums"]["service_type"]
+          status?: Database["public"]["Enums"]["work_status"]
+          updated_at?: string
+          weather_conditions?: string | null
+        }
+        Update: {
+          account_id?: string
+          areas_cleared?: string[] | null
+          check_in_latitude?: number | null
+          check_in_longitude?: number | null
+          check_in_time?: string | null
+          check_out_latitude?: number | null
+          check_out_longitude?: number | null
+          check_out_time?: string | null
+          created_at?: string
+          employee_id?: string | null
+          ice_melt_used_lbs?: number | null
+          id?: string
+          notes?: string | null
+          photo_urls?: string[] | null
+          service_type?: Database["public"]["Enums"]["service_type"]
+          status?: Database["public"]["Enums"]["work_status"]
+          updated_at?: string
+          weather_conditions?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shovel_work_logs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shovel_work_logs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_clock: {
+        Row: {
+          clock_in_latitude: number | null
+          clock_in_longitude: number | null
+          clock_in_time: string
+          clock_out_latitude: number | null
+          clock_out_longitude: number | null
+          clock_out_time: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_time: string
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          clock_out_time?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_time?: string
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          clock_out_time?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -125,6 +370,94 @@ export type Database = {
         }
         Relationships: []
       }
+      work_logs: {
+        Row: {
+          account_id: string
+          check_in_latitude: number | null
+          check_in_longitude: number | null
+          check_in_time: string | null
+          check_out_latitude: number | null
+          check_out_longitude: number | null
+          check_out_time: string | null
+          created_at: string
+          employee_id: string | null
+          equipment_id: string | null
+          id: string
+          notes: string | null
+          photo_urls: string[] | null
+          salt_used_lbs: number | null
+          service_type: Database["public"]["Enums"]["service_type"]
+          snow_depth_inches: number | null
+          status: Database["public"]["Enums"]["work_status"]
+          updated_at: string
+          weather_conditions: string | null
+        }
+        Insert: {
+          account_id: string
+          check_in_latitude?: number | null
+          check_in_longitude?: number | null
+          check_in_time?: string | null
+          check_out_latitude?: number | null
+          check_out_longitude?: number | null
+          check_out_time?: string | null
+          created_at?: string
+          employee_id?: string | null
+          equipment_id?: string | null
+          id?: string
+          notes?: string | null
+          photo_urls?: string[] | null
+          salt_used_lbs?: number | null
+          service_type?: Database["public"]["Enums"]["service_type"]
+          snow_depth_inches?: number | null
+          status?: Database["public"]["Enums"]["work_status"]
+          updated_at?: string
+          weather_conditions?: string | null
+        }
+        Update: {
+          account_id?: string
+          check_in_latitude?: number | null
+          check_in_longitude?: number | null
+          check_in_time?: string | null
+          check_out_latitude?: number | null
+          check_out_longitude?: number | null
+          check_out_time?: string | null
+          created_at?: string
+          employee_id?: string | null
+          equipment_id?: string | null
+          id?: string
+          notes?: string | null
+          photo_urls?: string[] | null
+          salt_used_lbs?: number | null
+          service_type?: Database["public"]["Enums"]["service_type"]
+          snow_depth_inches?: number | null
+          status?: Database["public"]["Enums"]["work_status"]
+          updated_at?: string
+          weather_conditions?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_logs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_logs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_logs_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -140,10 +473,16 @@ export type Database = {
       }
       is_admin_or_manager: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      is_user_employee: {
+        Args: { _employee_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "driver" | "shovel_crew" | "client"
       employee_category: "plow" | "shovel" | "both"
+      service_type: "plow" | "salt" | "both" | "shovel" | "ice_melt"
+      work_status: "pending" | "in_progress" | "completed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -273,6 +612,8 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "manager", "driver", "shovel_crew", "client"],
       employee_category: ["plow", "shovel", "both"],
+      service_type: ["plow", "salt", "both", "shovel", "ice_melt"],
+      work_status: ["pending", "in_progress", "completed", "cancelled"],
     },
   },
 } as const
