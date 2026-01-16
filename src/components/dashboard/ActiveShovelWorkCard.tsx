@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MapPin, LogOut, Shovel, Loader2, Clock } from 'lucide-react';
+import { PhotoUpload } from './PhotoUpload';
+import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 
 interface ActiveShovelWorkCardProps {
   workLog: ShovelWorkLog;
@@ -19,6 +21,7 @@ interface CheckOutData {
   iceMeltUsedLbs?: number;
   weatherConditions?: string;
   notes?: string;
+  photoUrls?: string[];
 }
 
 const CLEARABLE_AREAS = [
@@ -36,6 +39,8 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
   const [iceMeltUsed, setIceMeltUsed] = useState('');
   const [weather, setWeather] = useState('');
   const [notes, setNotes] = useState('');
+  
+  const photoUpload = usePhotoUpload({ folder: 'shovel-logs' });
 
   const handleAreaToggle = (areaId: string) => {
     setAreasCleared((prev) =>
@@ -47,11 +52,19 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
 
   const handleCheckOut = async () => {
     setIsSubmitting(true);
+    
+    // Upload photos first
+    let photoUrls: string[] = [];
+    if (photoUpload.photos.length > 0) {
+      photoUrls = await photoUpload.uploadPhotos(workLog.id);
+    }
+    
     await onCheckOut({
       areasCleared: areasCleared.length > 0 ? areasCleared : undefined,
       iceMeltUsedLbs: iceMeltUsed ? parseFloat(iceMeltUsed) : undefined,
       weatherConditions: weather || undefined,
       notes: notes || undefined,
+      photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
     });
     setIsSubmitting(false);
   };
@@ -156,9 +169,19 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
           />
         </div>
 
+        <PhotoUpload
+          photos={photoUpload.photos}
+          previews={photoUpload.previews}
+          isUploading={photoUpload.isUploading}
+          uploadProgress={photoUpload.uploadProgress}
+          canAddMore={photoUpload.canAddMore}
+          onAddPhotos={photoUpload.addPhotos}
+          onRemovePhoto={photoUpload.removePhoto}
+        />
+
         <Button
           onClick={handleCheckOut}
-          disabled={isSubmitting}
+          disabled={isSubmitting || photoUpload.isUploading}
           className="w-full"
           size="lg"
         >
