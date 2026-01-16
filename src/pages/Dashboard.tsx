@@ -116,7 +116,7 @@ export default function Dashboard() {
 
           {/* Plow/Driver section */}
           {(hasRole('driver') || isAdminOrManager()) && (
-            <Card className="border-plow/50">
+            <Card className="border-plow/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/driver')}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-plow">
                   <Truck className="h-5 w-5" />
@@ -125,16 +125,14 @@ export default function Dashboard() {
                 <CardDescription>Manage plow routes and work logs</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Check in/out of accounts, log snow removal activities, and track equipment usage.
-                </p>
+                <Button variant="outline" className="w-full">Open Dashboard</Button>
               </CardContent>
             </Card>
           )}
 
           {/* Shovel section */}
           {(hasRole('shovel_crew') || isAdminOrManager()) && (
-            <Card className="border-shovel/50">
+            <Card className="border-shovel/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/shovel')}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-shovel">
                   <Shovel className="h-5 w-5" />
@@ -143,16 +141,14 @@ export default function Dashboard() {
                 <CardDescription>Manage sidewalk clearing activities</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Check in/out of accounts, log shovel work, and record salt usage.
-                </p>
+                <Button variant="outline" className="w-full">Open Dashboard</Button>
               </CardContent>
             </Card>
           )}
 
           {/* Admin section */}
           {isAdminOrManager() && (
-            <Card className="border-warning/50">
+            <Card className="border-warning/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/admin')}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-warning">
                   <Shield className="h-5 w-5" />
@@ -161,9 +157,7 @@ export default function Dashboard() {
                 <CardDescription>Manage users, accounts, and equipment</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Access employee management, account setup, reports, and system configuration.
-                </p>
+                <Button variant="outline" className="w-full">Open Admin Panel</Button>
               </CardContent>
             </Card>
           )}

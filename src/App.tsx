@@ -11,6 +11,11 @@ import DriverDashboard from "./pages/DriverDashboard";
 import ShovelDashboard from "./pages/ShovelDashboard";
 import Pending from "./pages/Pending";
 import NotFound from "./pages/NotFound";
+import AdminLayout from "./pages/admin/AdminLayout";
+import UsersPage from "./pages/admin/UsersPage";
+import EmployeesPage from "./pages/admin/EmployeesPage";
+import AccountsPage from "./pages/admin/AccountsPage";
+import EquipmentPage from "./pages/admin/EquipmentPage";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +34,15 @@ const App = () => (
             <Route path="/driver" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
             <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
             <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
+            
+            {/* Admin routes */}
+            <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AdminLayout /></ProtectedRoute>}>
+              <Route index element={<Navigate to="/admin/users" replace />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="employees" element={<EmployeesPage />} />
+              <Route path="accounts" element={<AccountsPage />} />
+              <Route path="equipment" element={<EquipmentPage />} />
+            </Route>
             
             <Route path="*" element={<NotFound />} />
           </Routes>
