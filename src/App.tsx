@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import DriverDashboard from "./pages/DriverDashboard";
+import ShovelDashboard from "./pages/ShovelDashboard";
 import Pending from "./pages/Pending";
 import NotFound from "./pages/NotFound";
 
@@ -20,33 +22,14 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
-            
-            {/* Redirect root to dashboard */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             
-            {/* Protected routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/driver" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
+            <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
+            <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
             
-            {/* Pending approval page */}
-            <Route
-              path="/pending"
-              element={
-                <ProtectedRoute>
-                  <Pending />
-                </ProtectedRoute>
-              }
-            />
-            
-            {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
