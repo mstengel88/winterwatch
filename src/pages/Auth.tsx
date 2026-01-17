@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, Users, Building2 } from 'lucide-react';
 import { z } from 'zod';
@@ -173,6 +173,9 @@ export default function Auth() {
             Client Portal
           </TabsTrigger>
         </TabsList>
+        {/* Hidden TabsContent elements required for valid ARIA attributes */}
+        <TabsContent value="staff" className="hidden" />
+        <TabsContent value="client" className="hidden" />
       </Tabs>
 
       {/* Login Card */}
@@ -242,6 +245,7 @@ export default function Auth() {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-muted-foreground" />
