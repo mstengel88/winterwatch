@@ -15,6 +15,9 @@ import {
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
 import { generateWorkLogsPDF } from '@/lib/pdfExport';
 import { toast } from 'sonner';
+import { ShiftDialog } from '@/components/reports/ShiftDialog';
+import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
+import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
 
 interface TimeClockEntry {
   id: string;
@@ -35,16 +38,20 @@ interface WorkLogEntry {
   date: string;
   check_in_time: string | null;
   check_out_time: string | null;
+  account_id: string;
   account_name: string;
+  employee_id: string;
   service_type: string;
   snow_depth_inches: number | null;
   salt_used_lbs: number | null;
   ice_melt_used_lbs: number | null;
   weather_conditions: string | null;
+  equipment_id: string | null;
   equipment_name: string | null;
   employee_name: string;
   team_member_names: string[];
   photo_urls: string[] | null;
+  notes: string | null;
 }
 
 interface Account {
@@ -87,6 +94,15 @@ export default function ReportsPage() {
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
   const [selectedWorkLogs, setSelectedWorkLogs] = useState<Set<string>>(new Set());
+
+  // Dialog state
+  const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
+  const [workLogDialogOpen, setWorkLogDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<TimeClockEntry | null>(null);
+  const [editingWorkLog, setEditingWorkLog] = useState<WorkLogEntry | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'shift' | 'worklog'; id: string; name: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -139,16 +155,20 @@ export default function ReportsPage() {
         date: log.created_at,
         check_in_time: log.check_in_time,
         check_out_time: log.check_out_time,
+        account_id: log.account_id,
         account_name: log.account?.name || 'Unknown',
+        employee_id: log.employee_id,
         service_type: log.service_type,
         snow_depth_inches: log.snow_depth_inches,
         salt_used_lbs: log.salt_used_lbs,
         ice_melt_used_lbs: null,
         weather_conditions: log.weather_conditions,
+        equipment_id: log.equipment_id,
         equipment_name: log.equipment?.name || null,
         employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
         team_member_names: [],
         photo_urls: log.photo_urls,
+        notes: log.notes,
       }));
 
       // For shovel logs, fetch team member names if available
@@ -169,16 +189,20 @@ export default function ReportsPage() {
             date: log.created_at,
             check_in_time: log.check_in_time,
             check_out_time: log.check_out_time,
+            account_id: log.account_id,
             account_name: log.account?.name || 'Unknown',
+            employee_id: log.employee_id,
             service_type: log.service_type,
             snow_depth_inches: log.snow_depth_inches,
             salt_used_lbs: null,
             ice_melt_used_lbs: log.ice_melt_used_lbs,
             weather_conditions: log.weather_conditions,
+            equipment_id: null,
             equipment_name: null,
             employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
             team_member_names: teamMemberNames,
             photo_urls: log.photo_urls,
+            notes: log.notes,
           };
         })
       );
@@ -322,6 +346,188 @@ export default function ReportsPage() {
     } else {
       setSelectedWorkLogs(new Set(filteredWorkLogs.map(l => l.id)));
     }
+  };
+
+  // CRUD Handlers for Shifts
+  const handleSaveShift = async (data: {
+    id?: string;
+    employee_id: string;
+    clock_in_date: string;
+    clock_in_time: string;
+    clock_out_time: string;
+  }) => {
+    setIsSaving(true);
+    try {
+      const clockInDateTime = new Date(`${data.clock_in_date}T${data.clock_in_time}`);
+      const clockOutDateTime = data.clock_out_time 
+        ? new Date(`${data.clock_in_date}T${data.clock_out_time}`)
+        : null;
+
+      if (data.id) {
+        // Update existing shift
+        const { error } = await supabase
+          .from('time_clock')
+          .update({
+            employee_id: data.employee_id,
+            clock_in_time: clockInDateTime.toISOString(),
+            clock_out_time: clockOutDateTime?.toISOString() || null,
+          })
+          .eq('id', data.id);
+        if (error) throw error;
+        toast.success('Shift updated successfully');
+      } else {
+        // Create new shift
+        const { error } = await supabase
+          .from('time_clock')
+          .insert({
+            employee_id: data.employee_id,
+            clock_in_time: clockInDateTime.toISOString(),
+            clock_out_time: clockOutDateTime?.toISOString() || null,
+          });
+        if (error) throw error;
+        toast.success('Shift created successfully');
+      }
+      setShiftDialogOpen(false);
+      setEditingShift(null);
+      await fetchData();
+    } catch (error) {
+      console.error('Error saving shift:', error);
+      toast.error('Failed to save shift');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // CRUD Handlers for Work Logs
+  const handleSaveWorkLog = async (data: WorkLogFormData) => {
+    setIsSaving(true);
+    try {
+      const checkInDateTime = data.check_in_time 
+        ? new Date(`${data.date}T${data.check_in_time}`)
+        : null;
+      const checkOutDateTime = data.check_out_time 
+        ? new Date(`${data.date}T${data.check_out_time}`)
+        : null;
+
+      if (data.type === 'plow') {
+        const payload = {
+          account_id: data.account_id,
+          employee_id: data.employee_id,
+          equipment_id: data.equipment_id || null,
+          service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
+          status: 'completed' as const,
+          check_in_time: checkInDateTime?.toISOString() || null,
+          check_out_time: checkOutDateTime?.toISOString() || null,
+          snow_depth_inches: data.snow_depth_inches || null,
+          salt_used_lbs: data.salt_used_lbs || null,
+          weather_conditions: data.weather_conditions || null,
+          notes: data.notes || null,
+        };
+
+        if (data.id) {
+          const { error } = await supabase.from('work_logs').update(payload).eq('id', data.id);
+          if (error) throw error;
+          toast.success('Work log updated successfully');
+        } else {
+          const { error } = await supabase.from('work_logs').insert(payload);
+          if (error) throw error;
+          toast.success('Work log created successfully');
+        }
+      } else {
+        const payload = {
+          account_id: data.account_id,
+          employee_id: data.employee_id,
+          service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
+          status: 'completed' as const,
+          check_in_time: checkInDateTime?.toISOString() || null,
+          check_out_time: checkOutDateTime?.toISOString() || null,
+          snow_depth_inches: data.snow_depth_inches || null,
+          ice_melt_used_lbs: data.ice_melt_used_lbs || null,
+          weather_conditions: data.weather_conditions || null,
+          notes: data.notes || null,
+        };
+
+        if (data.id) {
+          const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', data.id);
+          if (error) throw error;
+          toast.success('Work log updated successfully');
+        } else {
+          const { error } = await supabase.from('shovel_work_logs').insert(payload);
+          if (error) throw error;
+          toast.success('Work log created successfully');
+        }
+      }
+      setWorkLogDialogOpen(false);
+      setEditingWorkLog(null);
+      await fetchData();
+    } catch (error) {
+      console.error('Error saving work log:', error);
+      toast.error('Failed to save work log');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete handlers
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsSaving(true);
+    try {
+      if (deleteTarget.type === 'shift') {
+        const { error } = await supabase.from('time_clock').delete().eq('id', deleteTarget.id);
+        if (error) throw error;
+        toast.success('Shift deleted successfully');
+      } else {
+        // Determine which table to delete from
+        const workLog = workLogs.find(l => l.id === deleteTarget.id);
+        if (workLog) {
+          const table = workLog.type === 'plow' ? 'work_logs' : 'shovel_work_logs';
+          const { error } = await supabase.from(table).delete().eq('id', deleteTarget.id);
+          if (error) throw error;
+          toast.success('Work log deleted successfully');
+        }
+      }
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+      await fetchData();
+    } catch (error) {
+      console.error('Error deleting:', error);
+      toast.error('Failed to delete');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Open dialog handlers
+  const openAddShift = () => {
+    setEditingShift(null);
+    setShiftDialogOpen(true);
+  };
+
+  const openEditShift = (shift: TimeClockEntry) => {
+    setEditingShift(shift);
+    setShiftDialogOpen(true);
+  };
+
+  const openDeleteShift = (shift: TimeClockEntry) => {
+    const empName = shift.employee ? `${shift.employee.first_name} ${shift.employee.last_name}` : 'Unknown';
+    setDeleteTarget({ type: 'shift', id: shift.id, name: empName });
+    setDeleteDialogOpen(true);
+  };
+
+  const openAddWorkLog = () => {
+    setEditingWorkLog(null);
+    setWorkLogDialogOpen(true);
+  };
+
+  const openEditWorkLog = (log: WorkLogEntry) => {
+    setEditingWorkLog(log);
+    setWorkLogDialogOpen(true);
+  };
+
+  const openDeleteWorkLog = (log: WorkLogEntry) => {
+    setDeleteTarget({ type: 'worklog', id: log.id, name: log.account_name });
+    setDeleteDialogOpen(true);
   };
 
   if (isLoading) {
@@ -530,7 +736,7 @@ export default function ReportsPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">Daily Shifts ({filteredShifts.length} shifts)</span>
             </div>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" onClick={openAddShift}>
               <Plus className="h-4 w-4 mr-1" />
               Add Shift
             </Button>
@@ -592,10 +798,10 @@ export default function ReportsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditShift(entry)}>
                           <Pencil className="h-3 w-3 text-muted-foreground" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteShift(entry)}>
                           <Trash2 className="h-3 w-3 text-red-400" />
                         </Button>
                       </div>
@@ -654,7 +860,7 @@ export default function ReportsPage() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-medium">Work Log Entries ({filteredWorkLogs.length})</span>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" onClick={openAddWorkLog}>
               <Plus className="h-4 w-4 mr-1" />
               Add Entry
             </Button>
@@ -751,10 +957,10 @@ export default function ReportsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
                           <Pencil className="h-3 w-3 text-muted-foreground" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
                           <Trash2 className="h-3 w-3 text-red-400" />
                         </Button>
                       </div>
@@ -773,6 +979,52 @@ export default function ReportsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Shift Dialog */}
+      <ShiftDialog
+        open={shiftDialogOpen}
+        onOpenChange={setShiftDialogOpen}
+        employees={employees}
+        initialData={editingShift}
+        onSave={handleSaveShift}
+        isLoading={isSaving}
+      />
+
+      {/* Work Log Dialog */}
+      <WorkLogDialog
+        open={workLogDialogOpen}
+        onOpenChange={setWorkLogDialogOpen}
+        accounts={accounts}
+        employees={employees}
+        equipment={equipment}
+        initialData={editingWorkLog ? {
+          id: editingWorkLog.id,
+          type: editingWorkLog.type,
+          account_id: editingWorkLog.account_id,
+          employee_id: editingWorkLog.employee_id,
+          equipment_id: editingWorkLog.equipment_id || undefined,
+          service_type: editingWorkLog.service_type,
+          check_in_time: editingWorkLog.check_in_time,
+          check_out_time: editingWorkLog.check_out_time,
+          snow_depth_inches: editingWorkLog.snow_depth_inches,
+          salt_used_lbs: editingWorkLog.salt_used_lbs,
+          ice_melt_used_lbs: editingWorkLog.ice_melt_used_lbs,
+          weather_conditions: editingWorkLog.weather_conditions,
+          notes: editingWorkLog.notes,
+        } : null}
+        onSave={handleSaveWorkLog}
+        isLoading={isSaving}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={deleteTarget?.type === 'shift' ? 'Delete Shift' : 'Delete Work Log'}
+        description={`Are you sure you want to delete this ${deleteTarget?.type === 'shift' ? 'shift' : 'work log'} for "${deleteTarget?.name}"? This action cannot be undone.`}
+        onConfirm={handleDelete}
+        isLoading={isSaving}
+      />
     </div>
   );
 }
