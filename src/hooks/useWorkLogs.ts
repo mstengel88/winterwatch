@@ -94,7 +94,8 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
         .from('work_logs')
         .select(`
           *,
-          account:accounts(*)
+          account:accounts(*),
+          employee:employees(first_name, last_name)
         `)
         .eq('employee_id', effectiveEmployeeId)
         .gte('created_at', today.toISOString())
