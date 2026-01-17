@@ -12,6 +12,7 @@ interface UseShovelWorkLogsReturn {
   error: string | null;
   checkIn: (accountId: string, serviceType?: ServiceType, teamMemberIds?: string[]) => Promise<boolean>;
   checkOut: (data: CheckOutData) => Promise<boolean>;
+  updateActiveWorkLog: (data: UpdateWorkLogData) => Promise<boolean>;
   refreshData: () => Promise<void>;
 }
 
@@ -22,6 +23,11 @@ interface CheckOutData {
   weatherConditions?: string;
   notes?: string;
   photoUrls?: string[];
+}
+
+interface UpdateWorkLogData {
+  teamMemberIds?: string[];
+  serviceType?: ServiceType;
 }
 
 export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
@@ -201,6 +207,43 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
     }
   };
 
+  const updateActiveWorkLog = async (data: UpdateWorkLogData): Promise<boolean> => {
+    if (!activeWorkLog) {
+      setError('No active work log found');
+      return false;
+    }
+
+    try {
+      const updatePayload: Record<string, unknown> = {};
+      
+      if (data.teamMemberIds !== undefined) {
+        updatePayload.team_member_ids = data.teamMemberIds.length > 0 ? data.teamMemberIds : null;
+      }
+      if (data.serviceType !== undefined) {
+        updatePayload.service_type = data.serviceType;
+      }
+
+      const { data: updatedData, error: updateError } = await supabase
+        .from('shovel_work_logs')
+        .update(updatePayload)
+        .eq('id', activeWorkLog.id)
+        .select(`
+          *,
+          account:accounts(*)
+        `)
+        .single();
+
+      if (updateError) throw updateError;
+
+      setActiveWorkLog(updatedData as ShovelWorkLog);
+      return true;
+    } catch (err) {
+      console.error('Error updating work log:', err);
+      setError('Failed to update work log');
+      return false;
+    }
+  };
+
   const refreshData = async () => {
     await fetchAccounts();
     await fetchActiveWorkLog();
@@ -215,6 +258,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
     error,
     checkIn,
     checkOut,
+    updateActiveWorkLog,
     refreshData,
   };
 }
