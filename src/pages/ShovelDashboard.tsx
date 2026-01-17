@@ -116,6 +116,13 @@ export default function ShovelDashboard() {
     }
   }, [shiftTeamStorageKey]);
 
+  // Save team members to localStorage whenever they change during a shift
+  useEffect(() => {
+    if (shiftTeamStorageKey && selectedTeamMembers.length > 0) {
+      localStorage.setItem(shiftTeamStorageKey, JSON.stringify(selectedTeamMembers));
+    }
+  }, [shiftTeamStorageKey, selectedTeamMembers]);
+
   // Clear stored team when shift ends
   useEffect(() => {
     if (!activeShift) {
