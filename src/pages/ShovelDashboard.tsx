@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
+import { useGeolocation } from '@/hooks/useGeolocation';
+import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,20 +29,37 @@ import {
   LogIn,
   MapPin,
   Snowflake,
-  Users,
   Navigation,
   Play,
-  Image,
-  Camera,
-  Footprints
+  Footprints,
+  LogOut
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInSeconds, differenceInMinutes, differenceInHours } from 'date-fns';
+import { Account } from '@/types/database';
 
 const TEAM_MEMBERS = [
   'Gavin Peeks',
   'Mitchell Anderson',
   'Mike (Pops) Anderson',
 ];
+
+// Calculate distance between two coordinates in km
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+interface AccountWithDistance {
+  account: Account;
+  distance: number | null;
+}
 
 export default function ShovelDashboard() {
   const { profile } = useAuth();
@@ -52,6 +72,18 @@ export default function ShovelDashboard() {
     checkIn,
     checkOut 
   } = useShovelWorkLogs();
+  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
+  const {
+    photos,
+    previews,
+    isUploading,
+    uploadProgress,
+    addPhotos,
+    removePhoto,
+    clearPhotos,
+    uploadPhotos,
+    canAddMore,
+  } = usePhotoUpload({ folder: 'shovel-logs' });
   const { toast } = useToast();
 
   const [selectedAccount, setSelectedAccount] = useState('');
@@ -63,6 +95,85 @@ export default function ShovelDashboard() {
   const [weather, setWeather] = useState('Cloudy');
   const [wind, setWind] = useState('11');
   const [notes, setNotes] = useState('');
+  const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  // Get location on mount and set up periodic refresh
+  useEffect(() => {
+    getCurrentLocation();
+    const interval = setInterval(() => {
+      getCurrentLocation();
+    }, 30000); // Refresh location every 30 seconds
+    return () => clearInterval(interval);
+  }, [getCurrentLocation]);
+
+  // Shift timer
+  useEffect(() => {
+    if (!activeShift) {
+      setShiftTimer({ hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+
+    const updateTimer = () => {
+      const start = new Date(activeShift.clock_in_time);
+      const now = new Date();
+      const totalSeconds = differenceInSeconds(now, start);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setShiftTimer({ hours, minutes, seconds });
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [activeShift]);
+
+  // Sort accounts by distance
+  const sortedAccounts = useMemo((): AccountWithDistance[] => {
+    if (!geoLocation) {
+      return accounts.map(account => ({ account, distance: null }));
+    }
+
+    return accounts
+      .map(account => {
+        if (account.latitude && account.longitude) {
+          const distance = calculateDistance(
+            geoLocation.latitude,
+            geoLocation.longitude,
+            account.latitude,
+            account.longitude
+          );
+          return { account, distance };
+        }
+        return { account, distance: null };
+      })
+      .sort((a, b) => {
+        if (a.distance === null && b.distance === null) return 0;
+        if (a.distance === null) return 1;
+        if (b.distance === null) return -1;
+        return a.distance - b.distance;
+      });
+  }, [geoLocation, accounts]);
+
+  // Get nearest account
+  const nearestAccount = useMemo(() => {
+    if (sortedAccounts.length === 0) return null;
+    const nearest = sortedAccounts[0];
+    if (nearest.distance !== null) return nearest;
+    return null;
+  }, [sortedAccounts]);
+
+  // Auto-select nearest account
+  useEffect(() => {
+    if (nearestAccount && !selectedAccount) {
+      setSelectedAccount(nearestAccount.account.id);
+    }
+  }, [nearestAccount, selectedAccount]);
+
+  const handleRefreshLocation = useCallback(async () => {
+    await getCurrentLocation();
+    toast({ title: 'Location updated' });
+  }, [getCurrentLocation, toast]);
 
   const handleClockIn = async () => {
     const success = await clockIn();
@@ -96,18 +207,33 @@ export default function ShovelDashboard() {
   };
 
   const handleCheckOut = async () => {
+    let photoUrls: string[] = [];
+    if (photos.length > 0 && activeWorkLog) {
+      photoUrls = await uploadPhotos(activeWorkLog.id);
+    }
+    
     const success = await checkOut({
       areasCleared: [],
       iceMeltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
       notes: notes || undefined,
       weatherConditions: weather || undefined,
+      photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
     });
     if (success) {
       toast({ title: 'Work completed!' });
       setNotes('');
       setSaltUsed('');
+      clearPhotos();
     } else {
       toast({ variant: 'destructive', title: 'Failed to check out' });
+    }
+  };
+
+  const handleLogService = async () => {
+    if (activeWorkLog) {
+      await handleCheckOut();
+    } else {
+      await handleCheckIn();
     }
   };
 
@@ -152,6 +278,8 @@ export default function ShovelDashboard() {
   const shoveled = recentWorkLogs.filter(log => log.service_type === 'shovel' || log.service_type === 'both').length;
   const salted = recentWorkLogs.filter(log => log.service_type === 'ice_melt' || log.service_type === 'salt').length;
 
+  const formatTime = (value: number) => value.toString().padStart(2, '0');
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -171,7 +299,7 @@ export default function ShovelDashboard() {
           </p>
         </div>
 
-        {/* Daily Shift Card */}
+        {/* Daily Shift Card with Timer */}
         <Card className="bg-[hsl(var(--card))]/80 border-border/50">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
@@ -181,9 +309,16 @@ export default function ShovelDashboard() {
                 </div>
                 <div>
                   <p className="font-medium">Daily Shift</p>
-                  <p className="text-sm text-muted-foreground">
-                    {activeShift ? 'Shift in progress' : 'Shift not started'}
-                  </p>
+                  {activeShift ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl font-mono font-bold text-purple-400">
+                        {formatTime(shiftTimer.hours)}:{formatTime(shiftTimer.minutes)}:{formatTime(shiftTimer.seconds)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">elapsed</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Shift not started</p>
+                  )}
                 </div>
               </div>
               {activeShift ? (
@@ -192,7 +327,7 @@ export default function ShovelDashboard() {
                   variant="outline"
                   className="border-red-500/50 text-red-400 hover:bg-red-500/20"
                 >
-                  <LogIn className="h-4 w-4 mr-2" />
+                  <LogOut className="h-4 w-4 mr-2" />
                   End Shift
                 </Button>
               ) : (
@@ -270,14 +405,41 @@ export default function ShovelDashboard() {
               <div className="flex items-center gap-3">
                 <Navigation className="h-5 w-5 text-purple-200" />
                 <div>
-                  <p className="font-medium text-white">
-                    <span className="text-purple-200">Nearest:</span> Green Hills Supply{' '}
-                    <span className="text-purple-200">2.1km</span>
-                  </p>
-                  <p className="text-sm text-purple-200">GPS accuracy: ±35 meters</p>
+                  {nearestAccount ? (
+                    <>
+                      <p className="font-medium text-white">
+                        <span className="text-purple-200">Nearest:</span> {nearestAccount.account.name}{' '}
+                        <span className="text-purple-200">
+                          {nearestAccount.distance !== null 
+                            ? nearestAccount.distance < 1 
+                              ? `${Math.round(nearestAccount.distance * 1000)}m`
+                              : `${nearestAccount.distance.toFixed(1)}km`
+                            : ''}
+                        </span>
+                      </p>
+                      <p className="text-sm text-purple-200">
+                        GPS accuracy: ±{geoLocation?.accuracy ? Math.round(geoLocation.accuracy) : '--'} meters
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-white">
+                        {geoLoading ? 'Getting location...' : 'Location unavailable'}
+                      </p>
+                      <p className="text-sm text-purple-200">
+                        {geoLoading ? 'Please wait' : 'Enable GPS to find nearest account'}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
-              <Navigation className="h-5 w-5 text-white" />
+              <button
+                onClick={handleRefreshLocation}
+                disabled={geoLoading}
+                className="p-2 rounded-full hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+              >
+                <Navigation className={`h-5 w-5 text-white ${geoLoading ? 'animate-pulse' : ''}`} />
+              </button>
             </div>
 
             {/* Select Account */}
@@ -285,12 +447,21 @@ export default function ShovelDashboard() {
               <Label className="text-sm text-muted-foreground">Select Account (verify or change)</Label>
               <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                 <SelectTrigger className="bg-[hsl(var(--card))]/80 border-border/50">
-                  <SelectValue placeholder="Green Hills Supply  2.1km" />
+                  <SelectValue placeholder="Select nearest account" />
                 </SelectTrigger>
                 <SelectContent className="bg-[hsl(var(--card))] border-border">
-                  {accounts.map((account) => (
+                  {sortedAccounts.map(({ account, distance }) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.name}
+                      <span className="flex items-center justify-between w-full gap-2">
+                        <span>{account.name}</span>
+                        {distance !== null && (
+                          <span className="text-muted-foreground text-xs">
+                            {distance < 1 
+                              ? `${Math.round(distance * 1000)}m`
+                              : `${distance.toFixed(1)}km`}
+                          </span>
+                        )}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -302,7 +473,7 @@ export default function ShovelDashboard() {
               variant="ghost" 
               className="w-full justify-center text-muted-foreground"
               onClick={handleCheckIn}
-              disabled={!activeShift}
+              disabled={!activeShift || activeWorkLog !== null}
             >
               <Play className="h-4 w-4 mr-2" />
               Check In & Start Timer
@@ -446,17 +617,40 @@ export default function ShovelDashboard() {
             {/* Photo Upload */}
             <div className="space-y-2">
               <Label className="text-sm">Photo (Optional)</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="bg-[hsl(var(--card))]/50 border-border/30">
-                  <Image className="h-4 w-4 mr-2" />
-                  Choose from gallery
-                </Button>
-                <Button variant="outline" className="bg-[hsl(var(--card))]/50 border-border/30">
-                  <Camera className="h-4 w-4 mr-2" />
-                  Take photo
-                </Button>
-              </div>
+              <PhotoUpload
+                photos={photos}
+                previews={previews}
+                isUploading={isUploading}
+                uploadProgress={uploadProgress}
+                canAddMore={canAddMore}
+                onAddPhotos={addPhotos}
+                onRemovePhoto={removePhoto}
+              />
             </div>
+
+            {/* Log Service Button */}
+            <Button
+              onClick={handleLogService}
+              disabled={!activeShift || !selectedAccount || isUploading}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-6 text-lg font-semibold"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Uploading Photos...
+                </>
+              ) : activeWorkLog ? (
+                <>
+                  <LogOut className="h-5 w-5 mr-2" />
+                  Complete & Log Service
+                </>
+              ) : (
+                <>
+                  <Shovel className="h-5 w-5 mr-2" />
+                  Log Service
+                </>
+              )}
+            </Button>
           </div>
 
           {/* Recent Activity */}
