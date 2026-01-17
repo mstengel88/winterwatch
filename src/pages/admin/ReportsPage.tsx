@@ -725,9 +725,9 @@ export default function ReportsPage() {
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="plow">Plow</SelectItem>
                     <SelectItem value="salt">Salt</SelectItem>
-                    <SelectItem value="both">Plow & Salt</SelectItem>
-                    <SelectItem value="shovel">Shovel</SelectItem>
-                    <SelectItem value="ice_melt">Ice Melt</SelectItem>
+                    <SelectItem value="both">Plow/Salt</SelectItem>
+                    <SelectItem value="shovel">Shovel Walks</SelectItem>
+                    <SelectItem value="ice_melt">Salt Walks</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -999,9 +999,13 @@ export default function ReportsPage() {
                           'border-cyan-500 text-cyan-400'
                         }
                       >
-                        {log.service_type === 'both' ? 'Both' : 
-                         log.service_type === 'ice_melt' ? 'Salt' : 
-                         log.service_type.charAt(0).toUpperCase() + log.service_type.slice(1)}
+                        {log.type === 'plow' 
+                          ? (log.service_type === 'both' ? 'Plow/Salt' : 
+                             log.service_type.charAt(0).toUpperCase() + log.service_type.slice(1))
+                          : (log.service_type === 'both' ? 'Shov/Salt' : 
+                             log.service_type === 'ice_melt' ? 'Salt' : 
+                             log.service_type === 'shovel' ? 'Shovel' : 
+                             log.service_type.charAt(0).toUpperCase() + log.service_type.slice(1))}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">

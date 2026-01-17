@@ -154,12 +154,12 @@ export function WorkLogDialog({
     ? [
         { value: 'plow', label: 'Plow' },
         { value: 'salt', label: 'Salt' },
-        { value: 'both', label: 'Plow & Salt' },
+        { value: 'both', label: 'Plow/Salt' },
       ]
     : [
-        { value: 'shovel', label: 'Shovel' },
-        { value: 'ice_melt', label: 'Ice Melt' },
-        { value: 'both', label: 'Shovel & Ice Melt' },
+        { value: 'shovel', label: 'Shovel Walks' },
+        { value: 'ice_melt', label: 'Salt Walks' },
+        { value: 'both', label: 'Shovel/Salt Walks' },
       ];
 
   return (
