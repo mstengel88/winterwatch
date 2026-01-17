@@ -196,7 +196,7 @@ export default function ReportsPage() {
           .order('created_at', { ascending: false }),
         supabase.from('accounts').select('id, name').eq('is_active', true).order('name'),
         supabase.from('employees').select('id, first_name, last_name, category').eq('is_active', true).order('first_name'),
-        supabase.from('equipment').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('equipment').select('id, name').eq('is_active', true).eq('status', 'available').order('name'),
       ]);
 
       setTimeClockEntries((timeClockRes.data || []) as TimeClockEntry[]);
