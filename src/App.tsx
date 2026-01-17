@@ -9,6 +9,8 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import DriverDashboard from "./pages/DriverDashboard";
 import ShovelDashboard from "./pages/ShovelDashboard";
+import WorkLogsPage from "./pages/WorkLogsPage";
+import TimeClockPage from "./pages/TimeClockPage";
 import Pending from "./pages/Pending";
 import NotFound from "./pages/NotFound";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -34,6 +36,8 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/driver" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
             <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
+            <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
+            <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
             <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
             
             {/* Admin routes */}
