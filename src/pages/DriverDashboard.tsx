@@ -276,7 +276,11 @@ export default function DriverDashboard() {
       toast({ variant: 'destructive', title: 'Please start your shift first' });
       return;
     }
-    const success = await checkIn(selectedAccountId);
+    if (!selectedEmployees) {
+      toast({ variant: 'destructive', title: 'Please select an employee' });
+      return;
+    }
+    const success = await checkIn(selectedAccountId, selectedEquipment || undefined, serviceType, selectedEmployees);
     if (success) {
       toast({ title: 'Checked in!' });
     } else {

@@ -10,7 +10,7 @@ interface UseWorkLogsReturn {
   recentWorkLogs: WorkLog[];
   isLoading: boolean;
   error: string | null;
-  checkIn: (accountId: string, equipmentId?: string, serviceType?: ServiceType) => Promise<boolean>;
+  checkIn: (accountId: string, equipmentId?: string, serviceType?: ServiceType, employeeId?: string) => Promise<boolean>;
   checkOut: (data: CheckOutData) => Promise<boolean>;
   refreshData: () => Promise<void>;
 }
@@ -124,10 +124,12 @@ export function useWorkLogs(): UseWorkLogsReturn {
   const checkIn = async (
     accountId: string,
     equipmentId?: string,
-    serviceType: ServiceType = 'both'
+    serviceType: ServiceType = 'both',
+    employeeId?: string
   ): Promise<boolean> => {
-    if (!employee) {
-      setError('No employee record found');
+    const effectiveEmployeeId = employeeId || employee?.id;
+    if (!effectiveEmployeeId) {
+      setError('No employee selected');
       return false;
     }
 
@@ -138,7 +140,7 @@ export function useWorkLogs(): UseWorkLogsReturn {
         .from('work_logs')
         .insert({
           account_id: accountId,
-          employee_id: employee.id,
+          employee_id: effectiveEmployeeId,
           equipment_id: equipmentId || null,
           service_type: serviceType,
           status: 'in_progress',
