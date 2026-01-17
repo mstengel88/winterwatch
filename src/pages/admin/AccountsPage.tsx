@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Pencil, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Account } from '@/types/database';
 import { accountSchema, getValidationError } from '@/lib/validations';
 
@@ -24,6 +25,13 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
+  const [bulkFormData, setBulkFormData] = useState({
+    service_type: '',
+    priority: '',
+    is_active: '' as '' | 'true' | 'false',
+  });
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -174,6 +182,86 @@ export default function AccountsPage() {
     }
   };
 
+  // Bulk selection helpers
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredAccounts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredAccounts.map(a => a.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const openBulkDialog = () => {
+    setBulkFormData({ service_type: '', priority: '', is_active: '' });
+    setIsBulkDialogOpen(true);
+  };
+
+  const handleBulkSave = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsSaving(true);
+    try {
+      const updates: Record<string, any> = {};
+      if (bulkFormData.service_type) updates.service_type = bulkFormData.service_type;
+      if (bulkFormData.priority) updates.priority = parseInt(bulkFormData.priority);
+      if (bulkFormData.is_active !== '') updates.is_active = bulkFormData.is_active === 'true';
+
+      if (Object.keys(updates).length === 0) {
+        toast.error('Please select at least one field to update');
+        setIsSaving(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('accounts')
+        .update(updates)
+        .in('id', Array.from(selectedIds));
+
+      if (error) throw error;
+
+      toast.success(`Updated ${selectedIds.size} accounts`);
+      setIsBulkDialogOpen(false);
+      setSelectedIds(new Set());
+      fetchAccounts();
+    } catch (error) {
+      console.error('Error bulk updating accounts:', error);
+      toast.error('Failed to update accounts');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} accounts?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .in('id', Array.from(selectedIds));
+
+      if (error) throw error;
+
+      toast.success(`Deleted ${selectedIds.size} accounts`);
+      setSelectedIds(new Set());
+      fetchAccounts();
+    } catch (error) {
+      console.error('Error bulk deleting accounts:', error);
+      toast.error('Failed to delete accounts');
+    }
+  };
+
   // Filter accounts by search
   const filteredAccounts = useMemo(() => {
     if (!search) return accounts;
@@ -279,11 +367,36 @@ export default function AccountsPage() {
             </Button>
           </div>
 
+          {/* Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+              <span className="text-sm font-medium">{selectedIds.size} selected</span>
+              <div className="flex-1" />
+              <Button size="sm" variant="outline" onClick={openBulkDialog}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Bulk Edit
+              </Button>
+              <Button size="sm" variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10" onClick={handleBulkDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+                Clear
+              </Button>
+            </div>
+          )}
+
           {/* Accounts Table */}
           <div className="rounded-lg border border-border/50 overflow-hidden">
             <table className="w-full">
               <thead className="bg-muted/30">
                 <tr className="text-left text-sm text-muted-foreground">
+                  <th className="px-4 py-3 font-medium w-10">
+                    <Checkbox
+                      checked={selectedIds.size === filteredAccounts.length && filteredAccounts.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Address</th>
                   <th className="px-4 py-3 font-medium">Contact</th>
@@ -295,7 +408,13 @@ export default function AccountsPage() {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {filteredAccounts.map((account) => (
-                  <tr key={account.id} className="hover:bg-muted/20 transition-colors">
+                  <tr key={account.id} className={`hover:bg-muted/20 transition-colors ${selectedIds.has(account.id) ? 'bg-primary/5' : ''}`}>
+                    <td className="px-4 py-3">
+                      <Checkbox
+                        checked={selectedIds.has(account.id)}
+                        onCheckedChange={() => toggleSelect(account.id)}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-lg bg-muted/50 flex items-center justify-center">
@@ -350,7 +469,7 @@ export default function AccountsPage() {
                 ))}
                 {filteredAccounts.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                       No accounts found
                     </td>
                   </tr>
@@ -535,6 +654,71 @@ export default function AccountsPage() {
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingAccount ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Edit Dialog */}
+      <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Edit {selectedIds.size} Accounts</DialogTitle>
+            <DialogDescription>
+              Only fields you change will be updated. Leave fields empty to keep existing values.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Service Type</Label>
+              <Select
+                value={bulkFormData.service_type}
+                onValueChange={(value) => setBulkFormData({ ...bulkFormData, service_type: value })}
+              >
+                <SelectTrigger className="bg-card">
+                  <SelectValue placeholder="No change" />
+                </SelectTrigger>
+                <SelectContent className="bg-card">
+                  <SelectItem value="plow">Plow</SelectItem>
+                  <SelectItem value="shovel">Shovel</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Priority (1-10)</Label>
+              <Input
+                type="number"
+                min="1"
+                max="10"
+                value={bulkFormData.priority}
+                onChange={(e) => setBulkFormData({ ...bulkFormData, priority: e.target.value })}
+                placeholder="No change"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={bulkFormData.is_active}
+                onValueChange={(value: '' | 'true' | 'false') => setBulkFormData({ ...bulkFormData, is_active: value })}
+              >
+                <SelectTrigger className="bg-card">
+                  <SelectValue placeholder="No change" />
+                </SelectTrigger>
+                <SelectContent className="bg-card">
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Update {selectedIds.size} Accounts
             </Button>
           </DialogFooter>
         </DialogContent>
