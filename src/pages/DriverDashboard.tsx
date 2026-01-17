@@ -582,18 +582,20 @@ export default function DriverDashboard() {
                   <SelectValue placeholder="Select account..." />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-primary/30">
-                  {sortedAccounts.map((acc) => (
-                    <SelectItem key={acc.id} value={acc.id}>
-                      <div className="flex items-center justify-between w-full gap-2">
-                        <span>{acc.name}</span>
-                        {acc.distance !== undefined && (
-                          <span className="text-xs text-muted-foreground ml-2">
-                            {acc.distance.toFixed(1)}km
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {sortedAccounts
+                    .filter((acc) => acc.id && acc.id.trim() !== '')
+                    .map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span>{acc.name}</span>
+                          {acc.distance !== undefined && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {acc.distance.toFixed(1)}km
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -701,11 +703,13 @@ export default function DriverDashboard() {
                     <SelectValue placeholder="Select employees..." />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-primary/30">
-                    {plowEmployees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.first_name} {emp.last_name}
-                      </SelectItem>
-                    ))}
+                    {plowEmployees
+                      .filter((emp) => emp.id && emp.id.trim() !== '')
+                      .map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.first_name} {emp.last_name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
