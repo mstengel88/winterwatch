@@ -92,15 +92,11 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
   }, [effectiveEmployeeId]);
 
   const fetchRecentWorkLogs = useCallback(async () => {
-    if (!effectiveEmployeeId) {
-      setRecentWorkLogs([]);
-      return;
-    }
-
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      // Fetch all recent work logs (not just current user) for better team visibility
       const { data, error: fetchError } = await supabase
         .from('work_logs')
         .select(`
@@ -108,7 +104,6 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
           account:accounts(*),
           employee:employees(first_name, last_name)
         `)
-        .eq('employee_id', effectiveEmployeeId)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false })
         .limit(10);
@@ -119,7 +114,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     } catch (err) {
       console.error('Error fetching recent work logs:', err);
     }
-  }, [effectiveEmployeeId]);
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
