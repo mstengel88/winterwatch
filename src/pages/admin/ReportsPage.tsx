@@ -308,12 +308,16 @@ export default function ReportsPage() {
     const rawLogs = filteredWorkLogs.map(log => ({
       id: log.id,
       date: format(new Date(log.date), 'MM/dd/yy'),
-      account: log.account_name,
-      employee: log.employee_name,
-      serviceType: log.service_type,
+      checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
+      checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
       duration: formatDuration(log.check_in_time, log.check_out_time),
-      saltLbs: log.salt_used_lbs || undefined,
-      iceMeltLbs: log.ice_melt_used_lbs || undefined,
+      account: log.account_name,
+      serviceType: log.service_type,
+      snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
+      saltLbs: log.salt_used_lbs ? `${log.salt_used_lbs}lb` : log.ice_melt_used_lbs ? `${log.ice_melt_used_lbs}lb` : '-',
+      equipment: log.equipment_name || '-',
+      employee: log.employee_name,
+      conditions: log.weather_conditions || '-',
       notes: log.weather_conditions || undefined,
     }));
 
@@ -324,12 +328,20 @@ export default function ReportsPage() {
       return sum;
     }, 0);
 
+    // Count unique properties
+    const uniqueAccounts = new Set(filteredWorkLogs.map(log => log.account_name)).size;
+    const plowCount = filteredWorkLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
+    const saltCount = filteredWorkLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
+
     generateWorkLogsPDF(rawLogs, {
       totalJobs: stats.total,
       totalHours,
       totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
       totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
-      dateRange: `${format(new Date(fromDate), 'MM/dd/yy')} - ${format(new Date(toDate), 'MM/dd/yy')}`,
+      plowCount,
+      saltCount,
+      propertyCount: uniqueAccounts,
+      dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
     });
     toast.success('PDF exported successfully');
   };

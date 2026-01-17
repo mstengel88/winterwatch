@@ -5,12 +5,16 @@ import { format } from 'date-fns';
 interface WorkLogData {
   id: string;
   date: string;
-  account: string;
-  employee: string;
-  serviceType: string;
+  checkIn: string;
+  checkOut: string;
   duration: string;
-  saltLbs?: number;
-  iceMeltLbs?: number;
+  account: string;
+  serviceType: string;
+  snowDepth: string;
+  saltLbs: string;
+  equipment: string;
+  employee: string;
+  conditions: string;
   notes?: string;
 }
 
@@ -19,6 +23,9 @@ interface ReportSummary {
   totalHours: number;
   totalSaltLbs: number;
   totalIceMeltLbs: number;
+  plowCount: number;
+  saltCount: number;
+  propertyCount: number;
   dateRange: string;
 }
 
@@ -27,97 +34,105 @@ export function generateWorkLogsPDF(
   summary: ReportSummary,
   title: string = 'Work Logs Report'
 ): void {
-  const doc = new jsPDF();
+  // Landscape orientation for wider table
+  const doc = new jsPDF({ orientation: 'landscape' });
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Header
-  doc.setFontSize(20);
+  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('WinterWatch Pro', 14, 20);
-  
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'normal');
-  doc.text(title, 14, 30);
+  doc.text(title, 15, 20);
   
   doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text(`Generated: ${format(new Date(), 'MMM d, yyyy h:mm a')}`, 14, 38);
-  doc.text(`Period: ${summary.dateRange}`, 14, 44);
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(0);
-
-  // Summary cards
-  doc.setFillColor(245, 245, 245);
-  const cardY = 52;
-  const cardHeight = 20;
-  const cardWidth = (pageWidth - 38) / 4;
+  doc.text(`Generated: ${format(new Date(), 'M/d/yyyy h:mm:ss a')}`, 15, 28);
+  doc.text(`Period: ${summary.dateRange}`, 15, 34);
   
-  // Draw summary boxes
-  const summaryData = [
-    { label: 'Total Jobs', value: summary.totalJobs.toString() },
-    { label: 'Total Hours', value: `${summary.totalHours.toFixed(1)}h` },
-    { label: 'Salt Used', value: `${summary.totalSaltLbs} lbs` },
-    { label: 'Ice Melt Used', value: `${summary.totalIceMeltLbs} lbs` },
-  ];
+  // Summary line
+  doc.setFontSize(9);
+  doc.text(
+    `Total Services: ${summary.totalJobs} | Plow: ${summary.plowCount} | Salt: ${summary.saltCount} | Properties: ${summary.propertyCount}`,
+    15,
+    43
+  );
 
-  summaryData.forEach((item, index) => {
-    const x = 14 + index * (cardWidth + 4);
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x, cardY, cardWidth, cardHeight, 2, 2, 'F');
-    
-    doc.setFontSize(8);
-    doc.setTextColor(100);
-    doc.text(item.label, x + 4, cardY + 7);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(0);
-    doc.setFont('helvetica', 'bold');
-    doc.text(item.value, x + 4, cardY + 15);
-    doc.setFont('helvetica', 'normal');
-  });
-
-  // Work logs table
+  // Work logs table with columns matching the example
   if (workLogs.length > 0) {
     autoTable(doc, {
-      startY: cardY + cardHeight + 10,
-      head: [['Date', 'Account', 'Employee', 'Service', 'Duration', 'Materials', 'Notes']],
+      startY: 50,
+      head: [['Date', 'Check In', 'Check Out', 'Duration', 'Account', 'Service', 'Snow', 'Salt', 'Equipment', 'Employee', 'Conditions']],
       body: workLogs.map((log) => [
         log.date,
-        log.account,
-        log.employee,
-        log.serviceType,
+        log.checkIn,
+        log.checkOut,
         log.duration,
-        log.saltLbs ? `Salt: ${log.saltLbs}lbs` : log.iceMeltLbs ? `Ice Melt: ${log.iceMeltLbs}lbs` : '-',
-        log.notes || '-',
+        log.account,
+        log.serviceType,
+        log.snowDepth,
+        log.saltLbs,
+        log.equipment,
+        log.employee,
+        log.conditions,
       ]),
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
+        fontSize: 7,
+        cellPadding: 2,
       },
       headStyles: {
-        fillColor: [59, 130, 246],
-        textColor: 255,
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
         fontStyle: 'bold',
+        lineWidth: 0,
+      },
+      bodyStyles: {
+        textColor: [0, 0, 0],
       },
       alternateRowStyles: {
-        fillColor: [248, 250, 252],
+        fillColor: [255, 255, 255],
       },
       columnStyles: {
-        0: { cellWidth: 22 },
-        1: { cellWidth: 35 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 28 },
-        6: { cellWidth: 'auto' },
+        0: { cellWidth: 22 },  // Date
+        1: { cellWidth: 18 },  // Check In
+        2: { cellWidth: 18 },  // Check Out
+        3: { cellWidth: 18 },  // Duration
+        4: { cellWidth: 40 },  // Account
+        5: { cellWidth: 28 },  // Service
+        6: { cellWidth: 16 },  // Snow
+        7: { cellWidth: 18 },  // Salt
+        8: { cellWidth: 30 },  // Equipment
+        9: { cellWidth: 35 },  // Employee
+        10: { cellWidth: 30 }, // Conditions
+      },
+      didDrawPage: (data) => {
+        // Draw header line under column headers
+        if (data.pageNumber === 1) {
+          const headerBottom = (data.table?.head?.[0]?.cells?.[0]?.y ?? 50) + 
+            (data.table?.head?.[0]?.cells?.[0]?.height ?? 8);
+          doc.setDrawColor(0);
+          doc.setLineWidth(0.5);
+          doc.line(15, headerBottom, pageWidth - 15, headerBottom);
+        }
       },
     });
+
+    // Add notes section at the bottom if any logs have notes
+    const logsWithNotes = workLogs.filter(log => log.notes && log.notes.trim() !== '' && log.notes !== '-');
+    if (logsWithNotes.length > 0) {
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      logsWithNotes.forEach((log, index) => {
+        doc.text(`Notes: ${log.notes}`, 15, finalY + (index * 6));
+      });
+    }
   } else {
     doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text('No work logs found for this period.', 14, cardY + cardHeight + 20);
+    doc.text('No work logs found for this period.', 15, 60);
   }
 
-  // Footer
+  // Footer with page numbers
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -131,8 +146,8 @@ export function generateWorkLogsPDF(
     );
   }
 
-  // Save
-  const fileName = `work-logs-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+  // Save with date range in filename
+  const fileName = `work-logs-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
   doc.save(fileName);
 }
 
@@ -178,7 +193,7 @@ export function generateInvoicePDF(
       log.date,
       log.serviceType,
       log.duration,
-      log.saltLbs ? `Salt: ${log.saltLbs}lbs` : log.iceMeltLbs ? `Ice Melt: ${log.iceMeltLbs}lbs` : '-',
+      log.saltLbs !== '-' ? `Salt: ${log.saltLbs}` : '-',
     ]),
     styles: {
       fontSize: 9,
