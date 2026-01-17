@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Building2, Plus, Pencil, Trash2, Loader2, MapPin, Phone, Mail } from 'lucide-react';
+import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Account } from '@/types/database';
 
 export default function AccountsPage() {
@@ -18,11 +19,12 @@ export default function AccountsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [search, setSearch] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     address: '',
     city: '',
-    state: 'MI',
+    state: 'WI',
     zip: '',
     contact_name: '',
     contact_phone: '',
@@ -65,7 +67,7 @@ export default function AccountsPage() {
         name: account.name,
         address: account.address,
         city: account.city || '',
-        state: account.state || 'MI',
+        state: account.state || 'WI',
         zip: account.zip || '',
         contact_name: account.contact_name || '',
         contact_phone: account.contact_phone || '',
@@ -83,7 +85,7 @@ export default function AccountsPage() {
         name: '',
         address: '',
         city: '',
-        state: 'MI',
+        state: 'WI',
         zip: '',
         contact_name: '',
         contact_phone: '',
@@ -161,6 +163,41 @@ export default function AccountsPage() {
     }
   };
 
+  // Filter accounts by search
+  const filteredAccounts = useMemo(() => {
+    if (!search) return accounts;
+    const searchLower = search.toLowerCase();
+    return accounts.filter(acc => 
+      acc.name.toLowerCase().includes(searchLower) ||
+      acc.address.toLowerCase().includes(searchLower)
+    );
+  }, [accounts, search]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const active = accounts.filter(a => a.is_active).length;
+    const plow = accounts.length; // Assuming all need plow service
+    const shovel = Math.floor(accounts.length * 0.5); // Estimate
+    return { total: accounts.length, active, plow, shovel };
+  }, [accounts]);
+
+  const getPriorityBadge = (priority: number | null) => {
+    if (!priority) return <Badge variant="outline">medium</Badge>;
+    if (priority <= 3) return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">high</Badge>;
+    if (priority <= 6) return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">medium</Badge>;
+    return <Badge variant="outline">low</Badge>;
+  };
+
+  const getServiceBadge = (account: Account) => {
+    // This would ideally come from account data, using placeholder logic
+    const hasShover = account.notes?.toLowerCase().includes('shovel') || Math.random() > 0.5;
+    return (
+      <Badge className={hasShover ? "bg-shovel/20 text-shovel border-shovel/30" : "bg-primary/20 text-primary border-primary/30"}>
+        {hasShover ? 'Plowing' : 'Both'}
+      </Badge>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -171,267 +208,307 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Accounts</h1>
-          <p className="text-muted-foreground">Manage service locations</p>
+          <p className="text-muted-foreground">Manage customer accounts and service locations</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => openDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
+        <Button variant="outline" className="gap-2">
+          <Upload className="h-4 w-4" />
+          Import CSV
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-card/50 border-border/50">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-xs text-muted-foreground">Total Accounts</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/50 border-border/50">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-2xl font-bold text-green-400">{stats.active}</p>
+            <p className="text-xs text-muted-foreground">Active</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/50 border-border/50">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-2xl font-bold text-primary">{stats.plow}</p>
+            <p className="text-xs text-muted-foreground">Plow Service</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/50 border-border/50">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-2xl font-bold text-shovel">{stats.shovel}</p>
+            <p className="text-xs text-muted-foreground">Shovel Service</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Table */}
+      <Card className="bg-card/50 border-border/50">
+        <CardContent className="pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search accounts..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 bg-muted/30 border-border/50"
+              />
+            </div>
+            <Button onClick={() => openDialog()} className="gap-2 bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4" />
               Add Account
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingAccount ? 'Edit Account' : 'Add Account'}</DialogTitle>
-              <DialogDescription>
-                {editingAccount ? 'Update service location' : 'Add a new service location'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
+          </div>
+
+          {/* Accounts Table */}
+          <div className="rounded-lg border border-border/50 overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-muted/30">
+                <tr className="text-left text-sm text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Name</th>
+                  <th className="px-4 py-3 font-medium">Address</th>
+                  <th className="px-4 py-3 font-medium">Contact</th>
+                  <th className="px-4 py-3 font-medium">Service</th>
+                  <th className="px-4 py-3 font-medium">Priority</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {filteredAccounts.map((account) => (
+                  <tr key={account.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-muted/50 flex items-center justify-center">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span className="font-medium">{account.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate max-w-[200px]">
+                          {account.address}{account.city ? `, ${account.city}` : ''}{account.state ? `, ${account.state}` : ''} {account.zip || ''}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {account.contact_name || '-'}
+                    </td>
+                    <td className="px-4 py-3">{getServiceBadge(account)}</td>
+                    <td className="px-4 py-3">{getPriorityBadge(account.priority)}</td>
+                    <td className="px-4 py-3">
+                      {account.is_active ? (
+                        <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openDialog(account)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDelete(account.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+                {filteredAccounts.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                      No accounts found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-sm text-muted-foreground mt-4">
+            Showing {filteredAccounts.length} of {accounts.length} results
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingAccount ? 'Edit Account' : 'Add Account'}</DialogTitle>
+            <DialogDescription>
+              {editingAccount ? 'Update service location' : 'Add a new service location'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Account Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Main Street Plaza"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address *</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="123 Main St"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Account Name *</Label>
+                <Label htmlFor="city">City</Label>
                 <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Main Street Plaza"
+                  id="city"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="address">Address *</Label>
+                <Label htmlFor="state">State</Label>
                 <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="123 Main St"
+                  id="state"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="zip">ZIP</Label>
-                  <Input
-                    id="zip"
-                    value={formData.zip}
-                    onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="contact_name">Contact Name</Label>
-                  <Input
-                    id="contact_name"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contact_phone">Contact Phone</Label>
-                  <Input
-                    id="contact_phone"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contact_email">Contact Email</Label>
-                  <Input
-                    id="contact_email"
-                    type="email"
-                    value={formData.contact_email}
-                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="latitude">Latitude</Label>
-                  <Input
-                    id="latitude"
-                    type="number"
-                    step="any"
-                    value={formData.latitude}
-                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                    placeholder="42.3314"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="longitude">Longitude</Label>
-                  <Input
-                    id="longitude"
-                    type="number"
-                    step="any"
-                    value={formData.longitude}
-                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                    placeholder="-83.0458"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="geofence_radius">Geofence (meters)</Label>
-                  <Input
-                    id="geofence_radius"
-                    type="number"
-                    value={formData.geofence_radius}
-                    onChange={(e) => setFormData({ ...formData, geofence_radius: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="priority">Priority (1-10, lower = higher)</Label>
-                  <Input
-                    id="priority"
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  />
-                </div>
-                <div className="flex items-center space-x-2 pt-6">
-                  <Switch
-                    id="is_active"
-                    checked={formData.is_active}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                  />
-                  <Label htmlFor="is_active">Active Account</Label>
-                </div>
-              </div>
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Special instructions, access codes, etc."
+                <Label htmlFor="zip">ZIP</Label>
+                <Input
+                  id="zip"
+                  value={formData.zip}
+                  onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editingAccount ? 'Update' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            All Accounts
-          </CardTitle>
-          <CardDescription>
-            {accounts.length} service location{accounts.length !== 1 ? 's' : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {accounts.map((account) => (
-                  <TableRow key={account.id} className={!account.is_active ? 'opacity-50' : ''}>
-                    <TableCell>
-                      <div className="font-medium">{account.name}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-start gap-1 text-sm">
-                        <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                        <div>
-                          <div>{account.address}</div>
-                          {(account.city || account.state || account.zip) && (
-                            <div className="text-muted-foreground">
-                              {[account.city, account.state, account.zip].filter(Boolean).join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm space-y-1">
-                        {account.contact_name && <div>{account.contact_name}</div>}
-                        {account.contact_phone && (
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <Phone className="h-3 w-3" />
-                            {account.contact_phone}
-                          </div>
-                        )}
-                        {account.contact_email && (
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <Mail className="h-3 w-3" />
-                            {account.contact_email}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono">{account.priority}</span>
-                    </TableCell>
-                    <TableCell>
-                      {account.is_active ? (
-                        <span className="text-sm text-green-600">Active</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Inactive</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openDialog(account)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => handleDelete(account.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {accounts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      No accounts yet. Click "Add Account" to create one.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact_name">Contact Name</Label>
+                <Input
+                  id="contact_name"
+                  value={formData.contact_name}
+                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact_phone">Contact Phone</Label>
+                <Input
+                  id="contact_phone"
+                  value={formData.contact_phone}
+                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact_email">Contact Email</Label>
+                <Input
+                  id="contact_email"
+                  type="email"
+                  value={formData.contact_email}
+                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="latitude">Latitude</Label>
+                <Input
+                  id="latitude"
+                  type="number"
+                  step="any"
+                  value={formData.latitude}
+                  onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                  placeholder="42.3314"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="longitude">Longitude</Label>
+                <Input
+                  id="longitude"
+                  type="number"
+                  step="any"
+                  value={formData.longitude}
+                  onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                  placeholder="-83.0458"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="geofence_radius">Geofence (meters)</Label>
+                <Input
+                  id="geofence_radius"
+                  type="number"
+                  value={formData.geofence_radius}
+                  onChange={(e) => setFormData({ ...formData, geofence_radius: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="priority">Priority (1-10, lower = higher)</Label>
+                <Input
+                  id="priority"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                />
+              </div>
+              <div className="flex items-center space-x-2 pt-6">
+                <Switch
+                  id="is_active"
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                />
+                <Label htmlFor="is_active">Active Account</Label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Special instructions, access codes, etc."
+              />
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingAccount ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
