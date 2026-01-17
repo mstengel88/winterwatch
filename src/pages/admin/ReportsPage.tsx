@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   Loader2, FileDown, Filter, Clock, Plus, Eye, Pencil, Trash2, 
-  Image as ImageIcon, RefreshCw, Settings, FileText
+  Image as ImageIcon, RefreshCw, Settings, FileText, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
 import { generateWorkLogsPDF } from '@/lib/pdfExport';
 import { toast } from 'sonner';
@@ -105,6 +106,58 @@ export default function ReportsPage() {
   const [editingWorkLog, setEditingWorkLog] = useState<WorkLogEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'shift' | 'worklog'; id: string; name: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Photo viewer state
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [viewingPhotos, setViewingPhotos] = useState<string[]>([]);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+
+  // Get signed URLs for photos from private bucket
+  const getSignedUrls = async (filePaths: string[]): Promise<string[]> => {
+    if (filePaths.length === 0) return [];
+    
+    const signedUrls: string[] = [];
+    
+    for (const path of filePaths) {
+      // Check if it's already a full URL (legacy data)
+      if (path.startsWith('http')) {
+        signedUrls.push(path);
+        continue;
+      }
+      
+      const { data, error } = await supabase.storage
+        .from('work-photos')
+        .createSignedUrl(path, 3600); // 1 hour expiration
+
+      if (!error && data?.signedUrl) {
+        signedUrls.push(data.signedUrl);
+      }
+    }
+    
+    return signedUrls;
+  };
+
+  // Open photo viewer with signed URLs
+  const openPhotoViewer = async (photoPaths: string[]) => {
+    if (!photoPaths || photoPaths.length === 0) return;
+    
+    setLoadingPhotos(true);
+    setPhotoViewerOpen(true);
+    setCurrentPhotoIndex(0);
+    
+    const urls = await getSignedUrls(photoPaths);
+    setViewingPhotos(urls);
+    setLoadingPhotos(false);
+  };
+
+  const nextPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev + 1) % viewingPhotos.length);
+  };
+
+  const prevPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev - 1 + viewingPhotos.length) % viewingPhotos.length);
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -1044,7 +1097,15 @@ export default function ReportsPage() {
                     </TableCell>
                     <TableCell>
                       {log.photo_urls && log.photo_urls.length > 0 ? (
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 px-2 gap-1"
+                          onClick={() => openPhotoViewer(log.photo_urls!)}
+                        >
+                          <ImageIcon className="h-4 w-4 text-primary" />
+                          <span className="text-xs">{log.photo_urls.length}</span>
+                        </Button>
                       ) : '-'}
                     </TableCell>
                     <TableCell>
@@ -1127,6 +1188,54 @@ export default function ReportsPage() {
         onConfirm={handleBulkDelete}
         isLoading={isSaving}
       />
+
+      {/* Photo Viewer Dialog */}
+      <Dialog open={photoViewerOpen} onOpenChange={setPhotoViewerOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {loadingPhotos ? 'Loading photos...' : `Photo ${currentPhotoIndex + 1} of ${viewingPhotos.length}`}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingPhotos ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : viewingPhotos.length > 0 ? (
+            <div className="relative">
+              <img
+                src={viewingPhotos[currentPhotoIndex]}
+                alt={`Photo ${currentPhotoIndex + 1}`}
+                className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
+              />
+              {viewingPhotos.length > 1 && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute left-2 top-1/2 -translate-y-1/2"
+                    onClick={prevPhoto}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                    onClick={nextPhoto}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-8">
+              No photos available
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
