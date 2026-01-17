@@ -506,10 +506,10 @@ export default function DriverDashboard() {
                 value={selectedAccountId} 
                 onValueChange={setSelectedAccountId}
               >
-                <SelectTrigger className="mt-1.5 bg-secondary border-border">
+                <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                   <SelectValue placeholder="Select account..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-card border-primary/30">
                   {sortedAccounts.map((acc) => (
                     <SelectItem key={acc.id} value={acc.id}>
                       <div className="flex items-center justify-between w-full gap-2">
@@ -612,10 +612,10 @@ export default function DriverDashboard() {
               <div>
                 <Label className="text-sm text-muted-foreground">Equipment</Label>
                 <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                  <SelectTrigger className="mt-1.5 bg-secondary border-border">
+                  <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select equipment..." />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-card border-primary/30">
                     {equipment.map((eq) => (
                       <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
                     ))}
@@ -625,10 +625,10 @@ export default function DriverDashboard() {
               <div>
                 <Label className="text-sm text-muted-foreground">Employees</Label>
                 <Select value={selectedEmployees} onValueChange={setSelectedEmployees}>
-                  <SelectTrigger className="mt-1.5 bg-secondary border-border">
+                  <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select employees..." />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-card border-primary/30">
                     <SelectItem value="self">Just me</SelectItem>
                     {plowEmployees.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
@@ -649,7 +649,7 @@ export default function DriverDashboard() {
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
-                  className="mt-1.5 bg-secondary border-border"
+                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -659,7 +659,7 @@ export default function DriverDashboard() {
                   placeholder="e.g., 150"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
-                  className="mt-1.5 bg-secondary border-border"
+                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
@@ -674,7 +674,7 @@ export default function DriverDashboard() {
                   type="number"
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
-                  className="mt-1.5 bg-secondary border-border"
+                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -684,7 +684,7 @@ export default function DriverDashboard() {
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  className="mt-1.5 bg-secondary border-border"
+                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -695,7 +695,7 @@ export default function DriverDashboard() {
                   type="number"
                   value={windSpeed}
                   onChange={(e) => setWindSpeed(e.target.value)}
-                  className="mt-1.5 bg-secondary border-border"
+                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
@@ -707,7 +707,7 @@ export default function DriverDashboard() {
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="mt-1.5 bg-secondary border-border min-h-[80px]"
+                className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20 min-h-[80px]"
               />
             </div>
 
@@ -727,14 +727,14 @@ export default function DriverDashboard() {
             {/* Submit Button */}
             {activeWorkLog ? (
               <Button 
-                className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                 onClick={handleCheckOut}
               >
                 Check Out & Complete
               </Button>
             ) : (
               <Button 
-                className="w-full bg-warning/50 hover:bg-warning/40 text-warning-foreground cursor-not-allowed"
+                className="w-full bg-primary/50 hover:bg-primary/40 text-primary-foreground cursor-not-allowed"
                 disabled
               >
                 Check In First
