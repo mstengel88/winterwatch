@@ -96,6 +96,38 @@ export default function ShovelDashboard() {
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
 
+  // Key for storing team members per shift in localStorage
+  const shiftTeamStorageKey = activeShift ? `shovel-team-${activeShift.id}` : null;
+
+  // Load saved team members when shift starts
+  useEffect(() => {
+    if (shiftTeamStorageKey && selectedTeamMembers.length === 0) {
+      const savedTeam = localStorage.getItem(shiftTeamStorageKey);
+      if (savedTeam) {
+        try {
+          const parsed = JSON.parse(savedTeam);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSelectedTeamMembers(parsed);
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+  }, [shiftTeamStorageKey]);
+
+  // Clear stored team when shift ends
+  useEffect(() => {
+    if (!activeShift) {
+      // Clean up old shift team storage keys
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('shovel-team-')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+  }, [activeShift]);
+
   // Get location on mount and set up periodic refresh
   useEffect(() => {
     getCurrentLocation();
@@ -262,6 +294,10 @@ export default function ShovelDashboard() {
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
     });
     if (success) {
+      // Save team members for this shift so they auto-populate for next log
+      if (shiftTeamStorageKey && selectedTeamMembers.length > 0) {
+        localStorage.setItem(shiftTeamStorageKey, JSON.stringify(selectedTeamMembers));
+      }
       toast({ title: 'Work completed!' });
       setNotes('');
       setSaltUsed('');
