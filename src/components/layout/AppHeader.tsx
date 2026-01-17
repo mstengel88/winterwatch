@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Snowflake, Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { Snowflake, Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -22,20 +30,27 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
+  { href: '/driver', label: 'Plow Driver', icon: Truck, roles: ['driver', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager'] },
   { href: '/time-clock', label: 'Time Clock', icon: Clock, roles: ['admin', 'manager'] },
-  { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
+  { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
 ];
 
 export function AppHeader() {
   const { profile, signOut, hasRole, isAdminOrManager } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleNavigate = (href: string) => {
+    navigate(href);
+    setMobileMenuOpen(false);
   };
 
   const filteredNavItems = navItems.filter((item) => {
@@ -53,34 +68,100 @@ export function AppHeader() {
   const displayName = profile?.full_name || profile?.email || 'User';
   const shortName = displayName.length > 12 ? displayName.slice(0, 12) + '...' : displayName;
 
+  const isActive = (href: string) => {
+    if (href === '/dashboard') return location.pathname === href;
+    return location.pathname.startsWith(href);
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="container flex h-14 items-center justify-between px-4">
-        {/* Logo */}
-        <div 
-          className="flex items-center gap-2 cursor-pointer" 
-          onClick={() => navigate('/dashboard')}
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary border border-primary/20">
-            <Snowflake className="h-4 w-4 text-primary-foreground" />
+        {/* Left: Mobile Menu + Logo */}
+        <div className="flex items-center gap-3">
+          {/* Mobile Hamburger Menu */}
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden h-8 w-8">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0">
+              <SheetHeader className="border-b border-border/40 p-4">
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary border border-primary/20">
+                    <Snowflake className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                  <span className="font-semibold">WinterWatch-Pro</span>
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col p-4 space-y-1">
+                {filteredNavItems.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Button
+                      key={item.href}
+                      variant={active ? 'secondary' : 'ghost'}
+                      className={cn(
+                        'justify-start gap-3 h-11',
+                        active && 'bg-primary/10 text-primary border border-primary/30'
+                      )}
+                      onClick={() => handleNavigate(item.href)}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      {item.label}
+                    </Button>
+                  );
+                })}
+              </nav>
+              <div className="absolute bottom-0 left-0 right-0 border-t border-border/40 p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/20 text-primary">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{displayName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Logo */}
+          <div 
+            className="flex items-center gap-2 cursor-pointer" 
+            onClick={() => navigate('/dashboard')}
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary border border-primary/20">
+              <Snowflake className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-semibold text-foreground hidden sm:inline">WinterWatch-Pro</span>
           </div>
-          <span className="font-semibold text-foreground">WinterWatch-Pro</span>
         </div>
 
-        {/* Navigation */}
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
           {filteredNavItems.map((item) => {
-            const isActive = location.pathname === item.href || 
-              (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+            const active = isActive(item.href);
             return (
               <Button
                 key={item.href}
-                variant={isActive ? 'secondary' : 'ghost'}
+                variant={active ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => navigate(item.href)}
                 className={cn(
                   'h-8 gap-2 text-sm',
-                  isActive && 'bg-primary/10 text-primary border border-primary/30'
+                  active && 'bg-primary/10 text-primary border border-primary/30'
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -91,7 +172,7 @@ export function AppHeader() {
         </nav>
 
         {/* Right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
             <Bell className="h-4 w-4" />
           </Button>
