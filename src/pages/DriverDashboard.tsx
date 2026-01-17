@@ -119,14 +119,10 @@ export default function DriverDashboard() {
   } = useWorkLogs({ employeeId: employee?.id });
 
   // Filter equipment based on selected service type
-  // Plow → service_type 'plow', Salt → service_type 'both', Plow & Salt → service_type 'both'
+  // All service types (plow, salt, both) → show equipment with service_type 'both'
   const filteredEquipment = useMemo(() => {
-    if (serviceType === 'plow') {
-      return allEquipment.filter(eq => eq.service_type === 'plow');
-    }
-    // For 'salt' and 'both', show equipment with service_type 'both'
     return allEquipment.filter(eq => eq.service_type === 'both');
-  }, [allEquipment, serviceType]);
+  }, [allEquipment]);
 
   // Clear equipment selection when service type changes if current selection doesn't match
   useEffect(() => {
