@@ -1,213 +1,328 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Loader2, TrendingUp, Clock, Users, Building2, Snowflake, Shovel, FileDown } from 'lucide-react';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { 
+  Loader2, FileDown, Filter, Clock, Plus, Eye, Pencil, Trash2, 
+  Image as ImageIcon, RefreshCw, Settings, FileText
+} from 'lucide-react';
+import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
 import { generateWorkLogsPDF } from '@/lib/pdfExport';
 import { toast } from 'sonner';
 
-interface WorkLogStats {
-  totalJobs: number;
-  totalHours: number;
-  totalSaltLbs: number;
-  totalIceMeltLbs: number;
-  jobsByDay: { date: string; plow: number; shovel: number }[];
-  jobsByEmployee: { name: string; count: number }[];
-  jobsByAccount: { name: string; count: number }[];
-}
-
-interface RawWorkLog {
+interface TimeClockEntry {
   id: string;
-  date: string;
-  account: string;
-  employee: string;
-  serviceType: string;
-  duration: string;
-  saltLbs?: number;
-  iceMeltLbs?: number;
-  notes?: string;
+  employee_id: string;
+  clock_in_time: string;
+  clock_out_time: string | null;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+  employee?: {
+    first_name: string;
+    last_name: string;
+  };
 }
 
-const COLORS = ['hsl(var(--plow))', 'hsl(var(--shovel))', 'hsl(var(--primary))', 'hsl(var(--warning))', 'hsl(var(--success))'];
+interface WorkLogEntry {
+  id: string;
+  type: 'plow' | 'shovel';
+  date: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  account_name: string;
+  service_type: string;
+  snow_depth_inches: number | null;
+  salt_used_lbs: number | null;
+  ice_melt_used_lbs: number | null;
+  weather_conditions: string | null;
+  equipment_name: string | null;
+  employee_name: string;
+  team_member_names: string[];
+  photo_urls: string[] | null;
+}
+
+interface Account {
+  id: string;
+  name: string;
+}
+
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  category: string;
+}
+
+interface Equipment {
+  id: string;
+  name: string;
+}
 
 export default function ReportsPage() {
-  const [stats, setStats] = useState<WorkLogStats | null>(null);
-  const [rawLogs, setRawLogs] = useState<RawWorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('7');
+  const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
+  const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
 
-  const fetchStats = async () => {
+  // Filter state
+  const [fromDate, setFromDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [toDate, setToDate] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [logType, setLogType] = useState('all');
+  const [selectedPlowAccount, setSelectedPlowAccount] = useState('all');
+  const [selectedShovelLocation, setSelectedShovelLocation] = useState('all');
+  const [selectedEmployee, setSelectedEmployee] = useState('all');
+  const [selectedServiceType, setSelectedServiceType] = useState('all');
+  const [selectedEquipment, setSelectedEquipment] = useState('all');
+  const [minSnow, setMinSnow] = useState('');
+  const [minSalt, setMinSalt] = useState('');
+
+  // Selection state for bulk actions
+  const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
+  const [selectedWorkLogs, setSelectedWorkLogs] = useState<Set<string>>(new Set());
+
+  const fetchData = async () => {
     setIsLoading(true);
     try {
-      const days = parseInt(dateRange);
-      const startDate = startOfDay(subDays(new Date(), days - 1)).toISOString();
-      const endDate = endOfDay(new Date()).toISOString();
+      const startDate = new Date(fromDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(toDate);
+      endDate.setHours(23, 59, 59, 999);
 
-      // Fetch work logs
-      const [workLogsRes, shovelLogsRes, employeesRes, accountsRes] = await Promise.all([
+      const [
+        timeClockRes,
+        workLogsRes,
+        shovelLogsRes,
+        accountsRes,
+        employeesRes,
+        equipmentRes
+      ] = await Promise.all([
+        supabase
+          .from('time_clock')
+          .select('*, employee:employees(first_name, last_name)')
+          .gte('clock_in_time', startDate.toISOString())
+          .lte('clock_in_time', endDate.toISOString())
+          .order('clock_in_time', { ascending: false }),
         supabase
           .from('work_logs')
-          .select('*, employee:employees(first_name, last_name), account:accounts(name)')
-          .gte('created_at', startDate)
-          .lte('created_at', endDate)
-          .eq('status', 'completed'),
+          .select('*, account:accounts(name), employee:employees(first_name, last_name), equipment:equipment(name)')
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString())
+          .order('created_at', { ascending: false }),
         supabase
           .from('shovel_work_logs')
-          .select('*, employee:employees(first_name, last_name), account:accounts(name)')
-          .gte('created_at', startDate)
-          .lte('created_at', endDate)
-          .eq('status', 'completed'),
-        supabase.from('employees').select('id, first_name, last_name'),
-        supabase.from('accounts').select('id, name'),
+          .select('*, account:accounts(name), employee:employees(first_name, last_name)')
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString())
+          .order('created_at', { ascending: false }),
+        supabase.from('accounts').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('employees').select('id, first_name, last_name, category').eq('is_active', true).order('first_name'),
+        supabase.from('equipment').select('id, name').eq('is_active', true).order('name'),
       ]);
 
-      const workLogs = workLogsRes.data || [];
-      const shovelLogs = shovelLogsRes.data || [];
+      setTimeClockEntries((timeClockRes.data || []) as TimeClockEntry[]);
+      setAccounts((accountsRes.data || []) as Account[]);
+      setEmployees((employeesRes.data || []) as Employee[]);
+      setEquipment((equipmentRes.data || []) as Equipment[]);
 
-      // Calculate total hours
-      const calculateHours = (logs: any[]) => {
-        return logs.reduce((total, log) => {
-          if (log.check_in_time && log.check_out_time) {
-            const diff = new Date(log.check_out_time).getTime() - new Date(log.check_in_time).getTime();
-            return total + diff / (1000 * 60 * 60);
-          }
-          return total;
-        }, 0);
-      };
-
-      // Jobs by day
-      const jobsByDayMap = new Map<string, { plow: number; shovel: number }>();
-      for (let i = 0; i < days; i++) {
-        const date = format(subDays(new Date(), days - 1 - i), 'MM/dd');
-        jobsByDayMap.set(date, { plow: 0, shovel: 0 });
-      }
-
-      workLogs.forEach((log) => {
-        const date = format(new Date(log.created_at), 'MM/dd');
-        const existing = jobsByDayMap.get(date);
-        if (existing) {
-          existing.plow += 1;
-        }
-      });
-
-      shovelLogs.forEach((log) => {
-        const date = format(new Date(log.created_at), 'MM/dd');
-        const existing = jobsByDayMap.get(date);
-        if (existing) {
-          existing.shovel += 1;
-        }
-      });
-
-      const jobsByDay = Array.from(jobsByDayMap.entries()).map(([date, counts]) => ({
-        date,
-        ...counts,
+      // Map work logs to unified format
+      const plowLogs: WorkLogEntry[] = (workLogsRes.data || []).map((log: any) => ({
+        id: log.id,
+        type: 'plow' as const,
+        date: log.created_at,
+        check_in_time: log.check_in_time,
+        check_out_time: log.check_out_time,
+        account_name: log.account?.name || 'Unknown',
+        service_type: log.service_type,
+        snow_depth_inches: log.snow_depth_inches,
+        salt_used_lbs: log.salt_used_lbs,
+        ice_melt_used_lbs: null,
+        weather_conditions: log.weather_conditions,
+        equipment_name: log.equipment?.name || null,
+        employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+        team_member_names: [],
+        photo_urls: log.photo_urls,
       }));
 
-      // Jobs by employee
-      const employeeJobCounts = new Map<string, number>();
-      [...workLogs, ...shovelLogs].forEach((log: any) => {
-        if (log.employee) {
-          const name = `${log.employee.first_name} ${log.employee.last_name}`;
-          employeeJobCounts.set(name, (employeeJobCounts.get(name) || 0) + 1);
-        }
-      });
-      const jobsByEmployee = Array.from(employeeJobCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
+      // For shovel logs, fetch team member names if available
+      const shovelLogsData = shovelLogsRes.data || [];
+      const shovelLogs: WorkLogEntry[] = await Promise.all(
+        shovelLogsData.map(async (log: any) => {
+          let teamMemberNames: string[] = [];
+          if (log.team_member_ids && log.team_member_ids.length > 0) {
+            const { data: teamMembers } = await supabase
+              .from('employees')
+              .select('first_name, last_name')
+              .in('id', log.team_member_ids);
+            teamMemberNames = (teamMembers || []).map((m: any) => `${m.first_name} ${m.last_name}`);
+          }
+          return {
+            id: log.id,
+            type: 'shovel' as const,
+            date: log.created_at,
+            check_in_time: log.check_in_time,
+            check_out_time: log.check_out_time,
+            account_name: log.account?.name || 'Unknown',
+            service_type: log.service_type,
+            snow_depth_inches: log.snow_depth_inches,
+            salt_used_lbs: null,
+            ice_melt_used_lbs: log.ice_melt_used_lbs,
+            weather_conditions: log.weather_conditions,
+            equipment_name: null,
+            employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+            team_member_names: teamMemberNames,
+            photo_urls: log.photo_urls,
+          };
+        })
+      );
 
-      // Jobs by account
-      const accountJobCounts = new Map<string, number>();
-      [...workLogs, ...shovelLogs].forEach((log: any) => {
-        if (log.account) {
-          const name = log.account.name;
-          accountJobCounts.set(name, (accountJobCounts.get(name) || 0) + 1);
-        }
-      });
-      const jobsByAccount = Array.from(accountJobCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-
-      // Calculate totals
-      const totalSalt = workLogs.reduce((sum, log) => sum + (log.salt_used_lbs || 0), 0);
-      const totalIceMelt = shovelLogs.reduce((sum, log) => sum + (log.ice_melt_used_lbs || 0), 0);
-
-      // Helper to calculate duration string
-      const getDuration = (checkIn: string | null, checkOut: string | null): string => {
-        if (!checkIn || !checkOut) return '-';
-        const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
-        const hours = diff / (1000 * 60 * 60);
-        return `${hours.toFixed(1)}h`;
-      };
-
-      // Build raw logs for PDF export
-      const allRawLogs: RawWorkLog[] = [
-        ...workLogs.map((log: any) => ({
-          id: log.id,
-          date: format(new Date(log.created_at), 'MM/dd/yy'),
-          account: log.account?.name || 'Unknown',
-          employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
-          serviceType: log.service_type === 'both' ? 'Plow & Salt' : log.service_type === 'plow' ? 'Plow' : 'Salt',
-          duration: getDuration(log.check_in_time, log.check_out_time),
-          saltLbs: log.salt_used_lbs,
-          notes: log.notes,
-        })),
-        ...shovelLogs.map((log: any) => ({
-          id: log.id,
-          date: format(new Date(log.created_at), 'MM/dd/yy'),
-          account: log.account?.name || 'Unknown',
-          employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
-          serviceType: log.service_type === 'ice_melt' ? 'Ice Melt' : 'Shovel',
-          duration: getDuration(log.check_in_time, log.check_out_time),
-          iceMeltLbs: log.ice_melt_used_lbs,
-          notes: log.notes,
-        })),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      setRawLogs(allRawLogs);
-
-      setStats({
-        totalJobs: workLogs.length + shovelLogs.length,
-        totalHours: calculateHours([...workLogs, ...shovelLogs]),
-        totalSaltLbs: totalSalt,
-        totalIceMeltLbs: totalIceMelt,
-        jobsByDay,
-        jobsByEmployee,
-        jobsByAccount,
-      });
+      setWorkLogs([...plowLogs, ...shovelLogs].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      ));
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Error fetching report data:', error);
+      toast.error('Failed to load report data');
     } finally {
       setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  }, [fromDate, toDate]);
+
+  // Filtered data
+  const filteredShifts = useMemo(() => {
+    return timeClockEntries.filter(entry => {
+      if (selectedEmployee !== 'all' && entry.employee_id !== selectedEmployee) return false;
+      return true;
+    });
+  }, [timeClockEntries, selectedEmployee]);
+
+  const filteredWorkLogs = useMemo(() => {
+    return workLogs.filter(log => {
+      if (logType !== 'all' && log.type !== logType) return false;
+      if (selectedServiceType !== 'all' && log.service_type !== selectedServiceType) return false;
+      if (log.type === 'plow' && selectedPlowAccount !== 'all') {
+        const account = accounts.find(a => a.id === selectedPlowAccount);
+        if (account && log.account_name !== account.name) return false;
+      }
+      if (log.type === 'shovel' && selectedShovelLocation !== 'all') {
+        const account = accounts.find(a => a.id === selectedShovelLocation);
+        if (account && log.account_name !== account.name) return false;
+      }
+      if (selectedEmployee !== 'all') {
+        const emp = employees.find(e => e.id === selectedEmployee);
+        if (emp && log.employee_name !== `${emp.first_name} ${emp.last_name}`) return false;
+      }
+      if (selectedEquipment !== 'all' && log.type === 'plow') {
+        const eq = equipment.find(e => e.id === selectedEquipment);
+        if (eq && log.equipment_name !== eq.name) return false;
+      }
+      if (minSnow && log.snow_depth_inches !== null && log.snow_depth_inches < parseFloat(minSnow)) return false;
+      if (minSalt) {
+        const saltAmount = log.type === 'plow' ? log.salt_used_lbs : log.ice_melt_used_lbs;
+        if (saltAmount !== null && saltAmount < parseFloat(minSalt)) return false;
+      }
+      return true;
+    });
+  }, [workLogs, logType, selectedPlowAccount, selectedShovelLocation, selectedEmployee, selectedServiceType, selectedEquipment, minSnow, minSalt, accounts, employees, equipment]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const plowCount = filteredWorkLogs.filter(l => l.type === 'plow').length;
+    const shovelCount = filteredWorkLogs.filter(l => l.type === 'shovel').length;
+    const saltCount = filteredWorkLogs.filter(l => 
+      l.service_type === 'salt' || l.service_type === 'both' || l.service_type === 'ice_melt'
+    ).length;
+    const uniqueLocations = new Set(filteredWorkLogs.map(l => l.account_name)).size;
+    return {
+      total: filteredWorkLogs.length,
+      plow: plowCount,
+      shovel: shovelCount,
+      salt: saltCount,
+      locations: uniqueLocations,
+    };
+  }, [filteredWorkLogs]);
+
+  const clearFilters = () => {
+    setLogType('all');
+    setSelectedPlowAccount('all');
+    setSelectedShovelLocation('all');
+    setSelectedEmployee('all');
+    setSelectedServiceType('all');
+    setSelectedEquipment('all');
+    setMinSnow('');
+    setMinSalt('');
+  };
+
+  const formatDuration = (checkIn: string | null, checkOut: string | null): string => {
+    if (!checkIn || !checkOut) return '-';
+    const minutes = differenceInMinutes(new Date(checkOut), new Date(checkIn));
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
+
+  const formatHours = (checkIn: string | null, checkOut: string | null): string => {
+    if (!checkIn || !checkOut) return '-';
+    const minutes = differenceInMinutes(new Date(checkOut), new Date(checkIn));
+    const hours = minutes / 60;
+    return `${hours.toFixed(1)}h`;
+  };
+
   const handleExportPDF = () => {
-    if (!stats) return;
-    
-    const dateRangeLabel = dateRange === '7' ? 'Last 7 days' 
-      : dateRange === '14' ? 'Last 14 days'
-      : dateRange === '30' ? 'Last 30 days'
-      : 'Last 90 days';
+    const rawLogs = filteredWorkLogs.map(log => ({
+      id: log.id,
+      date: format(new Date(log.date), 'MM/dd/yy'),
+      account: log.account_name,
+      employee: log.employee_name,
+      serviceType: log.service_type,
+      duration: formatDuration(log.check_in_time, log.check_out_time),
+      saltLbs: log.salt_used_lbs || undefined,
+      iceMeltLbs: log.ice_melt_used_lbs || undefined,
+      notes: log.weather_conditions || undefined,
+    }));
+
+    const totalHours = filteredWorkLogs.reduce((sum, log) => {
+      if (log.check_in_time && log.check_out_time) {
+        return sum + differenceInMinutes(new Date(log.check_out_time), new Date(log.check_in_time)) / 60;
+      }
+      return sum;
+    }, 0);
 
     generateWorkLogsPDF(rawLogs, {
-      totalJobs: stats.totalJobs,
-      totalHours: stats.totalHours,
-      totalSaltLbs: stats.totalSaltLbs,
-      totalIceMeltLbs: stats.totalIceMeltLbs,
-      dateRange: dateRangeLabel,
+      totalJobs: stats.total,
+      totalHours,
+      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
+      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
+      dateRange: `${format(new Date(fromDate), 'MM/dd/yy')} - ${format(new Date(toDate), 'MM/dd/yy')}`,
     });
-    
     toast.success('PDF exported successfully');
   };
 
-  useEffect(() => {
-    fetchStats();
-  }, [dateRange]);
+  const toggleAllShifts = () => {
+    if (selectedShifts.size === filteredShifts.length) {
+      setSelectedShifts(new Set());
+    } else {
+      setSelectedShifts(new Set(filteredShifts.map(s => s.id)));
+    }
+  };
+
+  const toggleAllWorkLogs = () => {
+    if (selectedWorkLogs.size === filteredWorkLogs.length) {
+      setSelectedWorkLogs(new Set());
+    } else {
+      setSelectedWorkLogs(new Set(filteredWorkLogs.map(l => l.id)));
+    }
+  };
 
   if (isLoading) {
     return (
@@ -219,176 +334,445 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground">View work history and performance metrics</p>
-        </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={handleExportPDF} disabled={!stats || rawLogs.length === 0}>
-            <FileDown className="h-4 w-4 mr-2" />
-            Export PDF
+          <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
+            <FileText className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Service Reports</h1>
+            <p className="text-muted-foreground text-sm">View, edit, and export work logs</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" className="bg-red-600 hover:bg-red-700">
+            <FileDown className="h-4 w-4 mr-1" />
+            PDF
           </Button>
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="14">Last 14 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-          </SelectContent>
-        </Select>
+          <Button size="sm" variant="outline">
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={handleExportPDF}>
+            <FileDown className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+          <Button size="sm" variant="outline" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalJobs || 0}</div>
-            <p className="text-xs text-muted-foreground">Completed work logs</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalHours.toFixed(1) || 0}h</div>
-            <p className="text-xs text-muted-foreground">Work time logged</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Salt Used</CardTitle>
-            <Snowflake className="h-4 w-4 text-plow" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalSaltLbs || 0} lbs</div>
-            <p className="text-xs text-muted-foreground">Plow operations</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Ice Melt Used</CardTitle>
-            <Shovel className="h-4 w-4 text-shovel" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalIceMeltLbs || 0} lbs</div>
-            <p className="text-xs text-muted-foreground">Shovel operations</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Jobs by Day Chart */}
-        <Card className="col-span-2">
-          <CardHeader>
-            <CardTitle>Jobs by Day</CardTitle>
-            <CardDescription>Completed work logs over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats?.jobsByDay || []}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="plow" name="Plow" fill="hsl(var(--plow))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="shovel" name="Shovel" fill="hsl(var(--shovel))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+      {/* Filters Card */}
+      <Card className="bg-[hsl(var(--card))]/80 border-border/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Report Filters</span>
+          </div>
+          
+          <div className="grid gap-4">
+            {/* Date Range */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">From Date</Label>
+                <Input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="bg-[hsl(var(--background))] border-border/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">To Date</Label>
+                <Input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="bg-[hsl(var(--background))] border-border/50"
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Top Employees */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Top Employees
-            </CardTitle>
-            <CardDescription>Most jobs completed</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats?.jobsByEmployee.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No data available</p>
-            ) : (
-              <div className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stats?.jobsByEmployee || []}
-                      dataKey="count"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ name, count }) => `${name.split(' ')[0]}: ${count}`}
-                    >
-                      {stats?.jobsByEmployee.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+            {/* Log Type */}
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Log Type</Label>
+              <Select value={logType} onValueChange={setLogType}>
+                <SelectTrigger className="bg-[hsl(var(--background))] border-border/50">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="plow">Plow Only</SelectItem>
+                  <SelectItem value="shovel">Shovel Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Account / Location / Employee */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Account (Plow)</Label>
+                <Select value={selectedPlowAccount} onValueChange={setSelectedPlowAccount}>
+                  <SelectTrigger className="bg-[hsl(var(--background))] border-border/50">
+                    <SelectValue placeholder="All Accounts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Accounts</SelectItem>
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Location (Shovel)</Label>
+                <Select value={selectedShovelLocation} onValueChange={setSelectedShovelLocation}>
+                  <SelectTrigger className="bg-[hsl(var(--background))] border-border/50">
+                    <SelectValue placeholder="All Locations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Locations</SelectItem>
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Employee</Label>
+                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                  <SelectTrigger className="bg-[hsl(var(--background))] border-border/50">
+                    <SelectValue placeholder="All Employees" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Employees</SelectItem>
+                    {employees.map(emp => (
+                      <SelectItem key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-        {/* Top Accounts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Top Accounts
-            </CardTitle>
-            <CardDescription>Most frequently serviced</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats?.jobsByAccount.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No data available</p>
-            ) : (
-              <div className="space-y-3">
-                {stats?.jobsByAccount.map((account, index) => (
-                  <div key={account.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="h-3 w-3 rounded-full" 
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }} 
+            {/* Service Type / Equipment */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Service Type</Label>
+                <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
+                  <SelectTrigger className="bg-[hsl(var(--background))] border-border/50">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="plow">Plow</SelectItem>
+                    <SelectItem value="salt">Salt</SelectItem>
+                    <SelectItem value="both">Plow & Salt</SelectItem>
+                    <SelectItem value="shovel">Shovel</SelectItem>
+                    <SelectItem value="ice_melt">Ice Melt</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Equipment</Label>
+                <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
+                  <SelectTrigger className="bg-[hsl(var(--background))] border-border/50">
+                    <SelectValue placeholder="All Equipment" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Equipment</SelectItem>
+                    {equipment.map(eq => (
+                      <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Min Snow / Min Salt */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Min Snow (in)</Label>
+                <Input
+                  type="number"
+                  placeholder="Any"
+                  value={minSnow}
+                  onChange={(e) => setMinSnow(e.target.value)}
+                  className="bg-[hsl(var(--background))] border-border/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Min Salt (lbs)</Label>
+                <Input
+                  type="number"
+                  placeholder="Any"
+                  value={minSalt}
+                  onChange={(e) => setMinSalt(e.target.value)}
+                  className="bg-[hsl(var(--background))] border-border/50"
+                />
+              </div>
+            </div>
+
+            <div className="text-center">
+              <Button variant="link" className="text-muted-foreground text-sm" onClick={clearFilters}>
+                Clear All Filters
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Daily Shifts Section */}
+      <Card className="bg-[hsl(var(--card))]/80 border-border/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Daily Shifts ({filteredShifts.length} shifts)</span>
+            </div>
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Shift
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/50">
+                  <TableHead className="w-10">
+                    <Checkbox 
+                      checked={selectedShifts.size === filteredShifts.length && filteredShifts.length > 0}
+                      onCheckedChange={toggleAllShifts}
+                    />
+                  </TableHead>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Start</TableHead>
+                  <TableHead>End</TableHead>
+                  <TableHead>Hours</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredShifts.slice(0, 10).map(entry => (
+                  <TableRow key={entry.id} className="border-border/30">
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedShifts.has(entry.id)}
+                        onCheckedChange={(checked) => {
+                          const newSet = new Set(selectedShifts);
+                          if (checked) newSet.add(entry.id);
+                          else newSet.delete(entry.id);
+                          setSelectedShifts(newSet);
+                        }}
                       />
-                      <span className="text-sm">{account.name}</span>
-                    </div>
-                    <span className="text-sm font-medium">{account.count} jobs</span>
-                  </div>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {entry.employee ? `${entry.employee.first_name} ${entry.employee.last_name}` : 'Unknown'}
+                    </TableCell>
+                    <TableCell>{format(new Date(entry.clock_in_time), 'MM/dd')}</TableCell>
+                    <TableCell>{format(new Date(entry.clock_in_time), 'HH:mm')}</TableCell>
+                    <TableCell>
+                      {entry.clock_out_time ? format(new Date(entry.clock_out_time), 'HH:mm') : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-cyan-400 cursor-pointer hover:underline">
+                        {formatHours(entry.clock_in_time, entry.clock_out_time)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {entry.clock_in_latitude && entry.clock_in_longitude ? (
+                        <Button variant="link" size="sm" className="text-cyan-400 p-0 h-auto">
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Trash2 className="h-3 w-3 text-red-400" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </div>
-            )}
+                {filteredShifts.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      No shifts found for the selected filters
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-5 gap-4">
+        <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+          <CardContent className="py-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Total</p>
+            <p className="text-3xl font-bold">{stats.total}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+          <CardContent className="py-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Plow</p>
+            <p className="text-3xl font-bold text-blue-400">{stats.plow}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+          <CardContent className="py-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Shovel</p>
+            <p className="text-3xl font-bold text-purple-400">{stats.shovel}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+          <CardContent className="py-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Salt</p>
+            <p className="text-3xl font-bold text-green-400">{stats.salt}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+          <CardContent className="py-4 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Locations</p>
+            <p className="text-3xl font-bold text-orange-400">{stats.locations}</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Work Log Entries Section */}
+      <Card className="bg-[hsl(var(--card))]/80 border-border/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <span className="font-medium">Work Log Entries ({filteredWorkLogs.length})</span>
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Entry
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/50">
+                  <TableHead className="w-10">
+                    <Checkbox 
+                      checked={selectedWorkLogs.size === filteredWorkLogs.length && filteredWorkLogs.length > 0}
+                      onCheckedChange={toggleAllWorkLogs}
+                    />
+                  </TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>In</TableHead>
+                  <TableHead>Out</TableHead>
+                  <TableHead>Dur.</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Snow/Salt</TableHead>
+                  <TableHead>Weather</TableHead>
+                  <TableHead>Equipment</TableHead>
+                  <TableHead>Crew</TableHead>
+                  <TableHead>Photo</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredWorkLogs.slice(0, 20).map(log => (
+                  <TableRow key={log.id} className="border-border/30">
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedWorkLogs.has(log.id)}
+                        onCheckedChange={(checked) => {
+                          const newSet = new Set(selectedWorkLogs);
+                          if (checked) newSet.add(log.id);
+                          else newSet.delete(log.id);
+                          setSelectedWorkLogs(newSet);
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={log.type === 'plow' ? 'bg-blue-600' : 'bg-purple-600'}>
+                        {log.type === 'plow' ? 'Plow' : 'Shov'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{format(new Date(log.date), 'MM/dd')}</TableCell>
+                    <TableCell>
+                      {log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
+                    </TableCell>
+                    <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
+                    <TableCell className="max-w-[100px] truncate" title={log.account_name}>
+                      {log.account_name}
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="outline"
+                        className={
+                          log.service_type === 'plow' ? 'border-blue-500 text-blue-400' :
+                          log.service_type === 'salt' || log.service_type === 'ice_melt' ? 'border-green-500 text-green-400' :
+                          log.service_type === 'shovel' ? 'border-purple-500 text-purple-400' :
+                          'border-cyan-500 text-cyan-400'
+                        }
+                      >
+                        {log.service_type === 'both' ? 'Both' : 
+                         log.service_type === 'ice_melt' ? 'Salt' : 
+                         log.service_type.charAt(0).toUpperCase() + log.service_type.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {log.snow_depth_inches !== null ? `${log.snow_depth_inches}"` : '-'} / {' '}
+                      {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
+                       log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
+                    </TableCell>
+                    <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
+                      {log.weather_conditions || '-'}
+                    </TableCell>
+                    <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
+                      {log.equipment_name || '-'}
+                    </TableCell>
+                    <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
+                      {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
+                    </TableCell>
+                    <TableCell>
+                      {log.photo_urls && log.photo_urls.length > 0 ? (
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Trash2 className="h-3 w-3 text-red-400" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredWorkLogs.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                      No work logs found for the selected filters
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
