@@ -4,13 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Snowflake, LogOut, Users, Building2, Wrench, UserCog, ArrowLeft, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { href: '/admin/users', label: 'Users & Roles', icon: UserCog },
-  { href: '/admin/employees', label: 'Employees', icon: Users },
-  { href: '/admin/accounts', label: 'Accounts', icon: Building2 },
-  { href: '/admin/equipment', label: 'Equipment', icon: Wrench },
-  { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
-];
+const navItems: { href: string; label: string; icon: React.ElementType }[] = [];
 
 export default function AdminLayout() {
   const { user, profile, signOut } = useAuth();
