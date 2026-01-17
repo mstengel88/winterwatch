@@ -282,6 +282,32 @@ export default function ShovelDashboard() {
     );
   };
 
+  // Validation: all fields required except notes and photos
+  const isFormValid = useMemo(() => {
+    // Account is always required
+    if (!selectedAccount) return false;
+    
+    // Team members required (at least one)
+    if (selectedTeamMembers.length === 0) return false;
+    
+    // Snow depth required
+    if (!snowDepth || snowDepth.trim() === '') return false;
+    
+    // Salt used required
+    if (!saltUsed || saltUsed.trim() === '') return false;
+    
+    // Temperature required
+    if (!temperature || temperature.trim() === '') return false;
+    
+    // Weather required
+    if (!weather || weather.trim() === '') return false;
+    
+    // Wind required
+    if (!wind || wind.trim() === '') return false;
+    
+    return true;
+  }, [selectedAccount, selectedTeamMembers, snowDepth, saltUsed, temperature, weather, wind]);
+
   const isLoading = employeeLoading || workLogsLoading;
 
   if (isLoading) {
@@ -592,7 +618,7 @@ export default function ShovelDashboard() {
             <div className="space-y-2">
               <Label className="text-sm flex items-center gap-2">
                 <Footprints className="h-4 w-4" />
-                Team Members
+                Team Members <span className="text-red-400">*</span>
               </Label>
               <Card className="bg-[hsl(var(--card))]/50 border-border/30">
                 <CardContent className="py-3 space-y-2">
@@ -620,7 +646,7 @@ export default function ShovelDashboard() {
             {/* Snow Depth and Salt Used */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm">Snow Depth (inches)</Label>
+                <Label className="text-sm">Snow Depth (inches) <span className="text-red-400">*</span></Label>
                 <Input 
                   placeholder="e.g., 3.5"
                   value={snowDepth}
@@ -629,7 +655,7 @@ export default function ShovelDashboard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">Salt Used (lbs)</Label>
+                <Label className="text-sm">Salt Used (lbs) <span className="text-red-400">*</span></Label>
                 <Input 
                   placeholder="e.g., 50"
                   value={saltUsed}
@@ -642,7 +668,7 @@ export default function ShovelDashboard() {
             {/* Temp, Weather, Wind */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm">Temp (°F)</Label>
+                <Label className="text-sm">Temp (°F) <span className="text-red-400">*</span></Label>
                 <Input 
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
@@ -650,7 +676,7 @@ export default function ShovelDashboard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">Weather</Label>
+                <Label className="text-sm">Weather <span className="text-red-400">*</span></Label>
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
@@ -658,7 +684,7 @@ export default function ShovelDashboard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">Wind (mph)</Label>
+                <Label className="text-sm">Wind (mph) <span className="text-red-400">*</span></Label>
                 <Input 
                   value={wind}
                   onChange={(e) => setWind(e.target.value)}
@@ -695,8 +721,12 @@ export default function ShovelDashboard() {
             {/* Log Service Button */}
             <Button
               onClick={handleLogService}
-              disabled={!activeShift || !selectedAccount || isUploading}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-6 text-lg font-semibold"
+              disabled={!activeShift || !isFormValid || isUploading}
+              className={`w-full py-6 text-lg font-semibold transition-colors ${
+                !activeShift || !isFormValid || isUploading
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+              }`}
             >
               {isUploading ? (
                 <>
