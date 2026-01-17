@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Clock, Search, Calendar, Users, Timer, TrendingUp, Loader2, MapPin, Play, Square } from 'lucide-react';
+import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Play, Square, LogOut } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInMinutes, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -31,11 +31,42 @@ interface EmployeeSummary {
   isActive: boolean;
 }
 
+// Real-time elapsed time component
+function ElapsedTime({ clockInTime }: { clockInTime: string }) {
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    const calculateElapsed = () => {
+      const start = new Date(clockInTime).getTime();
+      const now = Date.now();
+      const diff = now - start;
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setElapsed(
+        `${hours.toString().padStart(2, '0')}:${minutes
+          .toString()
+          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    };
+
+    calculateElapsed();
+    const interval = setInterval(calculateElapsed, 1000);
+
+    return () => clearInterval(interval);
+  }, [clockInTime]);
+
+  return <span className="font-mono tabular-nums">{elapsed}</span>;
+}
+
 export default function TimeClockPage() {
   const [entries, setEntries] = useState<TimeClockEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('7');
+  const [clockingOut, setClockingOut] = useState<string | null>(null);
 
   const fetchEntries = async () => {
     setIsLoading(true);
@@ -64,6 +95,28 @@ export default function TimeClockPage() {
   useEffect(() => {
     fetchEntries();
   }, [dateFilter]);
+
+  const handleClockOut = async (entryId: string) => {
+    setClockingOut(entryId);
+    try {
+      const { error } = await supabase
+        .from('time_clock')
+        .update({
+          clock_out_time: new Date().toISOString(),
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      toast.success('Employee clocked out successfully');
+      fetchEntries();
+    } catch (error) {
+      console.error('Error clocking out:', error);
+      toast.error('Failed to clock out employee');
+    } finally {
+      setClockingOut(null);
+    }
+  };
 
   const filteredEntries = entries.filter((entry) => {
     if (!search) return true;
@@ -262,6 +315,7 @@ export default function TimeClockPage() {
                         <TableHead>Clock Out</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -300,7 +354,11 @@ export default function TimeClockPage() {
                           <TableCell>
                             <div className="flex items-center gap-1 text-sm">
                               <Timer className="h-3 w-3 text-muted-foreground" />
-                              {getDuration(entry.clock_in_time, entry.clock_out_time)}
+                              {entry.clock_out_time ? (
+                                getDuration(entry.clock_in_time, entry.clock_out_time)
+                              ) : (
+                                <ElapsedTime clockInTime={entry.clock_in_time} />
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -311,6 +369,26 @@ export default function TimeClockPage() {
                                 <span className="h-1.5 w-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse" />
                                 Active
                               </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {!entry.clock_out_time && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleClockOut(entry.id)}
+                                disabled={clockingOut === entry.id}
+                                className="h-7 px-2"
+                              >
+                                {clockingOut === entry.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <>
+                                    <LogOut className="h-3 w-3 mr-1" />
+                                    Clock Out
+                                  </>
+                                )}
+                              </Button>
                             )}
                           </TableCell>
                         </TableRow>
