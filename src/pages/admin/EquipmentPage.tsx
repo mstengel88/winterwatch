@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from 'sonner';
 import { Truck, Plus, Loader2, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Equipment } from '@/types/database';
+import { equipmentSchema, getValidationError } from '@/lib/validations';
 
 const EQUIPMENT_TYPES = ['Plow Truck', 'Salt Truck', 'Loader', 'Skid Steer', 'Quadaxle', 'Box Truck', 'Semi', 'Other'];
 const STATUS_OPTIONS = ['available', 'in_use', 'maintenance', 'out_of_service'];
@@ -93,24 +94,27 @@ export default function EquipmentPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.type) {
-      toast.error('Name and type are required');
+    // Validate form data with zod schema
+    const validationResult = equipmentSchema.safeParse(formData);
+    if (!validationResult.success) {
+      toast.error(getValidationError(validationResult.error));
       return;
     }
 
     setIsSaving(true);
     try {
+      const validated = validationResult.data;
       const equipmentData = {
-        name: formData.name,
-        type: formData.type,
-        make: formData.make || null,
-        model: formData.model || null,
-        year: formData.year ? parseInt(formData.year) : null,
-        license_plate: formData.license_plate || null,
-        vin: formData.vin || null,
-        status: formData.status,
-        notes: formData.notes || null,
-        is_active: formData.is_active,
+        name: validated.name,
+        type: validated.type,
+        make: validated.make || null,
+        model: validated.model || null,
+        year: validated.year ? parseInt(validated.year) : null,
+        license_plate: validated.license_plate || null,
+        vin: validated.vin || null,
+        status: validated.status,
+        notes: validated.notes || null,
+        is_active: validated.is_active,
       };
 
       if (editingEquipment) {

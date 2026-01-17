@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from 'sonner';
 import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Account } from '@/types/database';
+import { accountSchema, getValidationError } from '@/lib/validations';
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -102,28 +103,31 @@ export default function AccountsPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.address) {
-      toast.error('Name and address are required');
+    // Validate form data with zod schema
+    const validationResult = accountSchema.safeParse(formData);
+    if (!validationResult.success) {
+      toast.error(getValidationError(validationResult.error));
       return;
     }
 
     setIsSaving(true);
     try {
+      const validated = validationResult.data;
       const accountData = {
-        name: formData.name,
-        address: formData.address,
-        city: formData.city || null,
-        state: formData.state || null,
-        zip: formData.zip || null,
-        contact_name: formData.contact_name || null,
-        contact_phone: formData.contact_phone || null,
-        contact_email: formData.contact_email || null,
-        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-        geofence_radius: formData.geofence_radius ? parseInt(formData.geofence_radius) : 100,
-        priority: formData.priority ? parseInt(formData.priority) : 5,
-        notes: formData.notes || null,
-        is_active: formData.is_active,
+        name: validated.name,
+        address: validated.address,
+        city: validated.city || null,
+        state: validated.state || null,
+        zip: validated.zip || null,
+        contact_name: validated.contact_name || null,
+        contact_phone: validated.contact_phone || null,
+        contact_email: validated.contact_email || null,
+        latitude: validated.latitude ? parseFloat(validated.latitude) : null,
+        longitude: validated.longitude ? parseFloat(validated.longitude) : null,
+        geofence_radius: validated.geofence_radius ? parseInt(validated.geofence_radius) : 100,
+        priority: validated.priority ? parseInt(validated.priority) : 5,
+        notes: validated.notes || null,
+        is_active: validated.is_active,
       };
 
       if (editingAccount) {

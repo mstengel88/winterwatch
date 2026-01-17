@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Users, Plus, Loader2, Truck, Shovel, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Employee, EmployeeCategory } from '@/types/database';
 import { Profile } from '@/types/auth';
+import { employeeSchema, getValidationError } from '@/lib/validations';
 
 const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both'];
 
@@ -88,21 +89,24 @@ export default function EmployeesPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.first_name || !formData.last_name) {
-      toast.error('First and last name are required');
+    // Validate form data with zod schema
+    const validationResult = employeeSchema.safeParse(formData);
+    if (!validationResult.success) {
+      toast.error(getValidationError(validationResult.error));
       return;
     }
 
     setIsSaving(true);
     try {
+      const validated = validationResult.data;
       const employeeData = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        category: formData.category,
-        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
-        user_id: formData.user_id || null,
+        first_name: validated.first_name,
+        last_name: validated.last_name,
+        email: validated.email || null,
+        phone: validated.phone || null,
+        category: validated.category,
+        hourly_rate: validated.hourly_rate ? parseFloat(validated.hourly_rate) : null,
+        user_id: validated.user_id || null,
       };
 
       if (editingEmployee) {
