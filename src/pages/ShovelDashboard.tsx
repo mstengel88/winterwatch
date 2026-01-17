@@ -99,9 +99,12 @@ export default function ShovelDashboard() {
   // Key for storing team members per shift in localStorage
   const shiftTeamStorageKey = activeShift ? `shovel-team-${activeShift.id}` : null;
 
-  // Load saved team members when shift starts
+  // Track if we've loaded team members for current shift
+  const [hasLoadedTeam, setHasLoadedTeam] = useState(false);
+
+  // Load saved team members when shift becomes available
   useEffect(() => {
-    if (shiftTeamStorageKey && selectedTeamMembers.length === 0) {
+    if (shiftTeamStorageKey && !hasLoadedTeam) {
       const savedTeam = localStorage.getItem(shiftTeamStorageKey);
       if (savedTeam) {
         try {
@@ -113,8 +116,13 @@ export default function ShovelDashboard() {
           // Ignore parse errors
         }
       }
+      setHasLoadedTeam(true);
     }
-  }, [shiftTeamStorageKey]);
+    // Reset when shift changes
+    if (!shiftTeamStorageKey) {
+      setHasLoadedTeam(false);
+    }
+  }, [shiftTeamStorageKey, hasLoadedTeam]);
 
   // Save team members to localStorage whenever they change during a shift
   useEffect(() => {
