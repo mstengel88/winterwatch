@@ -194,13 +194,19 @@ export default function TimeClockPage() {
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   };
 
-  // Check if entry was edited (updated_at differs from created_at by more than 5 seconds)
+  // Check if entry was manually edited after the last action (clock-in or clock-out)
   const isEdited = (entry: TimeClockEntry): boolean => {
-    if (!entry.created_at || !entry.updated_at) return false;
-    const created = new Date(entry.created_at).getTime();
+    if (!entry.updated_at) return false;
     const updated = new Date(entry.updated_at).getTime();
-    // Allow 5 seconds tolerance for initial creation
-    return Math.abs(updated - created) > 5000;
+    
+    // For completed entries, compare updated_at with clock_out_time
+    // For active entries, compare updated_at with clock_in_time
+    const lastActionTime = entry.clock_out_time 
+      ? new Date(entry.clock_out_time).getTime()
+      : new Date(entry.clock_in_time).getTime();
+    
+    // Allow 5 seconds tolerance for the normal update during clock-out
+    return (updated - lastActionTime) > 5000;
   };
 
   const formatTime = (dateString: string | null): string => {
