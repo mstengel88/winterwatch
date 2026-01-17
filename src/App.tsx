@@ -18,6 +18,7 @@ import EmployeesPage from "./pages/admin/EmployeesPage";
 import AccountsPage from "./pages/admin/AccountsPage";
 import EquipmentPage from "./pages/admin/EquipmentPage";
 import ReportsPage from "./pages/admin/ReportsPage";
+import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 
 const queryClient = new QueryClient();
 
@@ -30,12 +31,16 @@ const App = () => (
           <Sonner />
           <Routes>
             <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
             
-            <Route path="/dashboard" element={<ProtectedRoute><DriverDashboard /></ProtectedRoute>} />
+            {/* Role-specific dashboards */}
+            <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
             <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
+            
+            {/* Admin/Manager only pages */}
             <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
             <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
+            
             <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
             
             {/* Admin routes */}

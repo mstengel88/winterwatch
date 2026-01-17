@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home },
+  { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
@@ -52,9 +52,11 @@ export function AppHeader() {
     setMobileMenuOpen(false);
   };
 
+  // Filter nav items based on user roles
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
-    return item.roles.some((role) => hasRole(role as any) || isAdminOrManager());
+    // Check if user has any of the required roles
+    return item.roles.some((role) => hasRole(role as any));
   });
 
   const initials = profile?.full_name
@@ -69,7 +71,19 @@ export function AppHeader() {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
+    if (href === '/shovel') return location.pathname === href;
     return location.pathname.startsWith(href);
+  };
+
+  // Determine home route based on role
+  const getHomeRoute = () => {
+    if (isAdminOrManager() || hasRole('driver')) {
+      return '/dashboard';
+    }
+    if (hasRole('shovel_crew')) {
+      return '/shovel';
+    }
+    return '/';
   };
 
   return (
@@ -139,7 +153,7 @@ export function AppHeader() {
           {/* Logo */}
           <div 
             className="flex items-center gap-2 cursor-pointer" 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(getHomeRoute())}
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary border border-primary/20">
               <Snowflake className="h-4 w-4 text-primary-foreground" />
@@ -191,11 +205,11 @@ export function AppHeader() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+              <DropdownMenuItem onClick={() => navigate(getHomeRoute())}>
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+              <DropdownMenuItem onClick={() => navigate(getHomeRoute())}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
