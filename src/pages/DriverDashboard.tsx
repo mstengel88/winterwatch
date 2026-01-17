@@ -595,7 +595,7 @@ export default function DriverDashboard() {
                 <Button 
                   className="w-full justify-center bg-primary hover:bg-primary/90 text-primary-foreground mb-3"
                   onClick={handleCheckIn}
-                  disabled={!activeShift}
+                  disabled={!activeShift || !selectedAccountId}
                 >
                   <Play className="h-4 w-4 mr-2" />
                   Check In & Start Timer
