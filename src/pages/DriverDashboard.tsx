@@ -568,6 +568,7 @@ export default function DriverDashboard() {
               <Select 
                 value={selectedAccountId} 
                 onValueChange={setSelectedAccountId}
+                disabled={!!activeWorkLog}
               >
                 <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                   <SelectValue placeholder="Select account..." />
@@ -674,7 +675,7 @@ export default function DriverDashboard() {
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm text-muted-foreground">Equipment <span className="text-red-400">*</span></Label>
-                <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
+                <Select value={selectedEquipment} onValueChange={setSelectedEquipment} disabled={!!activeWorkLog}>
                   <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select equipment..." />
                   </SelectTrigger>
@@ -687,7 +688,7 @@ export default function DriverDashboard() {
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground">Employees <span className="text-red-400">*</span></Label>
-                <Select value={selectedEmployees} onValueChange={setSelectedEmployees}>
+                <Select value={selectedEmployees} onValueChange={setSelectedEmployees} disabled={!!activeWorkLog}>
                   <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select employees..." />
                   </SelectTrigger>
