@@ -344,7 +344,7 @@ export default function ShovelDashboard() {
     );
   }
 
-  const firstName = profile?.full_name || employee.first_name;
+  const employeeName = `${employee.first_name} ${employee.last_name}`;
   const completedToday = recentWorkLogs.filter(log => log.status === 'completed').length;
   const shoveled = recentWorkLogs.filter(log => log.service_type === 'shovel' || log.service_type === 'both').length;
   const salted = recentWorkLogs.filter(log => log.service_type === 'ice_melt' || log.service_type === 'salt').length;
@@ -366,7 +366,7 @@ export default function ShovelDashboard() {
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1">
-            Welcome back, {firstName}! Track your shovel crew services.
+            Welcome back, {employeeName}! Track your shovel crew services.
           </p>
         </div>
 

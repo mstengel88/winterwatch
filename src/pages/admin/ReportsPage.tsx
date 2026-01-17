@@ -318,7 +318,7 @@ export default function ReportsPage() {
       equipment: log.equipment_name || '-',
       employee: log.employee_name,
       conditions: log.weather_conditions || '-',
-      notes: log.weather_conditions || undefined,
+      notes: log.notes || undefined,
     }));
 
     const totalHours = filteredWorkLogs.reduce((sum, log) => {
