@@ -28,6 +28,9 @@ interface CheckOutData {
   weatherConditions?: string;
   notes?: string;
   photoUrls?: string[];
+  equipmentId?: string;
+  employeeId?: string;
+  serviceType?: ServiceType;
 }
 
 export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLogsReturn {
@@ -184,19 +187,32 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     const location = await getCurrentLocation();
 
     try {
+      const updatePayload: Record<string, unknown> = {
+        status: 'completed',
+        check_out_time: new Date().toISOString(),
+        check_out_latitude: location?.latitude ?? null,
+        check_out_longitude: location?.longitude ?? null,
+        snow_depth_inches: data.snowDepthInches ?? null,
+        salt_used_lbs: data.saltUsedLbs ?? null,
+        weather_conditions: data.weatherConditions ?? null,
+        notes: data.notes ?? null,
+        photo_urls: data.photoUrls ?? null,
+      };
+
+      // Update equipment/employee/service type if provided
+      if (data.equipmentId !== undefined) {
+        updatePayload.equipment_id = data.equipmentId || null;
+      }
+      if (data.employeeId !== undefined) {
+        updatePayload.employee_id = data.employeeId;
+      }
+      if (data.serviceType !== undefined) {
+        updatePayload.service_type = data.serviceType;
+      }
+
       const { error: updateError } = await supabase
         .from('work_logs')
-        .update({
-          status: 'completed',
-          check_out_time: new Date().toISOString(),
-          check_out_latitude: location?.latitude ?? null,
-          check_out_longitude: location?.longitude ?? null,
-          snow_depth_inches: data.snowDepthInches ?? null,
-          salt_used_lbs: data.saltUsedLbs ?? null,
-          weather_conditions: data.weatherConditions ?? null,
-          notes: data.notes ?? null,
-          photo_urls: data.photoUrls ?? null,
-        })
+        .update(updatePayload)
         .eq('id', activeWorkLog.id);
 
       if (updateError) throw updateError;
