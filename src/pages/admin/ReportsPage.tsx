@@ -4,11 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Loader2, TrendingUp, Clock, Users, Building2, Snowflake, Shovel } from 'lucide-react';
-import { format, subDays, startOfDay, endOfDay
-
-
- } from 'date-fns';
+import { Loader2, TrendingUp, Clock, Users, Building2, Snowflake, Shovel, FileDown } from 'lucide-react';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { generateWorkLogsPDF } from '@/lib/pdfExport';
+import { toast } from 'sonner';
 
 interface WorkLogStats {
   totalJobs: number;
@@ -20,10 +19,23 @@ interface WorkLogStats {
   jobsByAccount: { name: string; count: number }[];
 }
 
+interface RawWorkLog {
+  id: string;
+  date: string;
+  account: string;
+  employee: string;
+  serviceType: string;
+  duration: string;
+  saltLbs?: number;
+  iceMeltLbs?: number;
+  notes?: string;
+}
+
 const COLORS = ['hsl(var(--plow))', 'hsl(var(--shovel))', 'hsl(var(--primary))', 'hsl(var(--warning))', 'hsl(var(--success))'];
 
 export default function ReportsPage() {
   const [stats, setStats] = useState<WorkLogStats | null>(null);
+  const [rawLogs, setRawLogs] = useState<RawWorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState('7');
 
@@ -124,6 +136,40 @@ export default function ReportsPage() {
       const totalSalt = workLogs.reduce((sum, log) => sum + (log.salt_used_lbs || 0), 0);
       const totalIceMelt = shovelLogs.reduce((sum, log) => sum + (log.ice_melt_used_lbs || 0), 0);
 
+      // Helper to calculate duration string
+      const getDuration = (checkIn: string | null, checkOut: string | null): string => {
+        if (!checkIn || !checkOut) return '-';
+        const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+        const hours = diff / (1000 * 60 * 60);
+        return `${hours.toFixed(1)}h`;
+      };
+
+      // Build raw logs for PDF export
+      const allRawLogs: RawWorkLog[] = [
+        ...workLogs.map((log: any) => ({
+          id: log.id,
+          date: format(new Date(log.created_at), 'MM/dd/yy'),
+          account: log.account?.name || 'Unknown',
+          employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+          serviceType: log.service_type === 'both' ? 'Plow & Salt' : log.service_type === 'plow' ? 'Plow' : 'Salt',
+          duration: getDuration(log.check_in_time, log.check_out_time),
+          saltLbs: log.salt_used_lbs,
+          notes: log.notes,
+        })),
+        ...shovelLogs.map((log: any) => ({
+          id: log.id,
+          date: format(new Date(log.created_at), 'MM/dd/yy'),
+          account: log.account?.name || 'Unknown',
+          employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+          serviceType: log.service_type === 'ice_melt' ? 'Ice Melt' : 'Shovel',
+          duration: getDuration(log.check_in_time, log.check_out_time),
+          iceMeltLbs: log.ice_melt_used_lbs,
+          notes: log.notes,
+        })),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setRawLogs(allRawLogs);
+
       setStats({
         totalJobs: workLogs.length + shovelLogs.length,
         totalHours: calculateHours([...workLogs, ...shovelLogs]),
@@ -140,6 +186,25 @@ export default function ReportsPage() {
     }
   };
 
+  const handleExportPDF = () => {
+    if (!stats) return;
+    
+    const dateRangeLabel = dateRange === '7' ? 'Last 7 days' 
+      : dateRange === '14' ? 'Last 14 days'
+      : dateRange === '30' ? 'Last 30 days'
+      : 'Last 90 days';
+
+    generateWorkLogsPDF(rawLogs, {
+      totalJobs: stats.totalJobs,
+      totalHours: stats.totalHours,
+      totalSaltLbs: stats.totalSaltLbs,
+      totalIceMeltLbs: stats.totalIceMeltLbs,
+      dateRange: dateRangeLabel,
+    });
+    
+    toast.success('PDF exported successfully');
+  };
+
   useEffect(() => {
     fetchStats();
   }, [dateRange]);
@@ -154,14 +219,19 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Reports & Analytics</h1>
           <p className="text-muted-foreground">View work history and performance metrics</p>
         </div>
-        <Select value={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={handleExportPDF} disabled={!stats || rawLogs.length === 0}>
+            <FileDown className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="7">Last 7 days</SelectItem>
@@ -170,6 +240,7 @@ export default function ReportsPage() {
             <SelectItem value="90">Last 90 days</SelectItem>
           </SelectContent>
         </Select>
+        </div>
       </div>
 
       {/* Stats cards */}
