@@ -100,7 +100,7 @@ export default function DriverDashboard() {
 
   // Employee selection for UI display only - doesn't affect work log tracking
   const selectedEmployeeNameForUi = useMemo(() => {
-    if (selectedEmployees === 'self' || !selectedEmployees) {
+    if (!selectedEmployees) {
       return employee ? `${employee.first_name} ${employee.last_name}` : 'Employee';
     }
     const found = plowEmployees.find((e) => e.id === selectedEmployees);
@@ -136,12 +136,17 @@ export default function DriverDashboard() {
       });
   }, []);
 
-  // Auto-populate employee field with logged-in user
+  // Auto-select employee matching logged-in user's email
   useEffect(() => {
-    if (employee && !selectedEmployees) {
-      setSelectedEmployees('self');
+    if (profile?.email && plowEmployees.length > 0 && !selectedEmployees) {
+      const matchingEmployee = plowEmployees.find(
+        (emp) => emp.email?.toLowerCase() === profile.email?.toLowerCase()
+      );
+      if (matchingEmployee) {
+        setSelectedEmployees(matchingEmployee.id);
+      }
     }
-  }, [employee, selectedEmployees]);
+  }, [profile?.email, plowEmployees, selectedEmployees]);
 
   // Shift timer
   useEffect(() => {
@@ -342,8 +347,8 @@ export default function DriverDashboard() {
       photoUrls = await uploadPhotos(activeWorkLog.id);
     }
 
-    // Get the currently selected employee ID for checkout
-    const employeeIdToUse = selectedEmployees === 'self' ? employee?.id : selectedEmployees;
+    // Get the currently selected employee ID for checkout (or fallback to logged-in user)
+    const employeeIdToUse = selectedEmployees || employee?.id;
 
     const success = await checkOut({
       snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
@@ -696,7 +701,6 @@ export default function DriverDashboard() {
                     <SelectValue placeholder="Select employees..." />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-primary/30">
-                    <SelectItem value="self">Just me</SelectItem>
                     {plowEmployees.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.first_name} {emp.last_name}
