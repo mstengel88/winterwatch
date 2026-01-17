@@ -142,7 +142,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
       {/* Logo */}
       <div className="mb-8 flex flex-col items-center">
         <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-muted to-card border-4 border-border shadow-lg">
@@ -326,6 +326,6 @@ export default function Auth() {
       <p className="mt-8 text-center text-xs text-muted-foreground">
         © 2026 WinterWatch-Pro. All rights reserved.
       </p>
-    </div>
+    </main>
   );
 }
