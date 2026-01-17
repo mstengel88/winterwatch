@@ -95,11 +95,13 @@ export function ShiftDialog({
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map(emp => (
-                    <SelectItem key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name}
-                    </SelectItem>
-                  ))}
+                  {employees
+                    .filter((emp) => emp.id && emp.id.trim() !== '')
+                    .map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.first_name} {emp.last_name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
