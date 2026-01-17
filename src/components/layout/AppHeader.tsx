@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Snowflake, Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react';
+import { Snowflake, Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager'] },
+  { href: '/time-clock', label: 'Time Clock', icon: Clock, roles: ['admin', 'manager'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
 ];
 
