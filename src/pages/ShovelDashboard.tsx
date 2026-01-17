@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
@@ -131,17 +131,20 @@ export default function ShovelDashboard() {
     }
   }, [shiftTeamStorageKey, selectedTeamMembers]);
 
-  // Clear stored team when shift ends
+  // Clear stored team when shift ends (avoid clearing during initial load refresh)
+  const prevShiftIdRef = useRef<string | null>(activeShift?.id ?? null);
+
   useEffect(() => {
-    if (!activeShift) {
-      // Clean up old shift team storage keys
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('shovel-team-')) {
-          localStorage.removeItem(key);
-        }
-      });
+    const prevShiftId = prevShiftIdRef.current;
+    const currentShiftId = activeShift?.id ?? null;
+
+    // Only clear when we had an active shift and it is now gone (explicit clock-out)
+    if (prevShiftId && !currentShiftId) {
+      localStorage.removeItem(`shovel-team-${prevShiftId}`);
     }
-  }, [activeShift]);
+
+    prevShiftIdRef.current = currentShiftId;
+  }, [activeShift?.id]);
 
   // Get location on mount and set up periodic refresh
   useEffect(() => {
