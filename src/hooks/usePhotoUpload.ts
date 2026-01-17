@@ -72,7 +72,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
 
     setIsUploading(true);
     setUploadProgress(0);
-    const uploadedUrls: string[] = [];
+    const uploadedPaths: string[] = [];
 
     try {
       for (let i = 0; i < photos.length; i++) {
@@ -89,21 +89,54 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
           throw uploadError;
         }
 
-        const { data: urlData } = supabase.storage
-          .from(bucket)
-          .getPublicUrl(fileName);
-
-        uploadedUrls.push(urlData.publicUrl);
+        // Store just the file path instead of public URL
+        // Photos will be retrieved using signed URLs
+        uploadedPaths.push(fileName);
         setUploadProgress(((i + 1) / photos.length) * 100);
       }
 
-      return uploadedUrls;
+      return uploadedPaths;
     } catch (error) {
       console.error('Error uploading photos:', error);
       toast.error('Failed to upload some photos');
-      return uploadedUrls;
+      return uploadedPaths;
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // Helper function to get signed URLs for viewing photos
+  const getSignedUrls = async (filePaths: string[]): Promise<string[]> => {
+    if (filePaths.length === 0) return [];
+
+    try {
+      const signedUrls: string[] = [];
+      
+      for (const path of filePaths) {
+        // Check if it's already a full URL (legacy data)
+        if (path.startsWith('http')) {
+          signedUrls.push(path);
+          continue;
+        }
+        
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(path, 3600); // 1 hour expiration
+
+        if (error) {
+          console.error('Error creating signed URL:', error);
+          continue;
+        }
+
+        if (data?.signedUrl) {
+          signedUrls.push(data.signedUrl);
+        }
+      }
+
+      return signedUrls;
+    } catch (error) {
+      console.error('Error getting signed URLs:', error);
+      return [];
     }
   };
 
@@ -116,6 +149,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     removePhoto,
     clearPhotos,
     uploadPhotos,
+    getSignedUrls,
     canAddMore: photos.length < maxFiles,
   };
 }
