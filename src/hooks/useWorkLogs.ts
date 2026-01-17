@@ -50,6 +50,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
         .from('accounts')
         .select('*')
         .eq('is_active', true)
+        .in('service_type', ['plow', 'both'])
         .order('priority', { ascending: true })
         .order('name', { ascending: true });
 
