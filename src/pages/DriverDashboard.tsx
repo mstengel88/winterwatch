@@ -418,7 +418,7 @@ export default function DriverDashboard() {
                 <span className="text-sm font-normal text-muted-foreground">{temperature}°F</span>
               </h1>
               <p className="text-sm text-muted-foreground">
-                Welcome back, {profile?.full_name || employee.first_name}! Track your plowing and salting services.
+                Welcome back, {employee.first_name} {employee.last_name}! Track your plowing and salting services.
               </p>
             </div>
           </div>
