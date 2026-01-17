@@ -127,6 +127,40 @@
 
   body {
     @apply bg-background text-foreground dark;
+    /* PWA mobile optimizations */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Safe area support for notched devices */
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Prevent pull-to-refresh on PWA */
+  html, body {
+    overscroll-behavior: none;
+  }
+
+  /* Smooth scrolling for mobile */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Better touch targets for mobile */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text selection on interactive elements */
+  button, [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
   }
 }
 
@@ -140,5 +174,17 @@
   .theme-shovel {
     --primary: 271 81% 56%;
     --ring: 271 81% 56%;
+  }
+}
+
+/* PWA Standalone mode adjustments */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  /* Extra bottom padding for home indicator */
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
