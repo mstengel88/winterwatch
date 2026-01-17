@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Play, Square, LogOut } from 'lucide-react';
+import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Play, Square, LogOut, Pencil } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInMinutes, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -361,9 +361,17 @@ export default function TimeClockPage() {
                       {filteredEntries.slice(0, 15).map((entry) => (
                         <TableRow key={entry.id} className={`border-border/50 ${isEdited(entry) ? 'bg-destructive/10' : ''}`}>
                           <TableCell className="font-medium">
-                            {entry.employee
-                              ? `${entry.employee.first_name} ${entry.employee.last_name}`
-                              : '-'}
+                            <div className="flex items-center gap-2">
+                              {entry.employee
+                                ? `${entry.employee.first_name} ${entry.employee.last_name}`
+                                : '-'}
+                              {isEdited(entry) && (
+                                <Badge variant="outline" className="text-destructive border-destructive/50 gap-1 text-xs">
+                                  <Pencil className="h-3 w-3" />
+                                  Edited
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {format(new Date(entry.clock_in_time), 'MM/dd/yy')}
