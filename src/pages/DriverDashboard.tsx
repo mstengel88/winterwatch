@@ -104,6 +104,14 @@ export default function DriverDashboard() {
     return employee?.id;
   }, [selectedEmployees, employee?.id]);
 
+  const selectedEmployeeNameForUi = useMemo(() => {
+    if (selectedEmployees === 'self' || !selectedEmployees) {
+      return employee ? `${employee.first_name} ${employee.last_name}` : 'Employee';
+    }
+    const found = plowEmployees.find((e) => e.id === selectedEmployees);
+    return found ? `${found.first_name} ${found.last_name}` : 'Employee';
+  }, [selectedEmployees, employee, plowEmployees]);
+
   const {
     accounts,
     activeWorkLog,
@@ -835,7 +843,7 @@ export default function DriverDashboard() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {log.employee?.first_name || 'Unknown'}
+                            {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {selectedEmployeeNameForUi}
                           </p>
                           {log.notes && (
                             <p className="text-xs text-muted-foreground mt-0.5">{log.notes}</p>
