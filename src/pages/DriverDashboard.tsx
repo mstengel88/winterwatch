@@ -56,14 +56,6 @@ interface AccountWithDistance extends Account {
 export default function DriverDashboard() {
   const { profile } = useAuth();
   const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
-  const { 
-    accounts, 
-    activeWorkLog, 
-    recentWorkLogs, 
-    isLoading: workLogsLoading,
-    checkIn,
-    checkOut 
-  } = useWorkLogs();
   const { location: geoLocation, getCurrentLocation, isLoading: geoLoading, error: geoError } = useGeolocation();
   const { toast } = useToast();
   const {
@@ -105,6 +97,21 @@ export default function DriverDashboard() {
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  const selectedEmployeeIdForLogs = useMemo(() => {
+    if (selectedEmployees === 'self') return employee?.id;
+    if (selectedEmployees) return selectedEmployees;
+    return employee?.id;
+  }, [selectedEmployees, employee?.id]);
+
+  const {
+    accounts,
+    activeWorkLog,
+    recentWorkLogs,
+    isLoading: workLogsLoading,
+    checkIn,
+    checkOut,
+  } = useWorkLogs({ employeeId: selectedEmployeeIdForLogs });
 
   // Fetch equipment and plow employees
   useEffect(() => {
