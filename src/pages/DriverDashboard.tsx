@@ -127,7 +127,7 @@ export default function DriverDashboard() {
   // Auto-populate employee field with logged-in user
   useEffect(() => {
     if (employee && !selectedEmployees) {
-      setSelectedEmployees(employee.id);
+      setSelectedEmployees('self');
     }
   }, [employee, selectedEmployees]);
 
@@ -280,7 +280,13 @@ export default function DriverDashboard() {
       toast({ variant: 'destructive', title: 'Please select an employee' });
       return;
     }
-    const success = await checkIn(selectedAccountId, selectedEquipment || undefined, serviceType, selectedEmployees);
+    // Convert "self" to actual employee ID
+    const employeeIdToUse = selectedEmployees === 'self' ? employee?.id : selectedEmployees;
+    if (!employeeIdToUse) {
+      toast({ variant: 'destructive', title: 'Employee not found' });
+      return;
+    }
+    const success = await checkIn(selectedAccountId, selectedEquipment || undefined, serviceType, employeeIdToUse);
     if (success) {
       toast({ title: 'Checked in!' });
     } else {
