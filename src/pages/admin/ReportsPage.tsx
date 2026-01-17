@@ -677,9 +677,11 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Accounts</SelectItem>
-                    {accounts.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                    ))}
+                    {accounts
+                      .filter((acc) => acc.id && acc.id.trim() !== '')
+                      .map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -691,9 +693,11 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Locations</SelectItem>
-                    {accounts.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                    ))}
+                    {accounts
+                      .filter((acc) => acc.id && acc.id.trim() !== '')
+                      .map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -705,9 +709,11 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Employees</SelectItem>
-                    {employees.map(emp => (
-                      <SelectItem key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</SelectItem>
-                    ))}
+                    {employees
+                      .filter((emp) => emp.id && emp.id.trim() !== '')
+                      .map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -739,9 +745,11 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Equipment</SelectItem>
-                    {equipment.map(eq => (
-                      <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
-                    ))}
+                    {equipment
+                      .filter((eq) => eq.id && eq.id.trim() !== '')
+                      .map((eq) => (
+                        <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

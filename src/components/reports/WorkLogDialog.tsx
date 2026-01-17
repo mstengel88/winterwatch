@@ -196,9 +196,11 @@ export function WorkLogDialog({
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                    ))}
+                    {accounts
+                      .filter((acc) => acc.id && acc.id.trim() !== '')
+                      .map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -209,11 +211,13 @@ export function WorkLogDialog({
                     <SelectValue placeholder="Select employee" />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.map(emp => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.first_name} {emp.last_name}
-                      </SelectItem>
-                    ))}
+                    {employees
+                      .filter((emp) => emp.id && emp.id.trim() !== '')
+                      .map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.first_name} {emp.last_name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -237,15 +241,17 @@ export function WorkLogDialog({
               {type === 'plow' && (
                 <div className="space-y-2">
                   <Label>Equipment</Label>
-                  <Select value={equipmentId} onValueChange={setEquipmentId}>
+                  <Select value={equipmentId} onValueChange={(v) => setEquipmentId(v === 'none' ? '' : v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select equipment" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
-                      {equipment.map(eq => (
-                        <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
-                      ))}
+                      <SelectItem value="none">None</SelectItem>
+                      {equipment
+                        .filter((eq) => eq.id && eq.id.trim() !== '')
+                        .map((eq) => (
+                          <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>

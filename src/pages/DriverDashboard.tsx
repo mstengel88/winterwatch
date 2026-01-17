@@ -690,9 +690,11 @@ export default function DriverDashboard() {
                     <SelectValue placeholder="Select equipment..." />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-primary/30">
-                    {equipment.map((eq) => (
-                      <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
-                    ))}
+                    {equipment
+                      .filter((eq) => eq.id && eq.id.trim() !== '')
+                      .map((eq) => (
+                        <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
