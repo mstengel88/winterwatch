@@ -24,7 +24,8 @@ import {
   LogIn,
   Navigation,
   Play,
-  RefreshCw
+  RefreshCw,
+  Timer
 } from 'lucide-react';
 import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -103,6 +104,7 @@ export default function DriverDashboard() {
   const [equipment, setEquipment] = useState<any[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   // Fetch equipment and plow employees
   useEffect(() => {
@@ -143,6 +145,28 @@ export default function DriverDashboard() {
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [activeShift]);
+
+  // Work timer for check-in at location
+  useEffect(() => {
+    if (!activeWorkLog || !activeWorkLog.check_in_time) {
+      setWorkTimer({ hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+
+    const updateWorkTimer = () => {
+      const start = new Date(activeWorkLog.check_in_time!);
+      const now = new Date();
+      const totalSeconds = differenceInSeconds(now, start);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setWorkTimer({ hours, minutes, seconds });
+    };
+
+    updateWorkTimer();
+    const interval = setInterval(updateWorkTimer, 1000);
+    return () => clearInterval(interval);
+  }, [activeWorkLog]);
 
   // Calculate sorted accounts by distance
   const sortedAccounts = useMemo((): AccountWithDistance[] => {
@@ -506,8 +530,7 @@ export default function DriverDashboard() {
             {!activeWorkLog ? (
               <>
                 <Button 
-                  variant="ghost" 
-                  className="w-full justify-center text-muted-foreground mb-3"
+                  className="w-full justify-center bg-primary hover:bg-primary/90 text-primary-foreground mb-3"
                   onClick={handleCheckIn}
                   disabled={!activeShift}
                 >
@@ -524,12 +547,22 @@ export default function DriverDashboard() {
                 )}
               </>
             ) : (
-              <Card className="mb-4 border-success/50 bg-success/10">
+              <Card className="mb-4 border-primary/50 bg-primary/10">
                 <CardContent className="py-3 px-4">
-                  <p className="text-sm font-medium text-success">Currently working at location</p>
-                  <p className="text-xs text-muted-foreground">
-                    Started {format(new Date(activeWorkLog.check_in_time!), 'h:mm a')}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-primary">Currently working at location</p>
+                      <p className="text-xs text-muted-foreground">
+                        Started {format(new Date(activeWorkLog.check_in_time!), 'h:mm a')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-primary" />
+                      <span className="text-lg font-mono font-bold text-primary">
+                        {formatTime(workTimer.hours)}:{formatTime(workTimer.minutes)}:{formatTime(workTimer.seconds)}
+                      </span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
