@@ -179,13 +179,17 @@ export default function WorkLogsPage() {
     const rawLogs = filteredLogs.map((log) => ({
       id: log.id,
       date: format(new Date(log.created_at), 'MM/dd/yy'),
-      account: log.account?.name || 'Unknown',
-      employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
-      serviceType: getServiceTypeLabel(log.type, log.service_type),
+      checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
+      checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
       duration: getDuration(log.check_in_time, log.check_out_time),
-      saltLbs: log.salt_used_lbs,
-      iceMeltLbs: log.ice_melt_used_lbs,
-      notes: log.notes,
+      account: log.account?.name || 'Unknown',
+      serviceType: getServiceTypeLabel(log.type, log.service_type),
+      snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
+      saltLbs: log.salt_used_lbs ? `${log.salt_used_lbs}lb` : log.ice_melt_used_lbs ? `${log.ice_melt_used_lbs}lb` : '-',
+      equipment: log.equipment?.name || '-',
+      employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+      conditions: '-',
+      notes: log.notes || undefined,
     }));
 
     const totalHours = filteredLogs.reduce((total, log) => {
@@ -201,11 +205,19 @@ export default function WorkLogsPage() {
       : dateFilter === '30' ? 'Last 30 days'
       : 'Last 90 days';
 
+    // Count unique properties
+    const uniqueAccounts = new Set(filteredLogs.map(log => log.account?.name)).size;
+    const plowCount = filteredLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
+    const saltCount = filteredLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
+
     generateWorkLogsPDF(rawLogs, {
       totalJobs: filteredLogs.length,
       totalHours,
       totalSaltLbs: filteredLogs.reduce((sum, log) => sum + (log.salt_used_lbs || 0), 0),
       totalIceMeltLbs: filteredLogs.reduce((sum, log) => sum + (log.ice_melt_used_lbs || 0), 0),
+      plowCount,
+      saltCount,
+      propertyCount: uniqueAccounts,
       dateRange: dateRangeLabel,
     });
     
