@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
 import DriverDashboard from "./pages/DriverDashboard";
 import ShovelDashboard from "./pages/ShovelDashboard";
 import WorkLogsPage from "./pages/WorkLogsPage";
@@ -33,8 +32,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/driver" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><DriverDashboard /></ProtectedRoute>} />
             <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
             <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
             <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
