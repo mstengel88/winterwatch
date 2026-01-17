@@ -119,7 +119,6 @@ export default function DriverDashboard() {
     isLoading: workLogsLoading,
     checkIn,
     checkOut,
-    updateActiveWorkLog,
   } = useWorkLogs({ employeeId: selectedEmployeeIdForLogs });
 
   // Fetch equipment and plow employees
@@ -346,12 +345,18 @@ export default function DriverDashboard() {
       photoUrls = await uploadPhotos(activeWorkLog.id);
     }
 
+    // Get the currently selected employee ID for checkout
+    const employeeIdToUse = selectedEmployees === 'self' ? employee?.id : selectedEmployees;
+
     const success = await checkOut({
       snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
       saltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
       weatherConditions: `${temperature}°F ${weather} Wind: ${windSpeed}mph`,
       notes,
       photoUrls,
+      equipmentId: selectedEquipment || undefined,
+      employeeId: employeeIdToUse,
+      serviceType,
     });
     if (success) {
       toast({ title: 'Work completed!' });
@@ -705,29 +710,6 @@ export default function DriverDashboard() {
               </div>
             </div>
 
-            {/* Save Changes Button - only show when checked in */}
-            {activeWorkLog && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mb-4 w-full border-primary/50 text-primary hover:bg-primary/20"
-                onClick={async () => {
-                  const employeeIdToUse = selectedEmployees === 'self' ? employee?.id : selectedEmployees;
-                  const success = await updateActiveWorkLog({
-                    equipmentId: selectedEquipment || undefined,
-                    employeeId: employeeIdToUse,
-                    serviceType,
-                  });
-                  if (success) {
-                    toast({ title: 'Work log updated!' });
-                  } else {
-                    toast({ variant: 'destructive', title: 'Failed to update' });
-                  }
-                }}
-              >
-                Save Equipment/Employee Changes
-              </Button>
-            )}
 
             {/* Snow & Salt */}
             <div className="mb-4 grid grid-cols-2 gap-3">
