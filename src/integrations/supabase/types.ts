@@ -137,6 +137,7 @@ export type Database = {
           name: string
           next_maintenance_date: string | null
           notes: string | null
+          service_type: string | null
           status: string | null
           type: string
           updated_at: string
@@ -154,6 +155,7 @@ export type Database = {
           name: string
           next_maintenance_date?: string | null
           notes?: string | null
+          service_type?: string | null
           status?: string | null
           type: string
           updated_at?: string
@@ -171,6 +173,7 @@ export type Database = {
           name?: string
           next_maintenance_date?: string | null
           notes?: string | null
+          service_type?: string | null
           status?: string | null
           type?: string
           updated_at?: string
