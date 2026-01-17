@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
@@ -24,12 +24,28 @@ import {
   LogIn,
   Navigation,
   Play,
-  ImageIcon,
-  Camera,
   RefreshCw
 } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { Account } from '@/types/database';
+
+// Calculate distance between two coordinates in km
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+interface AccountWithDistance extends Account {
+  distance?: number;
+}
 
 export default function DriverDashboard() {
   const { profile } = useAuth();
@@ -42,7 +58,7 @@ export default function DriverDashboard() {
     checkIn,
     checkOut 
   } = useWorkLogs();
-  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
+  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading, error: geoError } = useGeolocation();
   const { toast } = useToast();
   const {
     photos,
@@ -56,9 +72,16 @@ export default function DriverDashboard() {
     canAddMore,
   } = usePhotoUpload({ folder: 'work-logs' });
 
-  // Get location on mount
+  // Get location on mount and set up periodic refresh
   useEffect(() => {
     getCurrentLocation();
+    
+    // Refresh location every 30 seconds for real-time updates
+    const interval = setInterval(() => {
+      getCurrentLocation();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [getCurrentLocation]);
 
   // Form state
@@ -81,28 +104,58 @@ export default function DriverDashboard() {
     });
   }, []);
 
-  // Calculate nearest account
-  const nearestAccount = useMemo(() => {
-    if (!geoLocation || accounts.length === 0) return null;
+  // Calculate sorted accounts by distance
+  const sortedAccounts = useMemo((): AccountWithDistance[] => {
+    if (!geoLocation || accounts.length === 0) {
+      return accounts.map(acc => ({ ...acc, distance: undefined }));
+    }
     
-    let nearest = accounts[0];
-    let minDist = Infinity;
-    
-    accounts.forEach((acc) => {
-      if (acc.latitude && acc.longitude) {
-        const dist = Math.sqrt(
-          Math.pow((acc.latitude - geoLocation.latitude) * 111, 2) +
-          Math.pow((acc.longitude - geoLocation.longitude) * 111 * Math.cos(geoLocation.latitude * Math.PI / 180), 2)
-        );
-        if (dist < minDist) {
-          minDist = dist;
-          nearest = acc;
+    return accounts
+      .map((acc) => {
+        let distance: number | undefined = undefined;
+        if (acc.latitude && acc.longitude) {
+          distance = calculateDistance(
+            geoLocation.latitude,
+            geoLocation.longitude,
+            acc.latitude,
+            acc.longitude
+          );
         }
-      }
-    });
-    
-    return { account: nearest, distance: minDist };
+        return { ...acc, distance };
+      })
+      .sort((a, b) => {
+        // Accounts with distance first, sorted by distance
+        if (a.distance !== undefined && b.distance !== undefined) {
+          return a.distance - b.distance;
+        }
+        if (a.distance !== undefined) return -1;
+        if (b.distance !== undefined) return 1;
+        return a.name.localeCompare(b.name);
+      });
   }, [geoLocation, accounts]);
+
+  // Get nearest account
+  const nearestAccount = useMemo(() => {
+    if (sortedAccounts.length === 0) return null;
+    const first = sortedAccounts[0];
+    if (first.distance !== undefined) {
+      return { account: first, distance: first.distance };
+    }
+    return null;
+  }, [sortedAccounts]);
+
+  // Auto-select nearest account when location updates and no account selected
+  useEffect(() => {
+    if (nearestAccount && !selectedAccountId) {
+      setSelectedAccountId(nearestAccount.account.id);
+    }
+  }, [nearestAccount, selectedAccountId]);
+
+  // Handle manual location refresh
+  const handleRefreshLocation = useCallback(async () => {
+    await getCurrentLocation();
+    toast({ title: 'Location updated' });
+  }, [getCurrentLocation, toast]);
 
   // Today's stats
   const todayStats = useMemo(() => {
@@ -127,6 +180,8 @@ export default function DriverDashboard() {
     const success = await clockIn();
     if (success) {
       toast({ title: 'Shift started!' });
+      // Refresh location after clocking in
+      getCurrentLocation();
     } else {
       toast({ variant: 'destructive', title: 'Failed to start shift' });
     }
@@ -334,7 +389,16 @@ export default function DriverDashboard() {
               <div className="flex items-center gap-3">
                 <Navigation className="h-5 w-5 text-primary-foreground/70" />
                 <div>
-                  {nearestAccount ? (
+                  {geoLoading ? (
+                    <p className="font-medium text-primary-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Getting location...
+                    </p>
+                  ) : geoError ? (
+                    <p className="font-medium text-primary-foreground">
+                      {geoError}
+                    </p>
+                  ) : nearestAccount ? (
                     <>
                       <p className="font-medium text-primary-foreground">
                         <span className="text-primary-foreground/70">Nearest:</span> {nearestAccount.account.name}{' '}
@@ -346,33 +410,43 @@ export default function DriverDashboard() {
                     </>
                   ) : (
                     <p className="font-medium text-primary-foreground">
-                      {geoLoading ? 'Getting location...' : 'Select an account'}
+                      No accounts with coordinates found
                     </p>
                   )}
                 </div>
               </div>
-              <Navigation className="h-5 w-5 text-primary-foreground" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefreshLocation}
+                disabled={geoLoading}
+                className="text-primary-foreground hover:bg-primary-foreground/20"
+              >
+                <Navigation className={`h-5 w-5 ${geoLoading ? 'animate-pulse' : ''}`} />
+              </Button>
             </div>
 
             {/* Account Select */}
             <div className="mb-4">
               <Label className="text-sm text-muted-foreground">Select Account (verify or change)</Label>
               <Select 
-                value={selectedAccountId || nearestAccount?.account.id} 
+                value={selectedAccountId} 
                 onValueChange={setSelectedAccountId}
               >
                 <SelectTrigger className="mt-1.5 bg-secondary border-border">
                   <SelectValue placeholder="Select account..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map((acc) => (
+                  {sortedAccounts.map((acc) => (
                     <SelectItem key={acc.id} value={acc.id}>
-                      {acc.name}
-                      {nearestAccount?.account.id === acc.id && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {nearestAccount.distance.toFixed(1)}km
-                        </span>
-                      )}
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span>{acc.name}</span>
+                        {acc.distance !== undefined && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {acc.distance.toFixed(1)}km
+                          </span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
