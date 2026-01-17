@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
 import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
+import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
 
 interface TimeClockEntry {
   id: string;
@@ -1096,17 +1097,10 @@ export default function ReportsPage() {
                       {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                     </TableCell>
                     <TableCell>
-                      {log.photo_urls && log.photo_urls.length > 0 ? (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 px-2 gap-1"
-                          onClick={() => openPhotoViewer(log.photo_urls!)}
-                        >
-                          <ImageIcon className="h-4 w-4 text-primary" />
-                          <span className="text-xs">{log.photo_urls.length}</span>
-                        </Button>
-                      ) : '-'}
+                      <PhotoThumbnails 
+                        photoPaths={log.photo_urls || []} 
+                        onViewPhotos={openPhotoViewer}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
