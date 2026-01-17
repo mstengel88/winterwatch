@@ -19,8 +19,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Sky blue primary - for plow/driver features */
-    --primary: 199 89% 48%;
+    /* Sky blue primary - for plow/driver features (darkened for WCAG AA 4.5:1 contrast) */
+    --primary: 199 89% 38%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96%;
@@ -38,22 +38,22 @@
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 199 89% 48%;
+    --ring: 199 89% 38%;
 
     --radius: 0.5rem;
 
     /* Sidebar - winter theme */
     --sidebar-background: 210 29% 24%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary: 199 89% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 29% 30%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 210 29% 30%;
-    --sidebar-ring: 199 89% 48%;
+    --sidebar-ring: 199 89% 38%;
 
     /* Custom WinterWatch tokens */
-    --plow: 199 89% 48%;
+    --plow: 199 89% 38%;
     --plow-foreground: 0 0% 100%;
     --shovel: 271 81% 56%;
     --shovel-foreground: 0 0% 100%;
@@ -61,7 +61,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    --info: 199 89% 38%;
     --info-foreground: 0 0% 100%;
   }
 
@@ -75,7 +75,7 @@
     --popover: 222 47% 14%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 199 89% 48%;
+    --primary: 199 89% 38%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 217 33% 17%;
@@ -92,18 +92,18 @@
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 199 89% 48%;
+    --ring: 199 89% 38%;
 
     --sidebar-background: 222 47% 8%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary: 199 89% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 47% 14%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 222 47% 14%;
-    --sidebar-ring: 199 89% 48%;
+    --sidebar-ring: 199 89% 38%;
 
-    --plow: 199 89% 48%;
+    --plow: 199 89% 38%;
     --plow-foreground: 0 0% 100%;
     --shovel: 271 81% 56%;
     --shovel-foreground: 0 0% 100%;
@@ -111,7 +111,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    --info: 199 89% 38%;
     --info-foreground: 0 0% 100%;
   }
 }
@@ -133,8 +133,8 @@
 /* Utility classes for role-based theming */
 @layer utilities {
   .theme-plow {
-    --primary: 199 89% 48%;
-    --ring: 199 89% 48%;
+    --primary: 199 89% 38%;
+    --ring: 199 89% 38%;
   }
 
   .theme-shovel {
