@@ -866,33 +866,39 @@ export default function DriverDashboard() {
               <Card className="border-border/50 bg-card">
                 <CardContent className="py-2 px-0">
                   <div className="divide-y divide-border">
-                    {recentWorkLogs.map((log: any) => (
-                      <div key={log.id} className="flex items-start gap-3 py-3 px-4">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 mt-0.5">
-                          <Truck className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-sm">{log.account?.name || 'Unknown'}</p>
-                            <Badge 
-                              className={
-                                log.service_type === 'plow' || log.service_type === 'both' 
-                                  ? 'bg-success text-success-foreground text-xs px-2 py-0.5' 
-                                  : 'bg-success text-success-foreground text-xs px-2 py-0.5'
-                              }
-                            >
-                              {log.service_type === 'plow' ? 'Plowed' : log.service_type === 'salt' ? 'Salted' : 'Both'}
-                            </Badge>
+                    {recentWorkLogs.map((log: any) => {
+                      const isInProgress = log.status === 'in_progress' || (log.check_in_time && !log.check_out_time);
+                      return (
+                        <div key={log.id} className={`flex items-start gap-3 py-3 px-4 ${isInProgress ? 'bg-primary/5' : ''}`}>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-lg mt-0.5 ${isInProgress ? 'bg-warning/20' : 'bg-primary/20'}`}>
+                            <Truck className={`h-4 w-4 ${isInProgress ? 'text-warning' : 'text-primary'}`} />
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {selectedEmployeeNameForUi}
-                          </p>
-                          {log.notes && (
-                            <p className="text-xs text-muted-foreground mt-0.5">{log.notes}</p>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm">{log.account?.name || 'Unknown'}</p>
+                              {isInProgress ? (
+                                <Badge className="bg-warning/20 text-warning border-warning/30 text-xs px-2 py-0.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-warning mr-1.5 animate-pulse" />
+                                  In Progress
+                                </Badge>
+                              ) : (
+                                <Badge 
+                                  className="bg-success text-success-foreground text-xs px-2 py-0.5"
+                                >
+                                  {log.service_type === 'plow' ? 'Plowed' : log.service_type === 'salt' ? 'Salted' : 'Both'}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {selectedEmployeeNameForUi}
+                            </p>
+                            {log.notes && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{log.notes}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
