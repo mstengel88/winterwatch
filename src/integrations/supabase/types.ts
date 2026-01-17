@@ -31,6 +31,7 @@ export type Database = {
           name: string
           notes: string | null
           priority: number | null
+          service_type: string | null
           state: string | null
           updated_at: string
           zip: string | null
@@ -51,6 +52,7 @@ export type Database = {
           name: string
           notes?: string | null
           priority?: number | null
+          service_type?: string | null
           state?: string | null
           updated_at?: string
           zip?: string | null
@@ -71,6 +73,7 @@ export type Database = {
           name?: string
           notes?: string | null
           priority?: number | null
+          service_type?: string | null
           state?: string | null
           updated_at?: string
           zip?: string | null
