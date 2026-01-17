@@ -259,15 +259,15 @@ export default function EmployeesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Link to User Account</Label>
-                <Select
-                  value={formData.user_id}
-                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
+              <Select
+                  value={formData.user_id || "none"}
+                  onValueChange={(value) => setFormData({ ...formData, user_id: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select user account (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {profiles.map((profile) => (
                       <SelectItem key={profile.id} value={profile.id}>
                         {profile.full_name || profile.email || profile.id}
