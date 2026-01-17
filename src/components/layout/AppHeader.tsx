@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Snowflake, Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck } from 'lucide-react';
+import { Snowflake, Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -199,6 +199,31 @@ export function AppHeader() {
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
+              {isAdminOrManager() && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/admin/users')}>
+                    <UserCog className="mr-2 h-4 w-4" />
+                    Users & Roles
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/employees')}>
+                    <Users className="mr-2 h-4 w-4" />
+                    Employees
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/accounts')}>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Accounts
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/equipment')}>
+                    <Wrench className="mr-2 h-4 w-4" />
+                    Equipment
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/reports')}>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Reports
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
