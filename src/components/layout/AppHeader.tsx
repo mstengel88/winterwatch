@@ -30,7 +30,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/driver', label: 'Plow Driver', icon: Truck, roles: ['driver', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager'] },
   { href: '/time-clock', label: 'Time Clock', icon: Clock, roles: ['admin', 'manager'] },
