@@ -521,20 +521,22 @@ export default function ShovelDashboard() {
                   <SelectValue placeholder="Select nearest account" />
                 </SelectTrigger>
                 <SelectContent className="bg-[hsl(var(--card))] border-border">
-                  {sortedAccounts.map(({ account, distance }) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      <span className="flex items-center justify-between w-full gap-2">
-                        <span>{account.name}</span>
-                        {distance !== null && (
-                          <span className="text-muted-foreground text-xs">
-                            {distance < 1 
-                              ? `${Math.round(distance * 1000)}m`
-                              : `${distance.toFixed(1)}km`}
-                          </span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
+                  {sortedAccounts
+                    .filter(({ account }) => account.id && account.id.trim() !== '')
+                    .map(({ account, distance }) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <span className="flex items-center justify-between w-full gap-2">
+                          <span>{account.name}</span>
+                          {distance !== null && (
+                            <span className="text-muted-foreground text-xs">
+                              {distance < 1 
+                                ? `${Math.round(distance * 1000)}m`
+                                : `${distance.toFixed(1)}km`}
+                            </span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
