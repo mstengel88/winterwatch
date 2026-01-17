@@ -545,7 +545,7 @@ export default function ShovelDashboard() {
                 <Button 
                   className="w-full bg-purple-600 hover:bg-purple-700"
                   onClick={handleCheckIn}
-                  disabled={!activeShift || selectedTeamMembers.length === 0 || !selectedAccount}
+                  disabled={!activeShift || !selectedAccount}
                 >
                   <Play className="h-4 w-4 mr-2" />
                   Check In & Start Timer
