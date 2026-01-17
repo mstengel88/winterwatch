@@ -93,7 +93,7 @@ export default function DriverDashboard() {
   const [weather, setWeather] = useState('Overcast');
   const [windSpeed, setWindSpeed] = useState('7');
   const [notes, setNotes] = useState('');
-  const [equipment, setEquipment] = useState<any[]>([]);
+  const [allEquipment, setAllEquipment] = useState<any[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -118,10 +118,30 @@ export default function DriverDashboard() {
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
 
+  // Filter equipment based on selected service type
+  // Plow → service_type 'plow', Salt → service_type 'both', Plow & Salt → service_type 'both'
+  const filteredEquipment = useMemo(() => {
+    if (serviceType === 'plow') {
+      return allEquipment.filter(eq => eq.service_type === 'plow');
+    }
+    // For 'salt' and 'both', show equipment with service_type 'both'
+    return allEquipment.filter(eq => eq.service_type === 'both');
+  }, [allEquipment, serviceType]);
+
+  // Clear equipment selection when service type changes if current selection doesn't match
+  useEffect(() => {
+    if (selectedEquipment) {
+      const isValid = filteredEquipment.some(eq => eq.id === selectedEquipment);
+      if (!isValid) {
+        setSelectedEquipment('');
+      }
+    }
+  }, [serviceType, filteredEquipment, selectedEquipment]);
+
   // Fetch equipment and plow employees
   useEffect(() => {
     supabase.from('equipment').select('*').eq('is_active', true).eq('status', 'available').then(({ data }) => {
-      if (data) setEquipment(data);
+      if (data) setAllEquipment(data);
     });
     
     // Fetch employees with plow or both category
@@ -690,7 +710,7 @@ export default function DriverDashboard() {
                     <SelectValue placeholder="Select equipment..." />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-primary/30">
-                    {equipment
+                    {filteredEquipment
                       .filter((eq) => eq.id && eq.id.trim() !== '')
                       .map((eq) => (
                         <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
