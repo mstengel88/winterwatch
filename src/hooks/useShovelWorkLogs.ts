@@ -10,7 +10,7 @@ interface UseShovelWorkLogsReturn {
   recentWorkLogs: ShovelWorkLog[];
   isLoading: boolean;
   error: string | null;
-  checkIn: (accountId: string, serviceType?: ServiceType) => Promise<boolean>;
+  checkIn: (accountId: string, serviceType?: ServiceType, teamMemberIds?: string[]) => Promise<boolean>;
   checkOut: (data: CheckOutData) => Promise<boolean>;
   refreshData: () => Promise<void>;
 }
@@ -18,6 +18,7 @@ interface UseShovelWorkLogsReturn {
 interface CheckOutData {
   areasCleared?: string[];
   iceMeltUsedLbs?: number;
+  snowDepthInches?: number;
   weatherConditions?: string;
   notes?: string;
   photoUrls?: string[];
@@ -122,7 +123,8 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
 
   const checkIn = async (
     accountId: string,
-    serviceType: ServiceType = 'shovel'
+    serviceType: ServiceType = 'shovel',
+    teamMemberIds?: string[]
   ): Promise<boolean> => {
     if (!employee) {
       setError('No employee record found');
@@ -142,6 +144,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
           check_in_time: new Date().toISOString(),
           check_in_latitude: location?.latitude ?? null,
           check_in_longitude: location?.longitude ?? null,
+          team_member_ids: teamMemberIds && teamMemberIds.length > 0 ? teamMemberIds : null,
         })
         .select(`
           *,
@@ -179,6 +182,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
           check_out_longitude: location?.longitude ?? null,
           areas_cleared: data.areasCleared ?? null,
           ice_melt_used_lbs: data.iceMeltUsedLbs ?? null,
+          snow_depth_inches: data.snowDepthInches ?? null,
           weather_conditions: data.weatherConditions ?? null,
           notes: data.notes ?? null,
           photo_urls: data.photoUrls ?? null,
