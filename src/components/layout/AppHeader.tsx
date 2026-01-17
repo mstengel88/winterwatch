@@ -18,8 +18,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Snowflake, Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
+import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import logo from '@/assets/logo.png';
 
 interface NavItem {
   href: string;
@@ -101,10 +102,8 @@ export function AppHeader() {
             <SheetContent side="left" className="w-72 p-0">
               <SheetHeader className="border-b border-border/40 p-4">
                 <SheetTitle className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary border border-primary/20">
-                    <Snowflake className="h-4 w-4 text-primary-foreground" />
-                  </div>
-                  <span className="font-semibold">WinterWatch-Pro</span>
+                  <img src={logo} alt="WinterPath" className="h-8 w-8 rounded-full object-cover" />
+                  <span className="font-semibold">WinterPath</span>
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col p-4 space-y-1">
@@ -155,10 +154,8 @@ export function AppHeader() {
             className="flex items-center gap-2 cursor-pointer" 
             onClick={() => navigate(getHomeRoute())}
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary border border-primary/20">
-              <Snowflake className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-foreground hidden sm:inline">WinterWatch-Pro</span>
+            <img src={logo} alt="WinterPath" className="h-8 w-8 rounded-full object-cover" />
+            <span className="font-semibold text-foreground hidden sm:inline">WinterPath</span>
           </div>
         </div>
 
