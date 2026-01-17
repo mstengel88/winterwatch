@@ -17,6 +17,7 @@ import { equipmentSchema, getValidationError } from '@/lib/validations';
 
 const EQUIPMENT_TYPES = ['Plow Truck', 'Salt Truck', 'Loader', 'Skid Steer', 'Quadaxle', 'Box Truck', 'Semi', 'Other'];
 const STATUS_OPTIONS = ['available', 'in_use', 'maintenance', 'out_of_service'];
+const SERVICE_TYPE_OPTIONS = ['plow', 'salt', 'both'];
 
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -34,6 +35,7 @@ export default function EquipmentPage() {
     license_plate: '',
     vin: '',
     status: 'available',
+    service_type: 'both',
     notes: '',
     is_active: true,
   });
@@ -72,6 +74,7 @@ export default function EquipmentPage() {
         license_plate: equip.license_plate || '',
         vin: equip.vin || '',
         status: equip.status || 'available',
+        service_type: (equip as any).service_type || 'both',
         notes: equip.notes || '',
         is_active: equip.is_active,
       });
@@ -86,6 +89,7 @@ export default function EquipmentPage() {
         license_plate: '',
         vin: '',
         status: 'available',
+        service_type: 'both',
         notes: '',
         is_active: true,
       });
@@ -113,6 +117,7 @@ export default function EquipmentPage() {
         license_plate: validated.license_plate || null,
         vin: validated.vin || null,
         status: validated.status,
+        service_type: formData.service_type,
         notes: validated.notes || null,
         is_active: validated.is_active,
       };
@@ -288,9 +293,8 @@ export default function EquipmentPage() {
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {equip.make || equip.model ? `${equip.make || ''} ${equip.model || ''}`.trim() : '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm">
-                      {equip.type.toLowerCase().includes('plow') ? 'Plow' : 
-                       equip.type.toLowerCase().includes('salt') ? 'Salt' : 'Both'}
+                    <td className="px-4 py-3 text-sm capitalize">
+                      {(equip as any).service_type || 'both'}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">-</td>
                     <td className="px-4 py-3">{getStatusBadge(equip.status)}</td>
@@ -422,7 +426,7 @@ export default function EquipmentPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select
@@ -436,6 +440,24 @@ export default function EquipmentPage() {
                     {STATUS_OPTIONS.map((status) => (
                       <SelectItem key={status} value={status}>
                         <span className="capitalize">{status.replace('_', ' ')}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Service</Label>
+                <Select
+                  value={formData.service_type}
+                  onValueChange={(value) => setFormData({ ...formData, service_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SERVICE_TYPE_OPTIONS.map((service) => (
+                      <SelectItem key={service} value={service}>
+                        <span className="capitalize">{service}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
