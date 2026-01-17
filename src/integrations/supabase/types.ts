@@ -235,7 +235,9 @@ export type Database = {
           notes: string | null
           photo_urls: string[] | null
           service_type: Database["public"]["Enums"]["service_type"]
+          snow_depth_inches: number | null
           status: Database["public"]["Enums"]["work_status"]
+          team_member_ids: string[] | null
           updated_at: string
           weather_conditions: string | null
         }
@@ -255,7 +257,9 @@ export type Database = {
           notes?: string | null
           photo_urls?: string[] | null
           service_type?: Database["public"]["Enums"]["service_type"]
+          snow_depth_inches?: number | null
           status?: Database["public"]["Enums"]["work_status"]
+          team_member_ids?: string[] | null
           updated_at?: string
           weather_conditions?: string | null
         }
@@ -275,7 +279,9 @@ export type Database = {
           notes?: string | null
           photo_urls?: string[] | null
           service_type?: Database["public"]["Enums"]["service_type"]
+          snow_depth_inches?: number | null
           status?: Database["public"]["Enums"]["work_status"]
+          team_member_ids?: string[] | null
           updated_at?: string
           weather_conditions?: string | null
         }

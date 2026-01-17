@@ -235,7 +235,8 @@ export default function ShovelDashboard() {
       toast({ variant: 'destructive', title: 'Please select an account' });
       return;
     }
-    const success = await checkIn(selectedAccount);
+    // Pass selected team members to the check-in
+    const success = await checkIn(selectedAccount, serviceType, selectedTeamMembers);
     if (success) {
       toast({ title: 'Checked in at account!' });
     } else {
@@ -252,6 +253,7 @@ export default function ShovelDashboard() {
     const success = await checkOut({
       areasCleared: [],
       iceMeltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
+      snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
       notes: notes || undefined,
       weatherConditions: weather || undefined,
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
@@ -260,6 +262,7 @@ export default function ShovelDashboard() {
       toast({ title: 'Work completed!' });
       setNotes('');
       setSaltUsed('');
+      setSnowDepth('');
       clearPhotos();
     } else {
       toast({ variant: 'destructive', title: 'Failed to check out' });
@@ -283,6 +286,8 @@ export default function ShovelDashboard() {
   };
 
   // Validation: all fields required except notes and photos
+  // Salt used is optional when service type is 'shovel'
+  // Snow depth is optional when service type is 'salt'
   const isFormValid = useMemo(() => {
     // Account is always required
     if (!selectedAccount) return false;
@@ -290,11 +295,11 @@ export default function ShovelDashboard() {
     // Team members required (at least one)
     if (selectedTeamMembers.length === 0) return false;
     
-    // Snow depth required
-    if (!snowDepth || snowDepth.trim() === '') return false;
+    // Snow depth required unless service type is 'salt'
+    if (serviceType !== 'salt' && (!snowDepth || snowDepth.trim() === '')) return false;
     
-    // Salt used required
-    if (!saltUsed || saltUsed.trim() === '') return false;
+    // Salt used required unless service type is 'shovel'
+    if (serviceType !== 'shovel' && (!saltUsed || saltUsed.trim() === '')) return false;
     
     // Temperature required
     if (!temperature || temperature.trim() === '') return false;
@@ -306,7 +311,7 @@ export default function ShovelDashboard() {
     if (!wind || wind.trim() === '') return false;
     
     return true;
-  }, [selectedAccount, selectedTeamMembers, snowDepth, saltUsed, temperature, weather, wind]);
+  }, [selectedAccount, selectedTeamMembers, snowDepth, saltUsed, temperature, weather, wind, serviceType]);
 
   const isLoading = employeeLoading || workLogsLoading;
 
@@ -646,7 +651,9 @@ export default function ShovelDashboard() {
             {/* Snow Depth and Salt Used */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm">Snow Depth (inches) <span className="text-red-400">*</span></Label>
+                <Label className="text-sm">
+                  Snow Depth (inches) {serviceType !== 'salt' && <span className="text-red-400">*</span>}
+                </Label>
                 <Input 
                   placeholder="e.g., 3.5"
                   value={snowDepth}
@@ -655,7 +662,9 @@ export default function ShovelDashboard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">Salt Used (lbs) <span className="text-red-400">*</span></Label>
+                <Label className="text-sm">
+                  Salt Used (lbs) {serviceType !== 'shovel' && <span className="text-red-400">*</span>}
+                </Label>
                 <Input 
                   placeholder="e.g., 50"
                   value={saltUsed}
