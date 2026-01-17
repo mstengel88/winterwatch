@@ -120,7 +120,7 @@ export default function DriverDashboard() {
 
   // Fetch equipment and plow employees
   useEffect(() => {
-    supabase.from('equipment').select('*').eq('is_active', true).then(({ data }) => {
+    supabase.from('equipment').select('*').eq('is_active', true).eq('status', 'available').then(({ data }) => {
       if (data) setEquipment(data);
     });
     
