@@ -139,19 +139,38 @@ export default function WorkLogsPage() {
     }
   };
 
+  const getServiceTypeLabel = (type: 'plow' | 'shovel', serviceType: string): string => {
+    if (type === 'plow') {
+      switch (serviceType) {
+        case 'plow': return 'Plow';
+        case 'salt': return 'Salt';
+        case 'both': return 'Plow/Salt';
+        default: return serviceType;
+      }
+    } else {
+      switch (serviceType) {
+        case 'shovel': return 'Shovel';
+        case 'ice_melt': return 'Salt';
+        case 'both': return 'Shovel/Salt';
+        default: return serviceType;
+      }
+    }
+  };
+
   const getServiceTypeBadge = (log: WorkLog) => {
+    const label = getServiceTypeLabel(log.type, log.service_type);
     if (log.type === 'shovel') {
       return (
         <Badge className="bg-shovel/20 text-shovel border-shovel/30">
           <Shovel className="h-3 w-3 mr-1" />
-          {log.service_type === 'ice_melt' ? 'Ice Melt' : 'Shovel'}
+          {label}
         </Badge>
       );
     }
     return (
       <Badge className="bg-plow/20 text-plow border-plow/30">
         <Truck className="h-3 w-3 mr-1" />
-        {log.service_type === 'both' ? 'Plow & Salt' : log.service_type === 'salt' ? 'Salt' : 'Plow'}
+        {label}
       </Badge>
     );
   };
@@ -162,9 +181,7 @@ export default function WorkLogsPage() {
       date: format(new Date(log.created_at), 'MM/dd/yy'),
       account: log.account?.name || 'Unknown',
       employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
-      serviceType: log.type === 'shovel' 
-        ? (log.service_type === 'ice_melt' ? 'Ice Melt' : 'Shovel')
-        : (log.service_type === 'both' ? 'Plow & Salt' : log.service_type === 'salt' ? 'Salt' : 'Plow'),
+      serviceType: getServiceTypeLabel(log.type, log.service_type),
       duration: getDuration(log.check_in_time, log.check_out_time),
       saltLbs: log.salt_used_lbs,
       iceMeltLbs: log.ice_melt_used_lbs,

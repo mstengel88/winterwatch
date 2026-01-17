@@ -1001,11 +1001,11 @@ export default function ReportsPage() {
                       >
                         {log.type === 'plow' 
                           ? (log.service_type === 'both' ? 'Plow/Salt' : 
-                             log.service_type.charAt(0).toUpperCase() + log.service_type.slice(1))
-                          : (log.service_type === 'both' ? 'Shov/Salt' : 
+                             log.service_type === 'plow' ? 'Plow' : 
+                             log.service_type === 'salt' ? 'Salt' : log.service_type)
+                          : (log.service_type === 'both' ? 'Shovel/Salt' : 
                              log.service_type === 'ice_melt' ? 'Salt' : 
-                             log.service_type === 'shovel' ? 'Shovel' : 
-                             log.service_type.charAt(0).toUpperCase() + log.service_type.slice(1))}
+                             log.service_type === 'shovel' ? 'Shovel' : log.service_type)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">
