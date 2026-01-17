@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,21 +7,30 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Auth from "./pages/Auth";
-import DriverDashboard from "./pages/DriverDashboard";
-import ShovelDashboard from "./pages/ShovelDashboard";
-import WorkLogsPage from "./pages/WorkLogsPage";
-import TimeClockPage from "./pages/TimeClockPage";
-import Pending from "./pages/Pending";
 import NotFound from "./pages/NotFound";
-import AdminLayout from "./pages/admin/AdminLayout";
-import UsersPage from "./pages/admin/UsersPage";
-import EmployeesPage from "./pages/admin/EmployeesPage";
-import AccountsPage from "./pages/admin/AccountsPage";
-import EquipmentPage from "./pages/admin/EquipmentPage";
-import ReportsPage from "./pages/admin/ReportsPage";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 
+// Lazy load route components for code splitting
+const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
+const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
+const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
+const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
+const Pending = lazy(() => import("./pages/Pending"));
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
+const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
+const AccountsPage = lazy(() => import("./pages/admin/AccountsPage"));
+const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
+const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
+
 const queryClient = new QueryClient();
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex min-h-screen items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -29,32 +39,34 @@ const App = () => (
         <AuthProvider>
           <Toaster />
           <Sonner />
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
-            
-            {/* Role-specific dashboards */}
-            <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
-            <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
-            
-            {/* Admin/Manager only pages */}
-            <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
-            <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
-            
-            <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
-            
-            {/* Admin routes */}
-            <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AdminLayout /></ProtectedRoute>}>
-              <Route index element={<Navigate to="/admin/users" replace />} />
-              <Route path="users" element={<UsersPage />} />
-              <Route path="employees" element={<EmployeesPage />} />
-              <Route path="accounts" element={<AccountsPage />} />
-              <Route path="equipment" element={<EquipmentPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-            </Route>
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
+              
+              {/* Role-specific dashboards */}
+              <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
+              <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
+              
+              {/* Admin/Manager only pages */}
+              <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
+              <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
+              
+              <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
+              
+              {/* Admin routes */}
+              <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AdminLayout /></ProtectedRoute>}>
+                <Route index element={<Navigate to="/admin/users" replace />} />
+                <Route path="users" element={<UsersPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="accounts" element={<AccountsPage />} />
+                <Route path="equipment" element={<EquipmentPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+              </Route>
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </AuthProvider>
         </TooltipProvider>
     </BrowserRouter>
