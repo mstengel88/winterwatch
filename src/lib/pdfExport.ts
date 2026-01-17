@@ -61,7 +61,7 @@ export function generateWorkLogsPDF(
   if (workLogs.length > 0) {
     autoTable(doc, {
       startY: 50,
-      head: [['Date', 'Check In', 'Check Out', 'Duration', 'Account', 'Service', 'Snow', 'Salt', 'Equipment', 'Employee', 'Conditions']],
+      head: [['Date', 'Check In', 'Check Out', 'Duration', 'Account', 'Service', 'Snow', 'Salt', 'Equipment', 'Employee', 'Conditions', 'Notes']],
       body: workLogs.map((log) => [
         log.date,
         log.checkIn,
@@ -74,10 +74,11 @@ export function generateWorkLogsPDF(
         log.equipment,
         log.employee,
         log.conditions,
+        log.notes || '-',
       ]),
       styles: {
-        fontSize: 7,
-        cellPadding: 2,
+        fontSize: 6,
+        cellPadding: 1.5,
       },
       headStyles: {
         fillColor: [255, 255, 255],
@@ -92,17 +93,18 @@ export function generateWorkLogsPDF(
         fillColor: [255, 255, 255],
       },
       columnStyles: {
-        0: { cellWidth: 22 },  // Date
-        1: { cellWidth: 18 },  // Check In
-        2: { cellWidth: 18 },  // Check Out
-        3: { cellWidth: 18 },  // Duration
-        4: { cellWidth: 40 },  // Account
-        5: { cellWidth: 28 },  // Service
-        6: { cellWidth: 16 },  // Snow
-        7: { cellWidth: 18 },  // Salt
-        8: { cellWidth: 30 },  // Equipment
-        9: { cellWidth: 35 },  // Employee
-        10: { cellWidth: 30 }, // Conditions
+        0: { cellWidth: 20 },  // Date
+        1: { cellWidth: 16 },  // Check In
+        2: { cellWidth: 16 },  // Check Out
+        3: { cellWidth: 16 },  // Duration
+        4: { cellWidth: 35 },  // Account
+        5: { cellWidth: 22 },  // Service
+        6: { cellWidth: 14 },  // Snow
+        7: { cellWidth: 14 },  // Salt
+        8: { cellWidth: 26 },  // Equipment
+        9: { cellWidth: 30 },  // Employee
+        10: { cellWidth: 24 }, // Conditions
+        11: { cellWidth: 34 }, // Notes
       },
       didDrawPage: (data) => {
         // Draw header line under column headers
@@ -115,17 +117,6 @@ export function generateWorkLogsPDF(
         }
       },
     });
-
-    // Add notes section at the bottom if any logs have notes
-    const logsWithNotes = workLogs.filter(log => log.notes && log.notes.trim() !== '' && log.notes !== '-');
-    if (logsWithNotes.length > 0) {
-      const finalY = (doc as any).lastAutoTable.finalY + 10;
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      logsWithNotes.forEach((log, index) => {
-        doc.text(`Notes: ${log.notes}`, 15, finalY + (index * 6));
-      });
-    }
   } else {
     doc.setFontSize(12);
     doc.setTextColor(100);
