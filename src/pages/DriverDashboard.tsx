@@ -890,7 +890,7 @@ export default function DriverDashboard() {
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {selectedEmployeeNameForUi}
+                              {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown'}
                             </p>
                             {log.notes && (
                               <p className="text-xs text-muted-foreground mt-0.5">{log.notes}</p>
