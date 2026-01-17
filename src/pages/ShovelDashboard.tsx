@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Select,
   SelectContent,
@@ -32,16 +33,11 @@ import {
   Navigation,
   Play,
   Footprints,
-  LogOut
+  LogOut,
+  Timer
 } from 'lucide-react';
-import { format, differenceInSeconds, differenceInMinutes, differenceInHours } from 'date-fns';
-import { Account } from '@/types/database';
-
-const TEAM_MEMBERS = [
-  'Gavin Peeks',
-  'Mitchell Anderson',
-  'Mike (Pops) Anderson',
-];
+import { format, differenceInSeconds } from 'date-fns';
+import { Account, Employee } from '@/types/database';
 
 // Calculate distance between two coordinates in km
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -96,6 +92,8 @@ export default function ShovelDashboard() {
   const [wind, setWind] = useState('11');
   const [notes, setNotes] = useState('');
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
 
   // Get location on mount and set up periodic refresh
   useEffect(() => {
@@ -105,6 +103,23 @@ export default function ShovelDashboard() {
     }, 30000); // Refresh location every 30 seconds
     return () => clearInterval(interval);
   }, [getCurrentLocation]);
+
+  // Fetch shovel employees from database
+  useEffect(() => {
+    const fetchShovelEmployees = async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .in('category', ['shovel', 'both'])
+        .eq('is_active', true)
+        .order('first_name');
+      
+      if (!error && data) {
+        setShovelEmployees(data as Employee[]);
+      }
+    };
+    fetchShovelEmployees();
+  }, []);
 
   // Shift timer
   useEffect(() => {
@@ -127,6 +142,28 @@ export default function ShovelDashboard() {
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [activeShift]);
+
+  // Work timer (elapsed time at current location)
+  useEffect(() => {
+    if (!activeWorkLog || !activeWorkLog.check_in_time) {
+      setWorkTimer({ hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+
+    const updateWorkTimer = () => {
+      const start = new Date(activeWorkLog.check_in_time!);
+      const now = new Date();
+      const totalSeconds = differenceInSeconds(now, start);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setWorkTimer({ hours, minutes, seconds });
+    };
+
+    updateWorkTimer();
+    const interval = setInterval(updateWorkTimer, 1000);
+    return () => clearInterval(interval);
+  }, [activeWorkLog]);
 
   // Sort accounts by distance
   const sortedAccounts = useMemo((): AccountWithDistance[] => {
@@ -493,10 +530,20 @@ export default function ShovelDashboard() {
             ) : (
               <Card className="border-green-500/50 bg-green-500/10">
                 <CardContent className="py-3 px-4">
-                  <p className="text-sm font-medium text-green-400">Currently working at location</p>
-                  <p className="text-xs text-muted-foreground">
-                    Started {activeWorkLog.check_in_time ? format(new Date(activeWorkLog.check_in_time), 'h:mm a') : 'Unknown'}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-400">Currently working at location</p>
+                      <p className="text-xs text-muted-foreground">
+                        Started {activeWorkLog.check_in_time ? format(new Date(activeWorkLog.check_in_time), 'h:mm a') : 'Unknown'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-green-400" />
+                      <span className="text-lg font-mono font-bold text-green-400">
+                        {formatTime(workTimer.hours)}:{formatTime(workTimer.minutes)}:{formatTime(workTimer.seconds)}
+                      </span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -549,19 +596,23 @@ export default function ShovelDashboard() {
               </Label>
               <Card className="bg-[hsl(var(--card))]/50 border-border/30">
                 <CardContent className="py-3 space-y-2">
-                  {TEAM_MEMBERS.map((member) => (
-                    <div 
-                      key={member}
-                      className="flex items-center gap-3 cursor-pointer"
-                      onClick={() => toggleTeamMember(member)}
-                    >
-                      <Checkbox 
-                        checked={selectedTeamMembers.includes(member)}
-                        className="border-purple-500 data-[state=checked]:bg-purple-600"
-                      />
-                      <span className="text-sm">{member}</span>
-                    </div>
-                  ))}
+                  {shovelEmployees.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No shovel crew members found</p>
+                  ) : (
+                    shovelEmployees.map((emp) => (
+                      <div 
+                        key={emp.id}
+                        className="flex items-center gap-3 cursor-pointer"
+                        onClick={() => toggleTeamMember(emp.id)}
+                      >
+                        <Checkbox 
+                          checked={selectedTeamMembers.includes(emp.id)}
+                          className="border-purple-500 data-[state=checked]:bg-purple-600"
+                        />
+                        <span className="text-sm">{emp.first_name} {emp.last_name}</span>
+                      </div>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </div>
