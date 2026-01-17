@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, Users, Building2 } from 'lucide-react';
 import { z } from 'zod';
@@ -24,6 +25,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [stayLoggedIn, setStayLoggedIn] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
 
@@ -258,6 +260,22 @@ export default function Auth() {
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}
             </div>
+
+            {isLogin && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="stayLoggedIn"
+                  checked={stayLoggedIn}
+                  onCheckedChange={(checked) => setStayLoggedIn(checked === true)}
+                />
+                <Label
+                  htmlFor="stayLoggedIn"
+                  className="text-sm font-normal text-muted-foreground cursor-pointer"
+                >
+                  Stay logged in
+                </Label>
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (

@@ -22,6 +22,8 @@ interface TimeClockEntry {
   clock_out_latitude: number | null;
   clock_out_longitude: number | null;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface EmployeeSummary {
@@ -77,7 +79,7 @@ export default function TimeClockPage() {
 
       const { data, error } = await supabase
         .from('time_clock')
-        .select('*, employee:employees(first_name, last_name)')
+        .select('*, employee:employees(first_name, last_name), created_at, updated_at')
         .gte('clock_in_time', startDate)
         .lte('clock_in_time', endDate)
         .order('clock_in_time', { ascending: false });
@@ -99,16 +101,44 @@ export default function TimeClockPage() {
   const handleClockOut = async (entryId: string) => {
     setClockingOut(entryId);
     try {
+      // Capture GPS location
+      let clockOutLocation: { latitude: number; longitude: number } | null = null;
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 60000,
+            });
+          });
+          clockOutLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+        } catch (geoError) {
+          console.warn('Could not get GPS location:', geoError);
+          // Continue without location
+        }
+      }
+
+      const updateData: Record<string, unknown> = {
+        clock_out_time: new Date().toISOString(),
+      };
+
+      if (clockOutLocation) {
+        updateData.clock_out_latitude = clockOutLocation.latitude;
+        updateData.clock_out_longitude = clockOutLocation.longitude;
+      }
+
       const { error } = await supabase
         .from('time_clock')
-        .update({
-          clock_out_time: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', entryId);
 
       if (error) throw error;
 
-      toast.success('Employee clocked out successfully');
+      toast.success('Employee clocked out successfully' + (clockOutLocation ? ' with GPS' : ''));
       fetchEntries();
     } catch (error) {
       console.error('Error clocking out:', error);
@@ -162,6 +192,15 @@ export default function TimeClockPage() {
     const hours = differenceInHours(end, start);
     const minutes = differenceInMinutes(end, start) % 60;
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
+  // Check if entry was edited (updated_at differs from created_at by more than 5 seconds)
+  const isEdited = (entry: TimeClockEntry): boolean => {
+    if (!entry.created_at || !entry.updated_at) return false;
+    const created = new Date(entry.created_at).getTime();
+    const updated = new Date(entry.updated_at).getTime();
+    // Allow 5 seconds tolerance for initial creation
+    return Math.abs(updated - created) > 5000;
   };
 
   const formatTime = (dateString: string | null): string => {
@@ -320,7 +359,7 @@ export default function TimeClockPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredEntries.slice(0, 15).map((entry) => (
-                        <TableRow key={entry.id} className="border-border/50">
+                        <TableRow key={entry.id} className={`border-border/50 ${isEdited(entry) ? 'bg-destructive/10' : ''}`}>
                           <TableCell className="font-medium">
                             {entry.employee
                               ? `${entry.employee.first_name} ${entry.employee.last_name}`
