@@ -26,9 +26,14 @@ import {
   Play,
   RefreshCw
 } from 'lucide-react';
-import { format, differenceInMinutes } from 'date-fns';
+import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import { Account } from '@/types/database';
+import { Account, Employee } from '@/types/database';
+
+// Format time with leading zeros
+function formatTime(value: number): string {
+  return value.toString().padStart(2, '0');
+}
 
 // Calculate distance between two coordinates in km
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -96,13 +101,48 @@ export default function DriverDashboard() {
   const [windSpeed, setWindSpeed] = useState('7');
   const [notes, setNotes] = useState('');
   const [equipment, setEquipment] = useState<any[]>([]);
+  const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
+  const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
-  // Fetch equipment
+  // Fetch equipment and plow employees
   useEffect(() => {
     supabase.from('equipment').select('*').eq('is_active', true).then(({ data }) => {
       if (data) setEquipment(data);
     });
+    
+    // Fetch employees with plow or both category
+    supabase
+      .from('employees')
+      .select('*')
+      .in('category', ['plow', 'both'])
+      .eq('is_active', true)
+      .order('first_name')
+      .then(({ data }) => {
+        if (data) setPlowEmployees(data as Employee[]);
+      });
   }, []);
+
+  // Shift timer
+  useEffect(() => {
+    if (!activeShift) {
+      setShiftTimer({ hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+
+    const updateTimer = () => {
+      const start = new Date(activeShift.clock_in_time);
+      const now = new Date();
+      const totalSeconds = differenceInSeconds(now, start);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setShiftTimer({ hours, minutes, seconds });
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [activeShift]);
 
   // Calculate sorted accounts by distance
   const sortedAccounts = useMemo((): AccountWithDistance[] => {
@@ -306,9 +346,18 @@ export default function DriverDashboard() {
                 </div>
                 <div>
                   <p className="font-medium">Daily Shift</p>
-                  <p className="text-sm text-muted-foreground">
-                    {activeShift ? 'Shift in progress' : 'Shift not started'}
-                  </p>
+                  {activeShift ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-mono font-bold text-primary">
+                        {formatTime(shiftTimer.hours)}:{formatTime(shiftTimer.minutes)}:{formatTime(shiftTimer.seconds)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Started {format(new Date(activeShift.clock_in_time), 'h:mm a')}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Shift not started</p>
+                  )}
                 </div>
               </div>
               {activeShift ? (
@@ -548,6 +597,11 @@ export default function DriverDashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="self">Just me</SelectItem>
+                    {plowEmployees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.first_name} {emp.last_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
