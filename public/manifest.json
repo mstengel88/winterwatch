@@ -1,7 +1,7 @@
 {
-  "name": "WinterWatch Pro",
-  "short_name": "WinterWatch",
-  "description": "Snow removal management for field crews",
+  "name": "WinterPath Service Tracker",
+  "short_name": "WinterPath",
+  "description": "Snow removal service tracking for field crews",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
   "display": "standalone",
