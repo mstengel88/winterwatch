@@ -468,24 +468,37 @@ export default function ShovelDashboard() {
               </Select>
             </div>
 
-            {/* Check In Button */}
-            <Button 
-              variant="ghost" 
-              className="w-full justify-center text-muted-foreground"
-              onClick={handleCheckIn}
-              disabled={!activeShift || activeWorkLog !== null}
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Check In & Start Timer
-            </Button>
+            {/* Check In Button or Active Work */}
+            {!activeWorkLog ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-center text-muted-foreground"
+                  onClick={handleCheckIn}
+                  disabled={!activeShift}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Check In & Start Timer
+                </Button>
 
-            {/* Warning Message */}
-            {!activeShift && (
-              <p className="text-center text-sm">
-                <span className="text-red-400">Start your </span>
-                <span className="text-yellow-400">daily shift</span>
-                <span className="text-red-400"> first via Time Clock</span>
-              </p>
+                {/* Warning Message */}
+                {!activeShift && (
+                  <p className="text-center text-sm">
+                    <span className="text-red-400">Start your </span>
+                    <span className="text-yellow-400">daily shift</span>
+                    <span className="text-red-400"> first via Time Clock</span>
+                  </p>
+                )}
+              </>
+            ) : (
+              <Card className="border-green-500/50 bg-green-500/10">
+                <CardContent className="py-3 px-4">
+                  <p className="text-sm font-medium text-green-400">Currently working at location</p>
+                  <p className="text-xs text-muted-foreground">
+                    Started {activeWorkLog.check_in_time ? format(new Date(activeWorkLog.check_in_time), 'h:mm a') : 'Unknown'}
+                  </p>
+                </CardContent>
+              </Card>
             )}
 
             {/* Service Type */}
