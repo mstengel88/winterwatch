@@ -98,12 +98,7 @@ export default function DriverDashboard() {
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
-  const selectedEmployeeIdForLogs = useMemo(() => {
-    if (selectedEmployees === 'self') return employee?.id;
-    if (selectedEmployees) return selectedEmployees;
-    return employee?.id;
-  }, [selectedEmployees, employee?.id]);
-
+  // Employee selection for UI display only - doesn't affect work log tracking
   const selectedEmployeeNameForUi = useMemo(() => {
     if (selectedEmployees === 'self' || !selectedEmployees) {
       return employee ? `${employee.first_name} ${employee.last_name}` : 'Employee';
@@ -112,6 +107,8 @@ export default function DriverDashboard() {
     return found ? `${found.first_name} ${found.last_name}` : 'Employee';
   }, [selectedEmployees, employee, plowEmployees]);
 
+  // Always use logged-in user's employee ID for tracking active work log
+  // Employee selection only affects what gets saved at checkout
   const {
     accounts,
     activeWorkLog,
@@ -119,7 +116,7 @@ export default function DriverDashboard() {
     isLoading: workLogsLoading,
     checkIn,
     checkOut,
-  } = useWorkLogs({ employeeId: selectedEmployeeIdForLogs });
+  } = useWorkLogs({ employeeId: employee?.id });
 
   // Fetch equipment and plow employees
   useEffect(() => {
