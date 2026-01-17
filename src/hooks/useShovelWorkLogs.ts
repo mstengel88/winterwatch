@@ -45,6 +45,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
         .from('accounts')
         .select('*')
         .eq('is_active', true)
+        .in('service_type', ['shovel', 'both'])
         .order('priority', { ascending: true })
         .order('name', { ascending: true });
 
