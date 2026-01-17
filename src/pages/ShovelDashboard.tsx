@@ -4,40 +4,41 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { ShiftTimer } from '@/components/dashboard/ShiftTimer';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Shovel, 
   Clock, 
   Loader2,
   AlertCircle,
-  Play,
-  Square,
+  LogIn,
   MapPin,
-  Thermometer,
+  Snowflake,
   Users,
-  CheckCircle2,
+  Navigation,
+  Play,
+  Image,
   Camera,
-  Footprints,
-  Building2
+  Footprints
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-const AREAS_OPTIONS = [
-  'Front Walkway',
-  'Side Entrance',
-  'Back Entrance',
-  'Parking Lot',
-  'Steps/Stairs',
-  'Ramp',
-  'Patio',
-  'Emergency Exit',
+const TEAM_MEMBERS = [
+  'Gavin Peeks',
+  'Mitchell Anderson',
+  'Mike (Pops) Anderson',
 ];
 
 export default function ShovelDashboard() {
@@ -53,63 +54,68 @@ export default function ShovelDashboard() {
   } = useShovelWorkLogs();
   const { toast } = useToast();
 
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
-  const [iceMeltUsed, setIceMeltUsed] = useState('');
+  const [selectedAccount, setSelectedAccount] = useState('');
+  const [serviceType, setServiceType] = useState<'shovel' | 'salt' | 'both'>('shovel');
+  const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>([]);
+  const [snowDepth, setSnowDepth] = useState('');
+  const [saltUsed, setSaltUsed] = useState('');
+  const [temperature, setTemperature] = useState('31');
+  const [weather, setWeather] = useState('Cloudy');
+  const [wind, setWind] = useState('11');
   const [notes, setNotes] = useState('');
-  const [weatherConditions, setWeatherConditions] = useState('');
 
   const handleClockIn = async () => {
     const success = await clockIn();
     if (success) {
-      toast({ title: 'Clocked in successfully!' });
+      toast({ title: 'Shift started successfully!' });
     } else {
-      toast({ variant: 'destructive', title: 'Failed to clock in' });
+      toast({ variant: 'destructive', title: 'Failed to start shift' });
     }
   };
 
   const handleClockOut = async () => {
     const success = await clockOut();
     if (success) {
-      toast({ title: 'Clocked out successfully!' });
+      toast({ title: 'Shift ended successfully!' });
     } else {
-      toast({ variant: 'destructive', title: 'Failed to clock out' });
+      toast({ variant: 'destructive', title: 'Failed to end shift' });
     }
   };
 
-  const handleCheckIn = async (accountId: string) => {
-    const success = await checkIn(accountId);
+  const handleCheckIn = async () => {
+    if (!selectedAccount) {
+      toast({ variant: 'destructive', title: 'Please select an account' });
+      return;
+    }
+    const success = await checkIn(selectedAccount);
     if (success) {
       toast({ title: 'Checked in at account!' });
     } else {
       toast({ variant: 'destructive', title: 'Failed to check in' });
     }
-    return success;
   };
 
   const handleCheckOut = async () => {
     const success = await checkOut({
-      areasCleared: selectedAreas,
-      iceMeltUsedLbs: iceMeltUsed ? parseFloat(iceMeltUsed) : undefined,
+      areasCleared: [],
+      iceMeltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
       notes: notes || undefined,
-      weatherConditions: weatherConditions || undefined,
+      weatherConditions: weather || undefined,
     });
     if (success) {
       toast({ title: 'Work completed!' });
-      setSelectedAreas([]);
-      setIceMeltUsed('');
       setNotes('');
-      setWeatherConditions('');
+      setSaltUsed('');
     } else {
       toast({ variant: 'destructive', title: 'Failed to check out' });
     }
-    return success;
   };
 
-  const toggleArea = (area: string) => {
-    setSelectedAreas(prev => 
-      prev.includes(area) 
-        ? prev.filter(a => a !== area)
-        : [...prev, area]
+  const toggleTeamMember = (member: string) => {
+    setSelectedTeamMembers(prev => 
+      prev.includes(member) 
+        ? prev.filter(m => m !== member)
+        : [...prev, member]
     );
   };
 
@@ -118,7 +124,7 @@ export default function ShovelDashboard() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-shovel" />
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
       </div>
     );
   }
@@ -126,334 +132,381 @@ export default function ShovelDashboard() {
   if (!employee) {
     return (
       <AppLayout>
-        <Card className="border-warning/50 bg-warning/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-warning">
+        <Card className="border-yellow-500/50 bg-yellow-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-yellow-500">
               <AlertCircle className="h-5 w-5" />
-              Employee Record Not Found
-            </CardTitle>
-            <CardDescription>
+              <span className="font-medium">Employee Record Not Found</span>
+            </div>
+            <p className="text-muted-foreground mt-2">
               Your user account is not linked to an employee record. Please contact your manager.
-            </CardDescription>
-          </CardHeader>
+            </p>
+          </CardContent>
         </Card>
       </AppLayout>
     );
   }
 
-  const firstName = profile?.full_name?.split(' ')[0] || employee.first_name;
+  const firstName = profile?.full_name || employee.first_name;
   const completedToday = recentWorkLogs.filter(log => log.status === 'completed').length;
-  const totalIceMelt = recentWorkLogs.reduce((sum, log) => sum + (log.ice_melt_used_lbs || 0), 0);
+  const shoveled = recentWorkLogs.filter(log => log.service_type === 'shovel' || log.service_type === 'both').length;
+  const salted = recentWorkLogs.filter(log => log.service_type === 'ice_melt' || log.service_type === 'salt').length;
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header with Purple Theme */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-shovel/30 to-shovel/10 flex items-center justify-center border border-shovel/30">
-                <Shovel className="h-5 w-5 text-shovel" />
-              </div>
-              <span>Shovel Dashboard</span>
-            </h1>
-            <p className="text-muted-foreground mt-1">Welcome back, {firstName}!</p>
+        {/* Header */}
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+              <Footprints className="h-5 w-5 text-purple-400" />
+            </div>
+            <h1 className="text-2xl font-bold">Shovel Crew</h1>
+            <Badge variant="outline" className="bg-[hsl(var(--card))]/50 border-border/50 text-muted-foreground">
+              {temperature}°F
+            </Badge>
           </div>
-          <Badge variant="outline" className="bg-shovel/10 text-shovel border-shovel/30 self-start">
-            <Users className="h-3 w-3 mr-1" />
-            Shovel Crew
-          </Badge>
+          <p className="text-muted-foreground mt-1">
+            Welcome back, {firstName}! Track your shovel crew services.
+          </p>
         </div>
 
         {/* Daily Shift Card */}
-        <Card className="bg-gradient-to-br from-shovel/10 to-shovel/5 border-shovel/30">
-          <CardContent className="pt-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <Card className="bg-[hsl(var(--card))]/80 border-border/50">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-purple-400" />
+                </div>
+                <div>
+                  <p className="font-medium">Daily Shift</p>
+                  <p className="text-sm text-muted-foreground">
+                    {activeShift ? 'Shift in progress' : 'Shift not started'}
+                  </p>
+                </div>
+              </div>
               {activeShift ? (
-                <>
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-full bg-shovel/20 flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-shovel" />
-                    </div>
-                    <ShiftTimer clockInTime={activeShift.clock_in_time} />
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleClockOut}
-                    className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  >
-                    <Square className="h-4 w-4 mr-2 fill-current" />
-                    Clock Out
-                  </Button>
-                </>
+                <Button 
+                  onClick={handleClockOut}
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  End Shift
+                </Button>
               ) : (
-                <>
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Not clocked in</p>
-                      <p className="text-sm text-muted-foreground">Start your shift to begin logging work</p>
-                    </div>
-                  </div>
-                  <Button onClick={handleClockIn} className="bg-shovel hover:bg-shovel/90">
-                    <Play className="h-4 w-4 mr-2 fill-current" />
-                    Clock In
-                  </Button>
-                </>
+                <Button 
+                  onClick={handleClockIn}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Start Shift
+                </Button>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Today's Overview Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card className="bg-card/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-shovel/20 flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-shovel" />
+        {/* TODAY'S OVERVIEW */}
+        <div>
+          <h2 className="text-xs font-medium text-muted-foreground mb-3 tracking-wide">TODAY'S OVERVIEW</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-2xl font-bold">{completedToday}</p>
+                    <p className="text-xs text-muted-foreground">Total Services</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{completedToday}</p>
-                  <p className="text-xs text-muted-foreground">Completed Today</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <Footprints className="h-4 w-4 text-purple-400" />
+                  <div>
+                    <p className="text-2xl font-bold">{shoveled}</p>
+                    <p className="text-xs text-muted-foreground">Shoveled</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <Thermometer className="h-5 w-5 text-blue-400" />
+              </CardContent>
+            </Card>
+            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <Snowflake className="h-4 w-4 text-blue-400" />
+                  <div>
+                    <p className="text-2xl font-bold">{salted}</p>
+                    <p className="text-xs text-muted-foreground">Salted</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{totalIceMelt}</p>
-                  <p className="text-xs text-muted-foreground">lbs Ice Melt</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-4 w-4 text-green-400" />
+                  <div>
+                    <p className="text-2xl font-bold">{accounts.length}</p>
+                    <p className="text-xs text-muted-foreground">Locations</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{accounts.length}</p>
-                  <p className="text-xs text-muted-foreground">Available Sites</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <Footprints className="h-5 w-5 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{recentWorkLogs.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Entries</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* Active Work or Account Selection */}
-        {activeWorkLog ? (
-          <Card className="border-shovel/30">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-shovel">
-                  <MapPin className="h-5 w-5" />
-                  Active Job
-                </CardTitle>
-                <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse" />
-                  In Progress
-                </Badge>
+        {/* Main Content - Two Columns */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Quick Log Entry */}
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold">Quick Log Entry</h2>
+            
+            {/* Nearest Location Card */}
+            <div className="bg-purple-600 rounded-lg p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Navigation className="h-5 w-5 text-purple-200" />
+                <div>
+                  <p className="font-medium text-white">
+                    <span className="text-purple-200">Nearest:</span> Green Hills Supply{' '}
+                    <span className="text-purple-200">2.1km</span>
+                  </p>
+                  <p className="text-sm text-purple-200">GPS accuracy: ±35 meters</p>
+                </div>
               </div>
-              <CardDescription>
-                {(activeWorkLog as any).account?.name} - {(activeWorkLog as any).account?.address}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Areas Cleared */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Areas Cleared</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {AREAS_OPTIONS.map((area) => (
-                    <div
-                      key={area}
-                      onClick={() => toggleArea(area)}
-                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                        selectedAreas.includes(area)
-                          ? 'bg-shovel/20 border-shovel/50 text-shovel'
-                          : 'bg-muted/30 border-border hover:border-shovel/30'
-                      }`}
-                    >
-                      <Checkbox checked={selectedAreas.includes(area)} />
-                      <span className="text-sm">{area}</span>
-                    </div>
+              <Navigation className="h-5 w-5 text-white" />
+            </div>
+
+            {/* Select Account */}
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Select Account (verify or change)</Label>
+              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                <SelectTrigger className="bg-[hsl(var(--card))]/80 border-border/50">
+                  <SelectValue placeholder="Green Hills Supply  2.1km" />
+                </SelectTrigger>
+                <SelectContent className="bg-[hsl(var(--card))] border-border">
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
                   ))}
-                </div>
-              </div>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* Ice Melt Used */}
-                <div className="space-y-2">
-                  <Label htmlFor="iceMelt">Ice Melt Used (lbs)</Label>
-                  <Input
-                    id="iceMelt"
-                    type="number"
-                    placeholder="0"
-                    value={iceMeltUsed}
-                    onChange={(e) => setIceMeltUsed(e.target.value)}
-                    className="bg-background/50"
-                  />
-                </div>
+            {/* Check In Button */}
+            <Button 
+              variant="ghost" 
+              className="w-full justify-center text-muted-foreground"
+              onClick={handleCheckIn}
+              disabled={!activeShift}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Check In & Start Timer
+            </Button>
 
-                {/* Weather Conditions */}
-                <div className="space-y-2">
-                  <Label htmlFor="weather">Weather Conditions</Label>
-                  <Input
-                    id="weather"
-                    placeholder="e.g., Light snow, 28°F"
-                    value={weatherConditions}
-                    onChange={(e) => setWeatherConditions(e.target.value)}
-                    className="bg-background/50"
-                  />
-                </div>
-              </div>
+            {/* Warning Message */}
+            {!activeShift && (
+              <p className="text-center text-sm">
+                <span className="text-red-400">Start your </span>
+                <span className="text-yellow-400">daily shift</span>
+                <span className="text-red-400"> first via Time Clock</span>
+              </p>
+            )}
 
-              {/* Notes */}
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Any additional notes..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="bg-background/50"
-                />
-              </div>
-
-              {/* Photo Upload Placeholder */}
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Upload completion photos</p>
-                <Button variant="outline" size="sm" className="mt-2">
-                  Choose Files
+            {/* Service Type */}
+            <div className="space-y-2">
+              <Label className="text-sm">Service Type</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant={serviceType === 'shovel' ? 'default' : 'ghost'}
+                  className={serviceType === 'shovel' 
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'bg-transparent hover:bg-muted/30'
+                  }
+                  onClick={() => setServiceType('shovel')}
+                >
+                  <Footprints className="h-4 w-4 mr-2" />
+                  Shovel Walks
+                </Button>
+                <Button
+                  variant={serviceType === 'salt' ? 'default' : 'ghost'}
+                  className={serviceType === 'salt' 
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'bg-transparent hover:bg-muted/30'
+                  }
+                  onClick={() => setServiceType('salt')}
+                >
+                  <Snowflake className="h-4 w-4 mr-2" />
+                  Salt Walks
+                </Button>
+                <Button
+                  variant={serviceType === 'both' ? 'default' : 'ghost'}
+                  className={serviceType === 'both' 
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'bg-transparent hover:bg-muted/30'
+                  }
+                  onClick={() => setServiceType('both')}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Shovel/Salt Walks
                 </Button>
               </div>
+            </div>
 
-              {/* Complete Button */}
-              <Button 
-                onClick={handleCheckOut} 
-                className="w-full bg-shovel hover:bg-shovel/90"
-                size="lg"
-              >
-                <CheckCircle2 className="h-5 w-5 mr-2" />
-                Complete Job
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader>
-              <CardTitle className="text-base">Available Accounts</CardTitle>
-              <CardDescription>Select an account to check in and start work</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {accounts.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No accounts available</p>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {accounts.map((account) => (
-                    <div
-                      key={account.id}
-                      className="group p-4 rounded-lg border border-border/50 hover:border-shovel/50 transition-colors cursor-pointer bg-background/50"
-                      onClick={() => handleCheckIn(account.id)}
+            {/* Team Members */}
+            <div className="space-y-2">
+              <Label className="text-sm flex items-center gap-2">
+                <Footprints className="h-4 w-4" />
+                Team Members
+              </Label>
+              <Card className="bg-[hsl(var(--card))]/50 border-border/30">
+                <CardContent className="py-3 space-y-2">
+                  {TEAM_MEMBERS.map((member) => (
+                    <div 
+                      key={member}
+                      className="flex items-center gap-3 cursor-pointer"
+                      onClick={() => toggleTeamMember(member)}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{account.name}</p>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{account.address}</span>
-                          </p>
-                          {account.priority && account.priority <= 3 && (
-                            <Badge variant="outline" className="mt-2 text-xs">
-                              Priority {account.priority}
-                            </Badge>
-                          )}
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          className="shrink-0 text-shovel group-hover:bg-shovel/20"
-                        >
-                          <Play className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Checkbox 
+                        checked={selectedTeamMembers.includes(member)}
+                        className="border-purple-500 data-[state=checked]:bg-purple-600"
+                      />
+                      <span className="text-sm">{member}</span>
                     </div>
                   ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Recent Activity */}
-        <Card className="bg-card/50 border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base">Today's Work</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentWorkLogs.length === 0 ? (
-              <p className="text-center text-muted-foreground py-6">No work logged today</p>
-            ) : (
-              <div className="space-y-3">
-                {recentWorkLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-shovel/20 flex items-center justify-center">
-                        <Shovel className="h-4 w-4 text-shovel" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{(log as any).account?.name || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {log.check_in_time && format(new Date(log.check_in_time), 'h:mm a')}
-                          {log.check_out_time && ` - ${format(new Date(log.check_out_time), 'h:mm a')}`}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge 
-                      variant="outline"
-                      className={
-                        log.status === 'completed' 
-                          ? 'bg-green-500/20 text-green-400 border-green-500/30' 
-                          : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                      }
-                    >
-                      {log.status === 'completed' ? 'Completed' : 'In Progress'}
-                    </Badge>
-                  </div>
-                ))}
+            {/* Snow Depth and Salt Used */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Snow Depth (inches)</Label>
+                <Input 
+                  placeholder="e.g., 3.5"
+                  value={snowDepth}
+                  onChange={(e) => setSnowDepth(e.target.value)}
+                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                />
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="space-y-2">
+                <Label className="text-sm">Salt Used (lbs)</Label>
+                <Input 
+                  placeholder="e.g., 50"
+                  value={saltUsed}
+                  onChange={(e) => setSaltUsed(e.target.value)}
+                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                />
+              </div>
+            </div>
+
+            {/* Temp, Weather, Wind */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Temp (°F)</Label>
+                <Input 
+                  value={temperature}
+                  onChange={(e) => setTemperature(e.target.value)}
+                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Weather</Label>
+                <Input 
+                  value={weather}
+                  onChange={(e) => setWeather(e.target.value)}
+                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Wind (mph)</Label>
+                <Input 
+                  value={wind}
+                  onChange={(e) => setWind(e.target.value)}
+                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label className="text-sm">Notes (Optional)</Label>
+              <Textarea 
+                placeholder="Any additional notes..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[80px]"
+              />
+            </div>
+
+            {/* Photo Upload */}
+            <div className="space-y-2">
+              <Label className="text-sm">Photo (Optional)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" className="bg-[hsl(var(--card))]/50 border-border/30">
+                  <Image className="h-4 w-4 mr-2" />
+                  Choose from gallery
+                </Button>
+                <Button variant="outline" className="bg-[hsl(var(--card))]/50 border-border/30">
+                  <Camera className="h-4 w-4 mr-2" />
+                  Take photo
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold">Recent Activity</h2>
+            <Card className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[300px]">
+              <CardContent className="py-6">
+                {recentWorkLogs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Clock className="h-8 w-8 text-muted-foreground mb-3" />
+                    <p className="font-medium text-muted-foreground">No activity yet</p>
+                    <p className="text-sm text-muted-foreground">Start logging your work!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recentWorkLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/20"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            <Shovel className="h-4 w-4 text-purple-400" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{(log as any).account?.name || 'Unknown'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {log.check_in_time && format(new Date(log.check_in_time), 'h:mm a')}
+                              {log.check_out_time && ` - ${format(new Date(log.check_out_time), 'h:mm a')}`}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge 
+                          variant="outline"
+                          className={
+                            log.status === 'completed' 
+                              ? 'bg-green-500/20 text-green-400 border-green-500/30' 
+                              : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                          }
+                        >
+                          {log.status === 'completed' ? 'Done' : 'Active'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </AppLayout>
   );
