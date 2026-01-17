@@ -9,10 +9,13 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Account } from '@/types/database';
 import { accountSchema, getValidationError } from '@/lib/validations';
+
+const SERVICE_TYPE_OPTIONS = ['plow', 'shovel', 'both'];
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -34,6 +37,7 @@ export default function AccountsPage() {
     longitude: '',
     geofence_radius: '100',
     priority: '5',
+    service_type: 'both',
     notes: '',
     is_active: true,
   });
@@ -77,6 +81,7 @@ export default function AccountsPage() {
         longitude: account.longitude?.toString() || '',
         geofence_radius: account.geofence_radius?.toString() || '100',
         priority: account.priority?.toString() || '5',
+        service_type: (account as any).service_type || 'both',
         notes: account.notes || '',
         is_active: account.is_active,
       });
@@ -95,6 +100,7 @@ export default function AccountsPage() {
         longitude: '',
         geofence_radius: '100',
         priority: '5',
+        service_type: 'both',
         notes: '',
         is_active: true,
       });
@@ -126,6 +132,7 @@ export default function AccountsPage() {
         longitude: validated.longitude ? parseFloat(validated.longitude) : null,
         geofence_radius: validated.geofence_radius ? parseInt(validated.geofence_radius) : 100,
         priority: validated.priority ? parseInt(validated.priority) : 5,
+        service_type: formData.service_type,
         notes: validated.notes || null,
         is_active: validated.is_active,
       };
@@ -193,13 +200,14 @@ export default function AccountsPage() {
   };
 
   const getServiceBadge = (account: Account) => {
-    // This would ideally come from account data, using placeholder logic
-    const hasShover = account.notes?.toLowerCase().includes('shovel') || Math.random() > 0.5;
-    return (
-      <Badge className={hasShover ? "bg-shovel/20 text-shovel border-shovel/30" : "bg-primary/20 text-primary border-primary/30"}>
-        {hasShover ? 'Plowing' : 'Both'}
-      </Badge>
-    );
+    const serviceType = (account as any).service_type || 'both';
+    if (serviceType === 'plow') {
+      return <Badge className="bg-primary/20 text-primary border-primary/30">Plow</Badge>;
+    }
+    if (serviceType === 'shovel') {
+      return <Badge className="bg-shovel/20 text-shovel border-shovel/30">Shovel</Badge>;
+    }
+    return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Both</Badge>;
   };
 
   if (isLoading) {
@@ -471,7 +479,7 @@ export default function AccountsPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority (1-10, lower = higher)</Label>
                 <Input
@@ -482,6 +490,24 @@ export default function AccountsPage() {
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Service Type</Label>
+                <Select
+                  value={formData.service_type}
+                  onValueChange={(value) => setFormData({ ...formData, service_type: value })}
+                >
+                  <SelectTrigger className="bg-card">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card">
+                    {SERVICE_TYPE_OPTIONS.map((service) => (
+                      <SelectItem key={service} value={service}>
+                        <span className="capitalize">{service}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center space-x-2 pt-6">
                 <Switch

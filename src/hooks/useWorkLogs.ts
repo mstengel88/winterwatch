@@ -114,7 +114,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
 
       if (fetchError) throw fetchError;
 
-      setRecentWorkLogs((data || []) as WorkLog[]);
+      setRecentWorkLogs((data || []) as unknown as WorkLog[]);
     } catch (err) {
       console.error('Error fetching recent work logs:', err);
     }
