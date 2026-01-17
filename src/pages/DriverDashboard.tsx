@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,16 +20,14 @@ import {
   Loader2,
   AlertCircle,
   LogIn,
-  ClipboardList,
   Navigation,
   Play,
-  Eye,
-  Calendar,
   Thermometer,
   Cloud,
   Wind,
   ImageIcon,
-  Camera
+  Camera,
+  RefreshCw
 } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,11 +60,11 @@ export default function DriverDashboard() {
   const [equipment, setEquipment] = useState<any[]>([]);
 
   // Fetch equipment
-  useState(() => {
+  useEffect(() => {
     supabase.from('equipment').select('*').eq('is_active', true).then(({ data }) => {
       if (data) setEquipment(data);
     });
-  });
+  }, []);
 
   // Calculate nearest account
   const nearestAccount = useMemo(() => {
@@ -167,7 +165,7 @@ export default function DriverDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -176,17 +174,17 @@ export default function DriverDashboard() {
   if (!employee) {
     return (
       <AppLayout>
-        <Card className="border-warning">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="border-warning bg-card">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-warning" />
-              Employee Record Not Found
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Your user account is not linked to an employee record. Please contact your manager.
-            </p>
+              <div>
+                <p className="font-medium">Employee Record Not Found</p>
+                <p className="text-sm text-muted-foreground">
+                  Your user account is not linked to an employee record. Please contact your manager.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </AppLayout>
@@ -195,386 +193,416 @@ export default function DriverDashboard() {
 
   return (
     <AppLayout>
-      {/* Page Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-            <Snowflake className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold flex items-center gap-2">
-              WinterWatch-Pro
-              <span className="text-sm font-normal text-muted-foreground">{temperature}°F</span>
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Welcome back, {profile?.full_name || employee.first_name}! Track your plowing and salting services.
-            </p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">This Week</p>
-          <p className="flex items-center gap-1 text-lg font-semibold">
-            <Clock className="h-4 w-4" />
-            {weeklyHours}h
-          </p>
-        </div>
-      </div>
-
-      {/* Daily Shift Card */}
-      <Card className="mb-6 bg-card/50">
-        <CardContent className="flex items-center justify-between py-4">
-          <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-muted-foreground" />
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
+              <Snowflake className="h-6 w-6 text-primary" />
+            </div>
             <div>
-              <p className="font-medium">Daily Shift</p>
+              <h1 className="text-xl font-semibold flex items-center gap-2">
+                WinterWatch-Pro
+                <span className="text-sm font-normal text-muted-foreground">{temperature}°F</span>
+              </h1>
               <p className="text-sm text-muted-foreground">
-                {activeShift ? 'Currently on shift' : 'Shift not started'}
+                Welcome back, {profile?.full_name || employee.first_name}! Track your plowing and salting services.
               </p>
             </div>
           </div>
-          {activeShift ? (
-            <Button variant="destructive" onClick={handleClockOut}>
-              <LogIn className="mr-2 h-4 w-4" />
-              End Shift
-            </Button>
-          ) : (
-            <Button className="bg-success hover:bg-success/90" onClick={handleClockIn}>
-              <LogIn className="mr-2 h-4 w-4" />
-              Start Shift
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Today's Overview */}
-      <div className="mb-6">
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Today's Overview
-        </h2>
-        <div className="grid grid-cols-4 gap-3">
-          <Card className="bg-card/50">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="h-4 w-4" />
-              </div>
-              <p className="mt-1 text-2xl font-bold">{todayStats.total}</p>
-              <p className="text-xs text-muted-foreground">Total Services</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-2 text-primary">
-                <Truck className="h-4 w-4" />
-              </div>
-              <p className="mt-1 text-2xl font-bold">{todayStats.plowed}</p>
-              <p className="text-xs text-muted-foreground">Plowed</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-2 text-success">
-                <Snowflake className="h-4 w-4" />
-              </div>
-              <p className="mt-1 text-2xl font-bold">{todayStats.salted}</p>
-              <p className="text-xs text-muted-foreground">Salted</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-2 text-success">
-                <MapPin className="h-4 w-4" />
-              </div>
-              <p className="mt-1 text-2xl font-bold">{todayStats.accounts}</p>
-              <p className="text-xs text-muted-foreground">Properties</p>
-            </CardContent>
-          </Card>
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">This Week</p>
+            <p className="flex items-center justify-end gap-1.5 text-lg font-semibold text-success">
+              <Clock className="h-4 w-4" />
+              {weeklyHours}h
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quick Log Entry */}
-        <div>
-          <h2 className="mb-3 text-sm font-medium">Quick Log Entry</h2>
-          
-          {/* Nearest Location */}
-          {nearestAccount && (
-            <Card className="mb-4 border-primary/50 bg-primary/10">
-              <CardContent className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2">
-                  <Navigation className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Nearest: </span>
-                      <span className="font-medium text-primary">{nearestAccount.account.name}</span>
-                      <span className="ml-2 text-muted-foreground">{nearestAccount.distance.toFixed(1)}km</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      GPS accuracy: ±{geoLocation?.accuracy?.toFixed(0) || 0} meters
-                    </p>
-                  </div>
-                </div>
-                <Navigation className="h-5 w-5 text-primary" />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Account Select */}
-          <div className="mb-4">
-            <Label className="text-muted-foreground">Select Account (verify or change)</Label>
-            <Select 
-              value={selectedAccountId || nearestAccount?.account.id} 
-              onValueChange={setSelectedAccountId}
-            >
-              <SelectTrigger className="mt-1 bg-muted/30">
-                <SelectValue placeholder="Select account..." />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.name}
-                    {nearestAccount?.account.id === acc.id && (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {nearestAccount.distance.toFixed(1)}km
-                      </span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Check In Button or Active Work */}
-          {!activeWorkLog ? (
-            <>
-              <Button 
-                variant="outline" 
-                className="mb-3 w-full"
-                onClick={handleCheckIn}
-                disabled={!activeShift}
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Check In & Start Timer
-              </Button>
-              
-              {!activeShift && (
-                <p className="mb-4 text-center text-sm text-warning">
-                  Start your <span className="text-primary">daily shift</span> first via Time Clock
+        {/* Daily Shift Card */}
+        <Card className="border-border/50 bg-card">
+          <CardContent className="flex items-center justify-between py-4 px-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                <Clock className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium">Daily Shift</p>
+                <p className="text-sm text-muted-foreground">
+                  {activeShift ? 'Currently on shift' : 'Shift not started'}
                 </p>
-              )}
-            </>
-          ) : (
-            <Card className="mb-4 border-success bg-success/10">
-              <CardContent className="py-3">
-                <p className="text-sm font-medium text-success">Currently working at location</p>
-                <p className="text-xs text-muted-foreground">
-                  Started {format(new Date(activeWorkLog.check_in_time!), 'h:mm a')}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Service Type */}
-          <div className="mb-4">
-            <Label className="text-muted-foreground">Service Type</Label>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {[
-                { value: 'plow', label: 'Plow Only', icon: Truck },
-                { value: 'salt', label: 'Salt Only', icon: Snowflake },
-                { value: 'both', label: 'Plow & Salt', icon: ClipboardList },
-              ].map((type) => (
-                <Button
-                  key={type.value}
-                  variant={serviceType === type.value ? 'default' : 'outline'}
-                  className={serviceType === type.value ? 'bg-primary' : 'bg-muted/30'}
-                  onClick={() => setServiceType(type.value as any)}
-                >
-                  <type.icon className="mr-2 h-4 w-4" />
-                  {type.label}
-                </Button>
-              ))}
+              </div>
             </div>
-          </div>
+            {activeShift ? (
+              <Button 
+                variant="destructive" 
+                onClick={handleClockOut}
+                className="gap-2"
+              >
+                <LogIn className="h-4 w-4" />
+                End Shift
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleClockIn}
+                className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+              >
+                <LogIn className="h-4 w-4" />
+                Start Shift
+              </Button>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Equipment & Employees */}
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-muted-foreground">Equipment</Label>
-              <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                <SelectTrigger className="mt-1 bg-muted/30">
-                  <SelectValue placeholder="Select equipment..." />
+        {/* Today's Overview */}
+        <div>
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Today's Overview
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="border-border/50 bg-card">
+              <CardContent className="py-4 px-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-2xl font-bold">{todayStats.total}</p>
+                <p className="text-xs text-muted-foreground">Total Services</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card">
+              <CardContent className="py-4 px-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Truck className="h-4 w-4 text-primary" />
+                </div>
+                <p className="text-2xl font-bold">{todayStats.plowed}</p>
+                <p className="text-xs text-muted-foreground">Plowed</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card">
+              <CardContent className="py-4 px-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Snowflake className="h-4 w-4 text-success" />
+                </div>
+                <p className="text-2xl font-bold">{todayStats.salted}</p>
+                <p className="text-xs text-muted-foreground">Salted</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card">
+              <CardContent className="py-4 px-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <MapPin className="h-4 w-4 text-success" />
+                </div>
+                <p className="text-2xl font-bold">{todayStats.accounts}</p>
+                <p className="text-xs text-muted-foreground">Properties</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Quick Log Entry */}
+          <div>
+            <h2 className="mb-3 text-base font-semibold">Quick Log Entry</h2>
+            
+            {/* Nearest Location */}
+            {nearestAccount && (
+              <Card className="mb-4 border-primary/30 bg-primary/5">
+                <CardContent className="flex items-center justify-between py-3 px-4">
+                  <div className="flex items-center gap-3">
+                    <Navigation className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Nearest: </span>
+                        <span className="font-medium text-primary">{nearestAccount.account.name}</span>
+                        <span className="ml-2 text-muted-foreground">{nearestAccount.distance.toFixed(1)}km</span>
+                      </p>
+                      <p className="text-xs text-success">
+                        GPS accuracy: ±{geoLocation?.accuracy?.toFixed(0) || 0} meters
+                      </p>
+                    </div>
+                  </div>
+                  <Navigation className="h-5 w-5 text-primary" />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Account Select */}
+            <div className="mb-4">
+              <Label className="text-sm text-muted-foreground">Select Account (verify or change)</Label>
+              <Select 
+                value={selectedAccountId || nearestAccount?.account.id} 
+                onValueChange={setSelectedAccountId}
+              >
+                <SelectTrigger className="mt-1.5 bg-secondary border-border">
+                  <SelectValue placeholder="Select account..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {equipment.map((eq) => (
-                    <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.name}
+                      {nearestAccount?.account.id === acc.id && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {nearestAccount.distance.toFixed(1)}km
+                        </span>
+                      )}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-muted-foreground">Employees</Label>
-              <Select value={selectedEmployees} onValueChange={setSelectedEmployees}>
-                <SelectTrigger className="mt-1 bg-muted/30">
-                  <SelectValue placeholder="Select employees..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="self">Just me</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          {/* Snow & Salt */}
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-muted-foreground">Snow Depth (inches)</Label>
-              <Input 
-                type="number"
-                placeholder="e.g., 3.5"
-                value={snowDepth}
-                onChange={(e) => setSnowDepth(e.target.value)}
-                className="mt-1 bg-muted/30"
-              />
-            </div>
-            <div>
-              <Label className="text-muted-foreground">Salt Used (lbs)</Label>
-              <Input 
-                type="number"
-                placeholder="e.g., 150"
-                value={saltUsed}
-                onChange={(e) => setSaltUsed(e.target.value)}
-                className="mt-1 bg-muted/30"
-              />
-            </div>
-          </div>
+            {/* Check In Button or Active Work */}
+            {!activeWorkLog ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="mb-3 w-full border-border bg-transparent hover:bg-muted"
+                  onClick={handleCheckIn}
+                  disabled={!activeShift}
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  Check In & Start Timer
+                </Button>
+                
+                {!activeShift && (
+                  <p className="mb-4 text-center text-sm">
+                    <span className="text-warning">Start your </span>
+                    <span className="text-primary">daily shift</span>
+                    <span className="text-warning"> first via Time Clock</span>
+                  </p>
+                )}
+              </>
+            ) : (
+              <Card className="mb-4 border-success/50 bg-success/10">
+                <CardContent className="py-3 px-4">
+                  <p className="text-sm font-medium text-success">Currently working at location</p>
+                  <p className="text-xs text-muted-foreground">
+                    Started {format(new Date(activeWorkLog.check_in_time!), 'h:mm a')}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Weather */}
-          <div className="mb-4 grid grid-cols-3 gap-3">
-            <div>
-              <Label className="text-muted-foreground flex items-center gap-1">
-                <Thermometer className="h-3 w-3" /> Temp (°F)
-              </Label>
-              <Input 
-                type="number"
-                value={temperature}
-                onChange={(e) => setTemperature(e.target.value)}
-                className="mt-1 bg-muted/30"
-              />
+            {/* Service Type */}
+            <div className="mb-4">
+              <Label className="text-sm text-muted-foreground">Service Type</Label>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <Button
+                  variant={serviceType === 'plow' ? 'default' : 'outline'}
+                  className={serviceType === 'plow' 
+                    ? 'bg-primary hover:bg-primary/90' 
+                    : 'border-border bg-transparent hover:bg-muted'
+                  }
+                  onClick={() => setServiceType('plow')}
+                >
+                  <Truck className="mr-1.5 h-4 w-4" />
+                  Plow Only
+                </Button>
+                <Button
+                  variant={serviceType === 'salt' ? 'default' : 'outline'}
+                  className={serviceType === 'salt' 
+                    ? 'bg-primary hover:bg-primary/90' 
+                    : 'border-border bg-transparent hover:bg-muted'
+                  }
+                  onClick={() => setServiceType('salt')}
+                >
+                  <Snowflake className="mr-1.5 h-4 w-4" />
+                  Salt Only
+                </Button>
+                <Button
+                  variant={serviceType === 'both' ? 'default' : 'outline'}
+                  className={serviceType === 'both' 
+                    ? 'bg-primary hover:bg-primary/90' 
+                    : 'border-border bg-transparent hover:bg-muted'
+                  }
+                  onClick={() => setServiceType('both')}
+                >
+                  <RefreshCw className="mr-1.5 h-4 w-4" />
+                  Plow & Salt
+                </Button>
+              </div>
             </div>
-            <div>
-              <Label className="text-muted-foreground flex items-center gap-1">
-                <Cloud className="h-3 w-3" /> Weather
-              </Label>
-              <Input 
-                value={weather}
-                onChange={(e) => setWeather(e.target.value)}
-                className="mt-1 bg-muted/30"
-              />
-            </div>
-            <div>
-              <Label className="text-muted-foreground flex items-center gap-1">
-                <Wind className="h-3 w-3" /> Wind (mph)
-              </Label>
-              <Input 
-                type="number"
-                value={windSpeed}
-                onChange={(e) => setWindSpeed(e.target.value)}
-                className="mt-1 bg-muted/30"
-              />
-            </div>
-          </div>
 
-          {/* Notes */}
-          <div className="mb-4">
-            <Label className="text-muted-foreground">Notes (Optional)</Label>
-            <Textarea
-              placeholder="Any additional notes..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="mt-1 bg-muted/30"
-            />
-          </div>
+            {/* Equipment & Employees */}
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm text-muted-foreground">Equipment</Label>
+                <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
+                  <SelectTrigger className="mt-1.5 bg-secondary border-border">
+                    <SelectValue placeholder="Select equipment..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipment.map((eq) => (
+                      <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">Employees</Label>
+                <Select value={selectedEmployees} onValueChange={setSelectedEmployees}>
+                  <SelectTrigger className="mt-1.5 bg-secondary border-border">
+                    <SelectValue placeholder="Select employees..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Just me</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          {/* Photo Upload */}
-          <div className="mb-4">
-            <Label className="text-muted-foreground">Photo (Optional)</Label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button variant="outline" className="bg-muted/30">
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Choose from gallery
+            {/* Snow & Salt */}
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm text-muted-foreground">Snow Depth (inches)</Label>
+                <Input 
+                  type="number"
+                  placeholder="e.g., 3.5"
+                  value={snowDepth}
+                  onChange={(e) => setSnowDepth(e.target.value)}
+                  className="mt-1.5 bg-secondary border-border"
+                />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">Salt Used (lbs)</Label>
+                <Input 
+                  type="number"
+                  placeholder="e.g., 150"
+                  value={saltUsed}
+                  onChange={(e) => setSaltUsed(e.target.value)}
+                  className="mt-1.5 bg-secondary border-border"
+                />
+              </div>
+            </div>
+
+            {/* Weather */}
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-sm text-muted-foreground flex items-center gap-1">
+                  Temp (°F)
+                </Label>
+                <Input 
+                  type="number"
+                  value={temperature}
+                  onChange={(e) => setTemperature(e.target.value)}
+                  className="mt-1.5 bg-secondary border-border"
+                />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground flex items-center gap-1">
+                  Weather
+                </Label>
+                <Input 
+                  value={weather}
+                  onChange={(e) => setWeather(e.target.value)}
+                  className="mt-1.5 bg-secondary border-border"
+                />
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground flex items-center gap-1">
+                  Wind (mph)
+                </Label>
+                <Input 
+                  type="number"
+                  value={windSpeed}
+                  onChange={(e) => setWindSpeed(e.target.value)}
+                  className="mt-1.5 bg-secondary border-border"
+                />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="mb-4">
+              <Label className="text-sm text-muted-foreground">Notes (Optional)</Label>
+              <Textarea
+                placeholder="Any additional notes..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="mt-1.5 bg-secondary border-border min-h-[80px]"
+              />
+            </div>
+
+            {/* Photo Upload */}
+            <div className="mb-4">
+              <Label className="text-sm text-muted-foreground">Photo (Optional)</Label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Button variant="outline" className="border-border bg-transparent hover:bg-muted">
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Choose from gallery
+                </Button>
+                <Button variant="outline" className="border-border bg-transparent hover:bg-muted">
+                  <Camera className="mr-2 h-4 w-4" />
+                  Take photo
+                </Button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            {activeWorkLog ? (
+              <Button 
+                className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
+                onClick={handleCheckOut}
+              >
+                Check Out & Complete
               </Button>
-              <Button variant="outline" className="bg-muted/30">
-                <Camera className="mr-2 h-4 w-4" />
-                Take photo
+            ) : (
+              <Button 
+                className="w-full bg-warning/50 hover:bg-warning/40 text-warning-foreground cursor-not-allowed"
+                disabled
+              >
+                Check In First
               </Button>
-            </div>
+            )}
           </div>
 
-          {/* Submit Button */}
-          {activeWorkLog && (
-            <Button 
-              className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
-              onClick={handleCheckOut}
-            >
-              Check Out & Complete
-            </Button>
-          )}
-          
-          {!activeWorkLog && !activeShift && (
-            <Button variant="outline" className="w-full" disabled>
-              Check In First
-            </Button>
-          )}
-        </div>
-
-        {/* Recent Activity */}
-        <div>
-          <h2 className="mb-3 text-sm font-medium">Recent Activity</h2>
-          {recentWorkLogs.length === 0 ? (
-            <Card className="bg-card/50">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Clock className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                <p className="font-medium text-muted-foreground">No activity yet</p>
-                <p className="text-sm text-muted-foreground">Start logging your work!</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {recentWorkLogs.map((log: any) => (
-                <Card key={log.id} className="bg-card/50">
-                  <CardContent className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <Snowflake className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="font-medium">{log.account?.name || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {log.employee?.first_name || 'Unknown'}
-                        </p>
-                        {log.notes && (
-                          <p className="text-xs text-muted-foreground">{log.notes}</p>
-                        )}
+          {/* Recent Activity */}
+          <div>
+            <h2 className="mb-3 text-base font-semibold">Recent Activity</h2>
+            {recentWorkLogs.length === 0 ? (
+              <Card className="border-border/50 bg-card">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <Clock className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                  <p className="font-medium text-muted-foreground">No activity yet</p>
+                  <p className="text-sm text-muted-foreground">Start logging your work!</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-border/50 bg-card">
+                <CardContent className="py-2 px-0">
+                  <div className="divide-y divide-border">
+                    {recentWorkLogs.map((log: any) => (
+                      <div key={log.id} className="flex items-start gap-3 py-3 px-4">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 mt-0.5">
+                          <Truck className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium text-sm">{log.account?.name || 'Unknown'}</p>
+                            <Badge 
+                              className={
+                                log.service_type === 'plow' || log.service_type === 'both' 
+                                  ? 'bg-success text-success-foreground text-xs px-2 py-0.5' 
+                                  : 'bg-success text-success-foreground text-xs px-2 py-0.5'
+                              }
+                            >
+                              {log.service_type === 'plow' ? 'Plowed' : log.service_type === 'salt' ? 'Salted' : 'Both'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {format(new Date(log.check_in_time || log.created_at), 'MMM d, h:mm a')} • {log.employee?.first_name || 'Unknown'}
+                          </p>
+                          {log.notes && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{log.notes}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        variant="secondary"
-                        className={
-                          log.service_type === 'plow' || log.service_type === 'both' 
-                            ? 'bg-primary/20 text-primary' 
-                            : 'bg-success/20 text-success'
-                        }
-                      >
-                        {log.service_type === 'plow' ? 'Plowed' : log.service_type === 'salt' ? 'Salted' : 'Both'}
-                      </Badge>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </AppLayout>
