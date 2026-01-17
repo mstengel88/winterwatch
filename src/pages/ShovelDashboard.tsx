@@ -66,7 +66,8 @@ export default function ShovelDashboard() {
     recentWorkLogs, 
     isLoading: workLogsLoading,
     checkIn,
-    checkOut 
+    checkOut,
+    updateActiveWorkLog,
   } = useShovelWorkLogs();
   const { location: geoLocation, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
   const {
@@ -515,7 +516,7 @@ export default function ShovelDashboard() {
             {/* Select Account */}
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Select Account (verify or change)</Label>
-              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+              <Select value={selectedAccount} onValueChange={setSelectedAccount} disabled={!!activeWorkLog}>
                 <SelectTrigger className="bg-[hsl(var(--card))]/80 border-border/50">
                   <SelectValue placeholder="Select nearest account" />
                 </SelectTrigger>
@@ -538,7 +539,52 @@ export default function ShovelDashboard() {
               </Select>
             </div>
 
-            {/* Service Type - BEFORE check-in */}
+            {/* Check In Button - right after account selection */}
+            {!activeWorkLog && (
+              <>
+                <Button 
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  onClick={handleCheckIn}
+                  disabled={!activeShift || selectedTeamMembers.length === 0 || !selectedAccount}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Check In & Start Timer
+                </Button>
+
+                {/* Warning Messages */}
+                {!activeShift && (
+                  <p className="text-center text-sm">
+                    <span className="text-red-400">Start your </span>
+                    <span className="text-yellow-400">daily shift</span>
+                    <span className="text-red-400"> first via Time Clock</span>
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* Active Work Card */}
+            {activeWorkLog && (
+              <Card className="border-green-500/50 bg-green-500/10">
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-400">Currently working at location</p>
+                      <p className="text-xs text-muted-foreground">
+                        Started {activeWorkLog.check_in_time ? format(new Date(activeWorkLog.check_in_time), 'h:mm a') : 'Unknown'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-green-400" />
+                      <span className="text-lg font-mono font-bold text-green-400">
+                        {formatTime(workTimer.hours)}:{formatTime(workTimer.minutes)}:{formatTime(workTimer.seconds)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Service Type */}
             <div className="space-y-2">
               <Label className="text-sm">Service Type <span className="text-red-400">*</span></Label>
               <div className="grid grid-cols-3 gap-2">
@@ -578,12 +624,38 @@ export default function ShovelDashboard() {
               </div>
             </div>
 
-            {/* Team Members - BEFORE check-in */}
+            {/* Team Members - editable before and after check-in */}
             <div className="space-y-2">
-              <Label className="text-sm flex items-center gap-2">
-                <Footprints className="h-4 w-4" />
-                Team Members <span className="text-red-400">*</span>
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm flex items-center gap-2">
+                  <Footprints className="h-4 w-4" />
+                  Team Members <span className="text-red-400">*</span>
+                </Label>
+                {activeWorkLog && selectedTeamMembers.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/20"
+                    onClick={async () => {
+                      const dbServiceType = serviceType === 'salt' ? 'ice_melt' : serviceType;
+                      const success = await updateActiveWorkLog({ 
+                        teamMemberIds: selectedTeamMembers,
+                        serviceType: dbServiceType,
+                      });
+                      if (success) {
+                        toast({ title: 'Team updated!' });
+                      } else {
+                        toast({ variant: 'destructive', title: 'Failed to update team' });
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                )}
+              </div>
+              {!activeWorkLog && selectedTeamMembers.length === 0 && (
+                <p className="text-xs text-amber-400">Select at least one team member to check in</p>
+              )}
               <Card className="bg-[hsl(var(--card))]/50 border-border/30">
                 <CardContent className="py-3 space-y-2">
                   {shovelEmployees.length === 0 ? (
@@ -606,53 +678,6 @@ export default function ShovelDashboard() {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Check In Button or Active Work */}
-            {!activeWorkLog ? (
-              <>
-                <Button 
-                  className="w-full bg-purple-600 hover:bg-purple-700"
-                  onClick={handleCheckIn}
-                  disabled={!activeShift || selectedTeamMembers.length === 0}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Check In & Start Timer
-                </Button>
-
-                {/* Warning Messages */}
-                {!activeShift && (
-                  <p className="text-center text-sm">
-                    <span className="text-red-400">Start your </span>
-                    <span className="text-yellow-400">daily shift</span>
-                    <span className="text-red-400"> first via Time Clock</span>
-                  </p>
-                )}
-                {activeShift && selectedTeamMembers.length === 0 && (
-                  <p className="text-center text-sm text-amber-400">
-                    Select at least one team member to check in
-                  </p>
-                )}
-              </>
-            ) : (
-              <Card className="border-green-500/50 bg-green-500/10">
-                <CardContent className="py-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-green-400">Currently working at location</p>
-                      <p className="text-xs text-muted-foreground">
-                        Started {activeWorkLog.check_in_time ? format(new Date(activeWorkLog.check_in_time), 'h:mm a') : 'Unknown'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Timer className="h-4 w-4 text-green-400" />
-                      <span className="text-lg font-mono font-bold text-green-400">
-                        {formatTime(workTimer.hours)}:{formatTime(workTimer.minutes)}:{formatTime(workTimer.seconds)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
             {/* Snow Depth and Salt Used */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
