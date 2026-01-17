@@ -278,13 +278,22 @@ export default function DriverDashboard() {
   };
 
   const handleCheckOut = async () => {
-    // Validate required fields
+    // Validate required fields based on service type
     const missingFields: string[] = [];
     
     if (!selectedEquipment) missingFields.push('Equipment');
     if (!selectedEmployees) missingFields.push('Employees');
-    if (!snowDepth || snowDepth.trim() === '') missingFields.push('Snow Depth');
-    if (!saltUsed || saltUsed.trim() === '') missingFields.push('Salt Used');
+    
+    // Snow depth required for plow and both
+    if ((serviceType === 'plow' || serviceType === 'both') && (!snowDepth || snowDepth.trim() === '')) {
+      missingFields.push('Snow Depth');
+    }
+    
+    // Salt used required for salt and both
+    if ((serviceType === 'salt' || serviceType === 'both') && (!saltUsed || saltUsed.trim() === '')) {
+      missingFields.push('Salt Used');
+    }
+    
     if (!temperature || temperature.trim() === '') missingFields.push('Temperature');
     if (!weather || weather.trim() === '') missingFields.push('Weather');
     if (!windSpeed || windSpeed.trim() === '') missingFields.push('Wind Speed');
@@ -305,8 +314,8 @@ export default function DriverDashboard() {
     }
 
     const success = await checkOut({
-      snowDepthInches: parseFloat(snowDepth),
-      saltUsedLbs: parseFloat(saltUsed),
+      snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
+      saltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
       weatherConditions: `${temperature}°F ${weather} Wind: ${windSpeed}mph`,
       notes,
       photoUrls,
@@ -665,7 +674,9 @@ export default function DriverDashboard() {
             {/* Snow & Salt */}
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-sm text-muted-foreground">Snow Depth (inches) <span className="text-red-400">*</span></Label>
+                <Label className="text-sm text-muted-foreground">
+                  Snow Depth (inches) {(serviceType === 'plow' || serviceType === 'both') && <span className="text-red-400">*</span>}
+                </Label>
                 <Input 
                   type="number"
                   placeholder="e.g., 3.5"
@@ -675,7 +686,9 @@ export default function DriverDashboard() {
                 />
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground">Salt Used (lbs) <span className="text-red-400">*</span></Label>
+                <Label className="text-sm text-muted-foreground">
+                  Salt Used (lbs) {(serviceType === 'salt' || serviceType === 'both') && <span className="text-red-400">*</span>}
+                </Label>
                 <Input 
                   type="number"
                   placeholder="e.g., 150"
