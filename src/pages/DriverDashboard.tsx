@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { 
   Snowflake, 
   Truck, 
@@ -22,9 +24,6 @@ import {
   LogIn,
   Navigation,
   Play,
-  Thermometer,
-  Cloud,
-  Wind,
   ImageIcon,
   Camera,
   RefreshCw
@@ -43,8 +42,24 @@ export default function DriverDashboard() {
     checkIn,
     checkOut 
   } = useWorkLogs();
-  const { location: geoLocation } = useGeolocation();
+  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
   const { toast } = useToast();
+  const {
+    photos,
+    previews,
+    isUploading,
+    uploadProgress,
+    addPhotos,
+    removePhoto,
+    clearPhotos,
+    uploadPhotos,
+    canAddMore,
+  } = usePhotoUpload({ folder: 'work-logs' });
+
+  // Get location on mount
+  useEffect(() => {
+    getCurrentLocation();
+  }, [getCurrentLocation]);
 
   // Form state
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -144,18 +159,25 @@ export default function DriverDashboard() {
   };
 
   const handleCheckOut = async () => {
+    // Upload photos first if any
+    let photoUrls: string[] = [];
+    if (photos.length > 0 && activeWorkLog) {
+      photoUrls = await uploadPhotos(activeWorkLog.id);
+    }
+
     const success = await checkOut({
       snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
       saltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
       weatherConditions: `${temperature}°F ${weather}`,
       notes,
-      photoUrls: [],
+      photoUrls,
     });
     if (success) {
       toast({ title: 'Work completed!' });
       setNotes('');
       setSnowDepth('');
       setSaltUsed('');
+      clearPhotos();
     } else {
       toast({ variant: 'destructive', title: 'Failed to check out' });
     }
@@ -220,37 +242,39 @@ export default function DriverDashboard() {
         </div>
 
         {/* Daily Shift Card */}
-        <Card className="border-border/50 bg-card">
-          <CardContent className="flex items-center justify-between py-4 px-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                <Clock className="h-5 w-5 text-muted-foreground" />
+        <Card className="bg-[hsl(var(--card))]/80 border-border/50">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Daily Shift</p>
+                  <p className="text-sm text-muted-foreground">
+                    {activeShift ? 'Shift in progress' : 'Shift not started'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Daily Shift</p>
-                <p className="text-sm text-muted-foreground">
-                  {activeShift ? 'Currently on shift' : 'Shift not started'}
-                </p>
-              </div>
+              {activeShift ? (
+                <Button 
+                  onClick={handleClockOut}
+                  variant="outline"
+                  className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  End Shift
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleClockIn}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Start Shift
+                </Button>
+              )}
             </div>
-            {activeShift ? (
-              <Button 
-                variant="destructive" 
-                onClick={handleClockOut}
-                className="gap-2"
-              >
-                <LogIn className="h-4 w-4" />
-                End Shift
-              </Button>
-            ) : (
-              <Button 
-                onClick={handleClockIn}
-                className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
-              >
-                <LogIn className="h-4 w-4" />
-                Start Shift
-              </Button>
-            )}
           </CardContent>
         </Card>
 
@@ -305,27 +329,30 @@ export default function DriverDashboard() {
           <div>
             <h2 className="mb-3 text-base font-semibold">Quick Log Entry</h2>
             
-            {/* Nearest Location */}
-            {nearestAccount && (
-              <Card className="mb-4 border-primary/30 bg-primary/5">
-                <CardContent className="flex items-center justify-between py-3 px-4">
-                  <div className="flex items-center gap-3">
-                    <Navigation className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">Nearest: </span>
-                        <span className="font-medium text-primary">{nearestAccount.account.name}</span>
-                        <span className="ml-2 text-muted-foreground">{nearestAccount.distance.toFixed(1)}km</span>
+            {/* Nearest Location Card */}
+            <div className="bg-primary rounded-lg p-4 flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Navigation className="h-5 w-5 text-primary-foreground/70" />
+                <div>
+                  {nearestAccount ? (
+                    <>
+                      <p className="font-medium text-primary-foreground">
+                        <span className="text-primary-foreground/70">Nearest:</span> {nearestAccount.account.name}{' '}
+                        <span className="text-primary-foreground/70">{nearestAccount.distance.toFixed(1)}km</span>
                       </p>
-                      <p className="text-xs text-success">
+                      <p className="text-sm text-primary-foreground/70">
                         GPS accuracy: ±{geoLocation?.accuracy?.toFixed(0) || 0} meters
                       </p>
-                    </div>
-                  </div>
-                  <Navigation className="h-5 w-5 text-primary" />
-                </CardContent>
-              </Card>
-            )}
+                    </>
+                  ) : (
+                    <p className="font-medium text-primary-foreground">
+                      {geoLoading ? 'Getting location...' : 'Select an account'}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Navigation className="h-5 w-5 text-primary-foreground" />
+            </div>
 
             {/* Account Select */}
             <div className="mb-4">
@@ -356,20 +383,20 @@ export default function DriverDashboard() {
             {!activeWorkLog ? (
               <>
                 <Button 
-                  variant="outline" 
-                  className="mb-3 w-full border-border bg-transparent hover:bg-muted"
+                  variant="ghost" 
+                  className="w-full justify-center text-muted-foreground mb-3"
                   onClick={handleCheckIn}
                   disabled={!activeShift}
                 >
-                  <Play className="mr-2 h-4 w-4" />
+                  <Play className="h-4 w-4 mr-2" />
                   Check In & Start Timer
                 </Button>
                 
                 {!activeShift && (
-                  <p className="mb-4 text-center text-sm">
-                    <span className="text-warning">Start your </span>
-                    <span className="text-primary">daily shift</span>
-                    <span className="text-warning"> first via Time Clock</span>
+                  <p className="text-center text-sm mb-4">
+                    <span className="text-red-400">Start your </span>
+                    <span className="text-yellow-400">daily shift</span>
+                    <span className="text-red-400"> first via Time Clock</span>
                   </p>
                 )}
               </>
@@ -385,40 +412,40 @@ export default function DriverDashboard() {
             )}
 
             {/* Service Type */}
-            <div className="mb-4">
-              <Label className="text-sm text-muted-foreground">Service Type</Label>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="space-y-2 mb-4">
+              <Label className="text-sm">Service Type</Label>
+              <div className="grid grid-cols-3 gap-2">
                 <Button
-                  variant={serviceType === 'plow' ? 'default' : 'outline'}
+                  variant={serviceType === 'plow' ? 'default' : 'ghost'}
                   className={serviceType === 'plow' 
-                    ? 'bg-primary hover:bg-primary/90' 
-                    : 'border-border bg-transparent hover:bg-muted'
+                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
+                    : 'bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('plow')}
                 >
-                  <Truck className="mr-1.5 h-4 w-4" />
+                  <Truck className="h-4 w-4 mr-2" />
                   Plow Only
                 </Button>
                 <Button
-                  variant={serviceType === 'salt' ? 'default' : 'outline'}
+                  variant={serviceType === 'salt' ? 'default' : 'ghost'}
                   className={serviceType === 'salt' 
-                    ? 'bg-primary hover:bg-primary/90' 
-                    : 'border-border bg-transparent hover:bg-muted'
+                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
+                    : 'bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('salt')}
                 >
-                  <Snowflake className="mr-1.5 h-4 w-4" />
+                  <Snowflake className="h-4 w-4 mr-2" />
                   Salt Only
                 </Button>
                 <Button
-                  variant={serviceType === 'both' ? 'default' : 'outline'}
+                  variant={serviceType === 'both' ? 'default' : 'ghost'}
                   className={serviceType === 'both' 
-                    ? 'bg-primary hover:bg-primary/90' 
-                    : 'border-border bg-transparent hover:bg-muted'
+                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
+                    : 'bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('both')}
                 >
-                  <RefreshCw className="mr-1.5 h-4 w-4" />
+                  <RefreshCw className="h-4 w-4 mr-2" />
                   Plow & Salt
                 </Button>
               </div>
@@ -525,17 +552,15 @@ export default function DriverDashboard() {
 
             {/* Photo Upload */}
             <div className="mb-4">
-              <Label className="text-sm text-muted-foreground">Photo (Optional)</Label>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Button variant="outline" className="border-border bg-transparent hover:bg-muted">
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  Choose from gallery
-                </Button>
-                <Button variant="outline" className="border-border bg-transparent hover:bg-muted">
-                  <Camera className="mr-2 h-4 w-4" />
-                  Take photo
-                </Button>
-              </div>
+              <PhotoUpload
+                photos={photos}
+                previews={previews}
+                isUploading={isUploading}
+                uploadProgress={uploadProgress}
+                canAddMore={canAddMore}
+                onAddPhotos={addPhotos}
+                onRemovePhoto={removePhoto}
+              />
             </div>
 
             {/* Submit Button */}
