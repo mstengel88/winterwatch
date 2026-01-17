@@ -23,7 +23,7 @@ interface CheckOutData {
   photoUrls?: string[];
 }
 
-export function useWorkLogs(): UseWorkLogsReturn {
+export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLogsReturn {
   const { employee } = useEmployee();
   const { getCurrentLocation } = useGeolocation();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -31,6 +31,8 @@ export function useWorkLogs(): UseWorkLogsReturn {
   const [recentWorkLogs, setRecentWorkLogs] = useState<WorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const effectiveEmployeeId = options?.employeeId ?? employee?.id;
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -51,7 +53,7 @@ export function useWorkLogs(): UseWorkLogsReturn {
   }, []);
 
   const fetchActiveWorkLog = useCallback(async () => {
-    if (!employee) {
+    if (!effectiveEmployeeId) {
       setActiveWorkLog(null);
       return;
     }
@@ -64,24 +66,22 @@ export function useWorkLogs(): UseWorkLogsReturn {
           account:accounts(*),
           equipment:equipment(*)
         `)
-        .eq('employee_id', employee.id)
+        .eq('employee_id', effectiveEmployeeId)
         .eq('status', 'in_progress')
         .order('check_in_time', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
-      }
+      if (fetchError) throw fetchError;
 
       setActiveWorkLog(data as WorkLog | null);
     } catch (err) {
       console.error('Error fetching active work log:', err);
     }
-  }, [employee]);
+  }, [effectiveEmployeeId]);
 
   const fetchRecentWorkLogs = useCallback(async () => {
-    if (!employee) {
+    if (!effectiveEmployeeId) {
       setRecentWorkLogs([]);
       return;
     }
@@ -96,7 +96,7 @@ export function useWorkLogs(): UseWorkLogsReturn {
           *,
           account:accounts(*)
         `)
-        .eq('employee_id', employee.id)
+        .eq('employee_id', effectiveEmployeeId)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false })
         .limit(10);
@@ -107,7 +107,7 @@ export function useWorkLogs(): UseWorkLogsReturn {
     } catch (err) {
       console.error('Error fetching recent work logs:', err);
     }
-  }, [employee]);
+  }, [effectiveEmployeeId]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -127,7 +127,7 @@ export function useWorkLogs(): UseWorkLogsReturn {
     serviceType: ServiceType = 'both',
     employeeId?: string
   ): Promise<boolean> => {
-    const effectiveEmployeeId = employeeId || employee?.id;
+    const effectiveEmployeeId = employeeId || options?.employeeId || employee?.id;
     if (!effectiveEmployeeId) {
       setError('No employee selected');
       return false;
