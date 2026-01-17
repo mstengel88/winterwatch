@@ -12,7 +12,14 @@ interface UseWorkLogsReturn {
   error: string | null;
   checkIn: (accountId: string, equipmentId?: string, serviceType?: ServiceType, employeeId?: string) => Promise<boolean>;
   checkOut: (data: CheckOutData) => Promise<boolean>;
+  updateActiveWorkLog: (data: UpdateWorkLogData) => Promise<boolean>;
   refreshData: () => Promise<void>;
+}
+
+interface UpdateWorkLogData {
+  equipmentId?: string;
+  employeeId?: string;
+  serviceType?: ServiceType;
 }
 
 interface CheckOutData {
@@ -204,6 +211,44 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     }
   };
 
+  const updateActiveWorkLog = async (data: UpdateWorkLogData): Promise<boolean> => {
+    if (!activeWorkLog) {
+      setError('No active work log to update');
+      return false;
+    }
+
+    try {
+      const updatePayload: Record<string, unknown> = {};
+      if (data.equipmentId !== undefined) {
+        updatePayload.equipment_id = data.equipmentId || null;
+      }
+      if (data.employeeId !== undefined) {
+        updatePayload.employee_id = data.employeeId;
+      }
+      if (data.serviceType !== undefined) {
+        updatePayload.service_type = data.serviceType;
+      }
+
+      if (Object.keys(updatePayload).length === 0) {
+        return true; // Nothing to update
+      }
+
+      const { error: updateError } = await supabase
+        .from('work_logs')
+        .update(updatePayload)
+        .eq('id', activeWorkLog.id);
+
+      if (updateError) throw updateError;
+
+      await fetchActiveWorkLog();
+      return true;
+    } catch (err) {
+      console.error('Error updating work log:', err);
+      setError('Failed to update work log');
+      return false;
+    }
+  };
+
   const refreshData = async () => {
     await fetchAccounts();
     await fetchActiveWorkLog();
@@ -218,6 +263,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     error,
     checkIn,
     checkOut,
+    updateActiveWorkLog,
     refreshData,
   };
 }

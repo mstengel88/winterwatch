@@ -119,6 +119,7 @@ export default function DriverDashboard() {
     isLoading: workLogsLoading,
     checkIn,
     checkOut,
+    updateActiveWorkLog,
   } = useWorkLogs({ employeeId: selectedEmployeeIdForLogs });
 
   // Fetch equipment and plow employees
@@ -675,7 +676,7 @@ export default function DriverDashboard() {
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm text-muted-foreground">Equipment <span className="text-red-400">*</span></Label>
-                <Select value={selectedEquipment} onValueChange={setSelectedEquipment} disabled={!!activeWorkLog}>
+                <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
                   <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select equipment..." />
                   </SelectTrigger>
@@ -688,7 +689,7 @@ export default function DriverDashboard() {
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground">Employees <span className="text-red-400">*</span></Label>
-                <Select value={selectedEmployees} onValueChange={setSelectedEmployees} disabled={!!activeWorkLog}>
+                <Select value={selectedEmployees} onValueChange={setSelectedEmployees}>
                   <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select employees..." />
                   </SelectTrigger>
@@ -703,6 +704,30 @@ export default function DriverDashboard() {
                 </Select>
               </div>
             </div>
+
+            {/* Save Changes Button - only show when checked in */}
+            {activeWorkLog && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mb-4 w-full border-primary/50 text-primary hover:bg-primary/20"
+                onClick={async () => {
+                  const employeeIdToUse = selectedEmployees === 'self' ? employee?.id : selectedEmployees;
+                  const success = await updateActiveWorkLog({
+                    equipmentId: selectedEquipment || undefined,
+                    employeeId: employeeIdToUse,
+                    serviceType,
+                  });
+                  if (success) {
+                    toast({ title: 'Work log updated!' });
+                  } else {
+                    toast({ variant: 'destructive', title: 'Failed to update' });
+                  }
+                }}
+              >
+                Save Equipment/Employee Changes
+              </Button>
+            )}
 
             {/* Snow & Salt */}
             <div className="mb-4 grid grid-cols-2 gap-3">
