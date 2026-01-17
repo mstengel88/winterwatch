@@ -124,6 +124,13 @@ export default function DriverDashboard() {
       });
   }, []);
 
+  // Auto-populate employee field with logged-in user
+  useEffect(() => {
+    if (employee && !selectedEmployees) {
+      setSelectedEmployees(employee.id);
+    }
+  }, [employee, selectedEmployees]);
+
   // Shift timer
   useEffect(() => {
     if (!activeShift) {
