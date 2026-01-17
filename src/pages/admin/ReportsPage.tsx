@@ -99,6 +99,8 @@ export default function ReportsPage() {
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
   const [workLogDialogOpen, setWorkLogDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleteType, setBulkDeleteType] = useState<'shifts' | 'worklogs'>('shifts');
   const [editingShift, setEditingShift] = useState<TimeClockEntry | null>(null);
   const [editingWorkLog, setEditingWorkLog] = useState<WorkLogEntry | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'shift' | 'worklog'; id: string; name: string } | null>(null);
@@ -498,6 +500,56 @@ export default function ReportsPage() {
     }
   };
 
+  // Bulk delete handlers
+  const handleBulkDelete = async () => {
+    setIsSaving(true);
+    try {
+      if (bulkDeleteType === 'shifts') {
+        const ids = Array.from(selectedShifts);
+        if (ids.length === 0) return;
+        const { error } = await supabase.from('time_clock').delete().in('id', ids);
+        if (error) throw error;
+        toast.success(`${ids.length} shift(s) deleted successfully`);
+        setSelectedShifts(new Set());
+      } else {
+        const ids = Array.from(selectedWorkLogs);
+        if (ids.length === 0) return;
+        
+        // Separate plow and shovel logs
+        const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
+        const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
+        
+        if (plowIds.length > 0) {
+          const { error } = await supabase.from('work_logs').delete().in('id', plowIds);
+          if (error) throw error;
+        }
+        if (shovelIds.length > 0) {
+          const { error } = await supabase.from('shovel_work_logs').delete().in('id', shovelIds);
+          if (error) throw error;
+        }
+        toast.success(`${ids.length} work log(s) deleted successfully`);
+        setSelectedWorkLogs(new Set());
+      }
+      setBulkDeleteDialogOpen(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Error bulk deleting:', error);
+      toast.error('Failed to delete selected items');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openBulkDeleteShifts = () => {
+    setBulkDeleteType('shifts');
+    setBulkDeleteDialogOpen(true);
+  };
+
+  const openBulkDeleteWorkLogs = () => {
+    setBulkDeleteType('worklogs');
+    setBulkDeleteDialogOpen(true);
+  };
+
   // Open dialog handlers
   const openAddShift = () => {
     setEditingShift(null);
@@ -736,10 +788,18 @@ export default function ReportsPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">Daily Shifts ({filteredShifts.length} shifts)</span>
             </div>
-            <Button size="sm" variant="outline" onClick={openAddShift}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Shift
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedShifts.size > 0 && (
+                <Button size="sm" variant="destructive" onClick={openBulkDeleteShifts}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete ({selectedShifts.size})
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={openAddShift}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Shift
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -860,10 +920,18 @@ export default function ReportsPage() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-medium">Work Log Entries ({filteredWorkLogs.length})</span>
-            <Button size="sm" variant="outline" onClick={openAddWorkLog}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Entry
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedWorkLogs.size > 0 && (
+                <Button size="sm" variant="destructive" onClick={openBulkDeleteWorkLogs}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete ({selectedWorkLogs.size})
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={openAddWorkLog}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Entry
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -1023,6 +1091,16 @@ export default function ReportsPage() {
         title={deleteTarget?.type === 'shift' ? 'Delete Shift' : 'Delete Work Log'}
         description={`Are you sure you want to delete this ${deleteTarget?.type === 'shift' ? 'shift' : 'work log'} for "${deleteTarget?.name}"? This action cannot be undone.`}
         onConfirm={handleDelete}
+        isLoading={isSaving}
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+        title={bulkDeleteType === 'shifts' ? `Delete ${selectedShifts.size} Shifts` : `Delete ${selectedWorkLogs.size} Work Logs`}
+        description={`Are you sure you want to delete ${bulkDeleteType === 'shifts' ? selectedShifts.size : selectedWorkLogs.size} selected ${bulkDeleteType === 'shifts' ? 'shift(s)' : 'work log(s)'}? This action cannot be undone.`}
+        onConfirm={handleBulkDelete}
         isLoading={isSaving}
       />
     </div>

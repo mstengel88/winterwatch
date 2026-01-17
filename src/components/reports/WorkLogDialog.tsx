@@ -159,6 +159,7 @@ export function WorkLogDialog({
     : [
         { value: 'shovel', label: 'Shovel' },
         { value: 'ice_melt', label: 'Ice Melt' },
+        { value: 'both', label: 'Shovel & Ice Melt' },
       ];
 
   return (
