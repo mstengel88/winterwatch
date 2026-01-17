@@ -118,13 +118,21 @@ export default function DriverDashboard() {
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
 
-  // Filter equipment based on selected service type
+  // Filter equipment based on selected service type and sort by number descending
   // Plow → show 'plow' and 'both', Salt/Both → show 'both' only
   const filteredEquipment = useMemo(() => {
+    let filtered;
     if (serviceType === 'plow') {
-      return allEquipment.filter(eq => eq.service_type === 'plow' || eq.service_type === 'both');
+      filtered = allEquipment.filter(eq => eq.service_type === 'plow' || eq.service_type === 'both');
+    } else {
+      filtered = allEquipment.filter(eq => eq.service_type === 'both');
     }
-    return allEquipment.filter(eq => eq.service_type === 'both');
+    // Sort by extracting numbers from name, descending
+    return filtered.sort((a, b) => {
+      const numA = parseInt(a.name?.match(/\d+/)?.[0] || '0', 10);
+      const numB = parseInt(b.name?.match(/\d+/)?.[0] || '0', 10);
+      return numB - numA;
+    });
   }, [allEquipment, serviceType]);
 
   // Clear equipment selection when service type changes if current selection doesn't match
