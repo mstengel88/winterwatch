@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Snowflake, LogOut, Users, Building2, Wrench, UserCog, ArrowLeft } from 'lucide-react';
+import { Snowflake, LogOut, Users, Building2, Wrench, UserCog, ArrowLeft, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { href: '/admin/employees', label: 'Employees', icon: Users },
   { href: '/admin/accounts', label: 'Accounts', icon: Building2 },
   { href: '/admin/equipment', label: 'Equipment', icon: Wrench },
+  { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
 ];
 
 export default function AdminLayout() {
