@@ -278,6 +278,26 @@ export default function DriverDashboard() {
   };
 
   const handleCheckOut = async () => {
+    // Validate required fields
+    const missingFields: string[] = [];
+    
+    if (!selectedEquipment) missingFields.push('Equipment');
+    if (!selectedEmployees) missingFields.push('Employees');
+    if (!snowDepth || snowDepth.trim() === '') missingFields.push('Snow Depth');
+    if (!saltUsed || saltUsed.trim() === '') missingFields.push('Salt Used');
+    if (!temperature || temperature.trim() === '') missingFields.push('Temperature');
+    if (!weather || weather.trim() === '') missingFields.push('Weather');
+    if (!windSpeed || windSpeed.trim() === '') missingFields.push('Wind Speed');
+    
+    if (missingFields.length > 0) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Required fields missing',
+        description: `Please fill in: ${missingFields.join(', ')}`
+      });
+      return;
+    }
+
     // Upload photos first if any
     let photoUrls: string[] = [];
     if (photos.length > 0 && activeWorkLog) {
@@ -285,9 +305,9 @@ export default function DriverDashboard() {
     }
 
     const success = await checkOut({
-      snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
-      saltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
-      weatherConditions: `${temperature}°F ${weather}`,
+      snowDepthInches: parseFloat(snowDepth),
+      saltUsedLbs: parseFloat(saltUsed),
+      weatherConditions: `${temperature}°F ${weather} Wind: ${windSpeed}mph`,
       notes,
       photoUrls,
     });
@@ -296,6 +316,8 @@ export default function DriverDashboard() {
       setNotes('');
       setSnowDepth('');
       setSaltUsed('');
+      setSelectedEquipment('');
+      setSelectedEmployees('');
       clearPhotos();
     } else {
       toast({ variant: 'destructive', title: 'Failed to check out' });
@@ -610,7 +632,7 @@ export default function DriverDashboard() {
             {/* Equipment & Employees */}
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-sm text-muted-foreground">Equipment</Label>
+                <Label className="text-sm text-muted-foreground">Equipment <span className="text-red-400">*</span></Label>
                 <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
                   <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select equipment..." />
@@ -623,7 +645,7 @@ export default function DriverDashboard() {
                 </Select>
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground">Employees</Label>
+                <Label className="text-sm text-muted-foreground">Employees <span className="text-red-400">*</span></Label>
                 <Select value={selectedEmployees} onValueChange={setSelectedEmployees}>
                   <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select employees..." />
@@ -643,7 +665,7 @@ export default function DriverDashboard() {
             {/* Snow & Salt */}
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-sm text-muted-foreground">Snow Depth (inches)</Label>
+                <Label className="text-sm text-muted-foreground">Snow Depth (inches) <span className="text-red-400">*</span></Label>
                 <Input 
                   type="number"
                   placeholder="e.g., 3.5"
@@ -653,7 +675,7 @@ export default function DriverDashboard() {
                 />
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground">Salt Used (lbs)</Label>
+                <Label className="text-sm text-muted-foreground">Salt Used (lbs) <span className="text-red-400">*</span></Label>
                 <Input 
                   type="number"
                   placeholder="e.g., 150"
@@ -668,7 +690,7 @@ export default function DriverDashboard() {
             <div className="mb-4 grid grid-cols-3 gap-3">
               <div>
                 <Label className="text-sm text-muted-foreground flex items-center gap-1">
-                  Temp (°F)
+                  Temp (°F) <span className="text-red-400">*</span>
                 </Label>
                 <Input 
                   type="number"
@@ -679,7 +701,7 @@ export default function DriverDashboard() {
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground flex items-center gap-1">
-                  Weather
+                  Weather <span className="text-red-400">*</span>
                 </Label>
                 <Input 
                   value={weather}
@@ -689,7 +711,7 @@ export default function DriverDashboard() {
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground flex items-center gap-1">
-                  Wind (mph)
+                  Wind (mph) <span className="text-red-400">*</span>
                 </Label>
                 <Input 
                   type="number"
