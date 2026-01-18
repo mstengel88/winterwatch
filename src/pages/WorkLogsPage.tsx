@@ -206,6 +206,7 @@ export default function WorkLogsPage() {
   const handleExportPDF = () => {
     const rawLogs = filteredLogs.map((log) => ({
       id: log.id,
+      type: log.type,
       date: format(new Date(log.created_at), 'MM/dd/yy'),
       checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
       checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
@@ -215,7 +216,9 @@ export default function WorkLogsPage() {
       snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
       saltLbs: log.salt_used_lbs ? `${log.salt_used_lbs}lb` : log.ice_melt_used_lbs ? `${log.ice_melt_used_lbs}lb` : '-',
       equipment: log.equipment?.name || '-',
-      employee: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+      employee: log.type === 'shovel' && log.teamMemberNames && log.teamMemberNames.length > 0
+        ? log.teamMemberNames.join(', ')
+        : log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
       conditions: '-',
       notes: log.notes || undefined,
     }));
