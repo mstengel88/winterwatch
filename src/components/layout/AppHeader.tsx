@@ -202,11 +202,11 @@ export function AppHeader() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate(getHomeRoute())}>
+              <DropdownMenuItem onClick={() => navigate('/profile')}>
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate(getHomeRoute())}>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
@@ -228,10 +228,6 @@ export function AppHeader() {
                   <DropdownMenuItem onClick={() => navigate('/admin/equipment')}>
                     <Wrench className="mr-2 h-4 w-4" />
                     Equipment
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/admin/reports')}>
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Reports
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/time-clock')}>
                     <Clock className="mr-2 h-4 w-4" />

@@ -10,8 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   Loader2, FileDown, Filter, Clock, Plus, Eye, Pencil, Trash2, 
-  Image as ImageIcon, RefreshCw, Settings, FileText, ChevronLeft, ChevronRight
+  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
 import { generateWorkLogsPDF } from '@/lib/pdfExport';
@@ -358,6 +364,14 @@ export default function ReportsPage() {
     return `${hours.toFixed(1)}h`;
   };
 
+  const handlePrintPDF = () => {
+    handleExportPDF();
+    // Open print dialog after a short delay to allow PDF generation
+    setTimeout(() => {
+      window.print();
+    }, 500);
+  };
+
   const handleExportPDF = () => {
     const rawLogs = filteredWorkLogs.map((log) => {
       const employeeDisplay =
@@ -411,6 +425,87 @@ export default function ReportsPage() {
       dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
     });
     toast.success('PDF exported successfully');
+  };
+
+  const handleExportTimeSheets = () => {
+    // Generate CSV for time sheets
+    const headers = ['Employee', 'Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Location'];
+    const rows = filteredShifts.map(shift => {
+      const employeeName = shift.employee ? `${shift.employee.first_name} ${shift.employee.last_name}` : 'Unknown';
+      const hours = formatHours(shift.clock_in_time, shift.clock_out_time);
+      const location = shift.clock_in_latitude && shift.clock_in_longitude 
+        ? `${shift.clock_in_latitude.toFixed(4)}, ${shift.clock_in_longitude.toFixed(4)}` 
+        : '-';
+      return [
+        employeeName,
+        format(new Date(shift.clock_in_time), 'MM/dd/yyyy'),
+        format(new Date(shift.clock_in_time), 'HH:mm'),
+        shift.clock_out_time ? format(new Date(shift.clock_out_time), 'HH:mm') : '-',
+        hours,
+        location
+      ];
+    });
+
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `timesheets_${format(new Date(fromDate), 'yyyy-MM-dd')}_to_${format(new Date(toDate), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    toast.success('Time sheets exported successfully');
+  };
+
+  const handleExportSummary = () => {
+    // Calculate summary statistics
+    const totalShiftHours = filteredShifts.reduce((sum, shift) => {
+      if (shift.clock_in_time && shift.clock_out_time) {
+        return sum + differenceInMinutes(new Date(shift.clock_out_time), new Date(shift.clock_in_time)) / 60;
+      }
+      return sum;
+    }, 0);
+
+    const totalWorkLogHours = filteredWorkLogs.reduce((sum, log) => {
+      if (log.check_in_time && log.check_out_time) {
+        return sum + differenceInMinutes(new Date(log.check_out_time), new Date(log.check_in_time)) / 60;
+      }
+      return sum;
+    }, 0);
+
+    const uniqueEmployees = new Set([
+      ...filteredShifts.map(s => s.employee_id),
+      ...filteredWorkLogs.map(l => l.employee_id)
+    ].filter(Boolean)).size;
+
+    const summaryData = [
+      ['WinterWatch-Pro Summary Report'],
+      [`Period: ${format(new Date(fromDate), 'MM/dd/yyyy')} to ${format(new Date(toDate), 'MM/dd/yyyy')}`],
+      [`Generated: ${format(new Date(), 'MM/dd/yyyy HH:mm')}`],
+      [''],
+      ['TIME CLOCK SUMMARY'],
+      ['Total Shifts', filteredShifts.length.toString()],
+      ['Total Hours', totalShiftHours.toFixed(1)],
+      [''],
+      ['WORK LOG SUMMARY'],
+      ['Total Jobs', stats.total.toString()],
+      ['Plow Jobs', stats.plow.toString()],
+      ['Shovel Jobs', stats.shovel.toString()],
+      ['Salt Applications', stats.salt.toString()],
+      ['Total Work Hours', totalWorkLogHours.toFixed(1)],
+      ['Unique Locations', stats.locations.toString()],
+      [''],
+      ['OVERALL'],
+      ['Active Employees', uniqueEmployees.toString()],
+      ['Total Salt Used (lbs)', filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0).toString()],
+      ['Total Ice Melt Used (lbs)', filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0).toString()],
+    ];
+
+    const csvContent = summaryData.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `summary_${format(new Date(fromDate), 'yyyy-MM-dd')}_to_${format(new Date(toDate), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    toast.success('Summary report exported successfully');
   };
 
   const toggleAllShifts = () => {
@@ -683,17 +778,33 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="bg-red-600 hover:bg-red-700">
-            <FileDown className="h-4 w-4 mr-1" />
-            PDF
+          <Button size="sm" variant="outline" onClick={handlePrintPDF}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
           </Button>
-          <Button size="sm" variant="outline">
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={handleExportPDF}>
-            <FileDown className="h-4 w-4 mr-1" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="bg-primary hover:bg-primary/90">
+                <FileDown className="h-4 w-4 mr-1" />
+                Export
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPDF}>
+                <FileText className="h-4 w-4 mr-2" />
+                Export Work Logs PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportTimeSheets}>
+                <Clock className="h-4 w-4 mr-2" />
+                Export Time Sheets
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportSummary}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Export Summary Report
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="outline" onClick={fetchData}>
             <RefreshCw className="h-4 w-4" />
           </Button>
