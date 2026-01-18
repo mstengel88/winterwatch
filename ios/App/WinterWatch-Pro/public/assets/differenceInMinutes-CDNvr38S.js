@@ -1,0 +1,1 @@
+import{d as r,g as f}from"./differenceInMilliseconds-CqskIra_.js";import{a as t}from"./format-D46ChU1D.js";function u(n,d,e){const i=r(n,d)/t;return f(e==null?void 0:e.roundingMethod)(i)}export{u as d};
