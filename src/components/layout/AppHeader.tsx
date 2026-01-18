@@ -102,8 +102,8 @@ export function AppHeader() {
             <SheetContent side="left" className="w-72 p-0">
               <SheetHeader className="border-b border-border/40 p-4">
                 <SheetTitle className="flex items-center gap-2">
-                  <img src={logo} alt="WinterPath" className="h-8 w-8 rounded-full object-cover" />
-                  <span className="font-semibold">WinterPath</span>
+                  <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
+                  <span className="font-semibold">WinterWatch-Pro</span>
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col p-4 space-y-1">
@@ -154,8 +154,8 @@ export function AppHeader() {
             className="flex items-center gap-2 cursor-pointer" 
             onClick={() => navigate(getHomeRoute())}
           >
-            <img src={logo} alt="WinterPath" className="h-8 w-8 rounded-full object-cover" />
-            <span className="font-semibold text-foreground hidden sm:inline">WinterPath</span>
+            <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
+            <span className="font-semibold text-foreground hidden sm:inline">WinterWatch-Pro</span>
           </div>
         </div>
 
