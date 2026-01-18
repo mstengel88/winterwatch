@@ -93,7 +93,7 @@ export function WorkLogDialog({
     if (initialData) {
       setType(initialData.type);
       setAccountId(initialData.account_id);
-      setEmployeeId(initialData.employee_id);
+      setEmployeeId(initialData.employee_id || '');
       setEquipmentId(initialData.equipment_id || '');
       setServiceType(initialData.service_type);
       if (initialData.check_in_time) {
