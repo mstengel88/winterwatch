@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
+// Widgets disabled
+// import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
 import { 
   Shovel, 
   Clock, 
@@ -469,42 +470,7 @@ export default function ShovelDashboard() {
           </CardContent>
         </Card>
 
-        {/* Dashboard Widgets Row */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Stats Widget */}
-          <ShiftStatsWidget
-            totalJobs={completedToday}
-            completedJobs={completedToday}
-            primaryServiceCount={shoveled}
-            secondaryServiceCount={salted}
-            hoursWorked={activeShift ? (shiftTimer.hours + shiftTimer.minutes / 60).toFixed(1) : '0.0'}
-            accountsAvailable={accounts.length}
-            variant="shovel"
-          />
-
-          {/* Weather Widget */}
-          <WeatherWidget
-            temperature={temperature}
-            conditions={weather}
-            windSpeed={wind}
-            variant="shovel"
-          />
-
-          {/* Quick Actions Widget */}
-          <QuickActionsWidget
-            isShiftActive={!!activeShift}
-            isCheckedIn={!!activeWorkLog}
-            hasAccountSelected={!!selectedAccount}
-            onClockIn={handleClockIn}
-            onClockOut={handleClockOut}
-            onCheckIn={handleCheckIn}
-            onCheckOut={handleCheckOut}
-            onRefreshLocation={handleRefreshLocation}
-            isLoading={geoLoading}
-            variant="shovel"
-            nearestAccountName={nearestAccount?.account?.name}
-          />
-        </div>
+        {/* Widgets disabled */}
 
         {/* Main Content - Two Columns */}
         <div className="grid lg:grid-cols-2 gap-6">
