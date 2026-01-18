@@ -4,6 +4,7 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useWidgetSync } from '@/hooks/useWidgetSync';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -106,6 +107,17 @@ export default function DriverDashboard() {
     checkIn,
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
+
+  // Sync shift data with native home screen widgets
+  useWidgetSync({
+    temperature,
+    conditions: weather,
+    jobsCompleted: recentWorkLogs.length,
+    isCheckedIn: !!activeWorkLog,
+    currentLocation: selectedAccountId 
+      ? accounts.find(a => a.id === selectedAccountId)?.name 
+      : undefined,
+  });
 
   // Filter equipment based on selected service type and sort by number descending
   // Plow → show 'plow' and 'both', Salt/Both → show 'both' only

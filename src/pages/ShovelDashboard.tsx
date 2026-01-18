@@ -4,6 +4,7 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useWidgetSync } from '@/hooks/useWidgetSync';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { Button } from '@/components/ui/button';
@@ -84,6 +85,17 @@ export default function ShovelDashboard() {
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
+
+  // Sync shift data with native home screen widgets
+  useWidgetSync({
+    temperature,
+    conditions: weather,
+    jobsCompleted: recentWorkLogs.filter(log => log.status === 'completed').length,
+    isCheckedIn: !!activeWorkLog,
+    currentLocation: selectedAccount 
+      ? accounts.find(a => a.id === selectedAccount)?.name 
+      : undefined,
+  });
 
   // Key for storing team members per shift in localStorage
   const shiftTeamStorageKey = activeShift ? `shovel-team-${activeShift.id}` : null;
