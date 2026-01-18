@@ -39,45 +39,47 @@ export function generateWorkLogsPDF(
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  // WinterWatch color scheme
-  const primaryColor: [number, number, number] = [10, 132, 183];
-  const darkBg: [number, number, number] = [15, 23, 42];
-  const textLight: [number, number, number] = [226, 232, 240];
-  const textMuted: [number, number, number] = [148, 163, 184];
-
-  // Dark background for entire page
-  doc.setFillColor(...darkBg);
-  doc.rect(0, 0, pageWidth, pageHeight, 'F');
-
-  // Header with primary color accent
-  doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, pageWidth, 8, 'F');
+  // WinterWatch color scheme - service type colors
+  const primaryColor: [number, number, number] = [10, 132, 183]; // Sky blue
+  const plowColor: [number, number, number] = [10, 132, 183];    // Sky blue for plow
+  const saltColor: [number, number, number] = [234, 179, 8];     // Yellow/amber for salt
+  const shovelColor: [number, number, number] = [139, 92, 246];  // Purple for shovel
+  const iceMeltColor: [number, number, number] = [6, 182, 212];  // Cyan for ice melt
+  const bothColor: [number, number, number] = [34, 197, 94];     // Green for both
 
   // Title
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...textLight);
+  doc.setTextColor(0, 0, 0);
   doc.text(title, 15, 20);
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...textMuted);
+  doc.setTextColor(100, 100, 100);
   doc.text(`Generated: ${format(new Date(), 'M/d/yyyy h:mm:ss a')}`, 15, 28);
   doc.text(`Period: ${summary.dateRange}`, 15, 34);
   
   // Summary line
   doc.setFontSize(9);
-  doc.setTextColor(...textLight);
+  doc.setTextColor(0, 0, 0);
   doc.text(
     `Total Services: ${summary.totalJobs} | Plow: ${summary.plowCount} | Salt: ${summary.saltCount} | Properties: ${summary.propertyCount}`,
     15,
     43
   );
 
-  const cardBg: [number, number, number] = [19, 30, 54];
-  const mutedBg: [number, number, number] = [29, 39, 57];
+  // Helper to get service type color
+  const getServiceColor = (serviceType: string): [number, number, number] => {
+    const type = serviceType.toLowerCase();
+    if (type === 'plow') return plowColor;
+    if (type === 'salt') return saltColor;
+    if (type === 'shovel') return shovelColor;
+    if (type === 'ice_melt' || type === 'ice melt') return iceMeltColor;
+    if (type === 'both') return bothColor;
+    return [100, 100, 100]; // Default gray
+  };
 
-  // Work logs table with columns matching the example
+  // Work logs table
   if (workLogs.length > 0) {
     autoTable(doc, {
       startY: 50,
@@ -99,7 +101,7 @@ export function generateWorkLogsPDF(
       styles: {
         fontSize: 6,
         cellPadding: 1.5,
-        textColor: textLight,
+        textColor: [0, 0, 0],
       },
       headStyles: {
         fillColor: primaryColor,
@@ -108,11 +110,11 @@ export function generateWorkLogsPDF(
         lineWidth: 0,
       },
       bodyStyles: {
-        fillColor: cardBg,
-        textColor: textLight,
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
       },
       alternateRowStyles: {
-        fillColor: mutedBg,
+        fillColor: [248, 250, 252],
       },
       columnStyles: {
         0: { cellWidth: 20 },  // Date
@@ -128,19 +130,19 @@ export function generateWorkLogsPDF(
         10: { cellWidth: 24 }, // Conditions
         11: { cellWidth: 34 }, // Notes
       },
-      didDrawPage: (data) => {
-        // Dark background for all pages
-        doc.setFillColor(...darkBg);
-        doc.rect(0, 0, pageWidth, pageHeight, 'F');
-        
-        // Primary color accent bar at top
-        doc.setFillColor(...primaryColor);
-        doc.rect(0, 0, pageWidth, 8, 'F');
+      didParseCell: (data) => {
+        // Color the Service column (index 5) based on service type
+        if (data.section === 'body' && data.column.index === 5) {
+          const serviceType = String(data.cell.raw || '');
+          data.cell.styles.fillColor = getServiceColor(serviceType);
+          data.cell.styles.textColor = [255, 255, 255];
+          data.cell.styles.fontStyle = 'bold';
+        }
       },
     });
   } else {
     doc.setFontSize(12);
-    doc.setTextColor(...textMuted);
+    doc.setTextColor(100, 100, 100);
     doc.text('No work logs found for this period.', 15, 60);
   }
 
@@ -149,7 +151,7 @@ export function generateWorkLogsPDF(
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
-    doc.setTextColor(...textMuted);
+    doc.setTextColor(150, 150, 150);
     doc.text(
       `Page ${i} of ${pageCount}`,
       pageWidth / 2,
