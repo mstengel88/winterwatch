@@ -30,6 +30,10 @@ interface WorkLog {
   type: 'plow' | 'shovel';
   ice_melt_used_lbs?: number | null;
   areas_cleared?: string[] | null;
+
+  // Shovel logs: selected team members from the Shovel Crew page
+  team_member_ids?: string[] | null;
+  teamMemberNames?: string[];
 }
 
 export default function WorkLogsPage() {
@@ -62,18 +66,42 @@ export default function WorkLogsPage() {
           .order('created_at', { ascending: false }),
       ]);
 
+      // Resolve shovel team member names in one query (avoid N+1).
+      const shovelTeamIds = Array.from(
+        new Set(
+          (shovelLogsRes.data || []).flatMap((l: any) => (l.team_member_ids as string[] | null) || [])
+        )
+      );
+
+      const teamMemberNameById = new Map<string, string>();
+      if (shovelTeamIds.length > 0) {
+        const { data: teamMembers, error: teamMembersError } = await supabase
+          .from('employees')
+          .select('id, first_name, last_name')
+          .in('id', shovelTeamIds);
+
+        if (!teamMembersError && teamMembers) {
+          for (const m of teamMembers as any[]) {
+            teamMemberNameById.set(m.id, `${m.first_name} ${m.last_name}`);
+          }
+        }
+      }
+
       const workLogs: WorkLog[] = (workLogsRes.data || []).map((log) => ({
         ...log,
         type: 'plow' as const,
         equipment: log.equipment,
       }));
 
-      const shovelLogs: WorkLog[] = (shovelLogsRes.data || []).map((log) => ({
+      const shovelLogs: WorkLog[] = (shovelLogsRes.data || []).map((log: any) => ({
         ...log,
         type: 'shovel' as const,
         equipment: null,
         snow_depth_inches: null,
         salt_used_lbs: null,
+        teamMemberNames: ((log.team_member_ids as string[] | null) || [])
+          .map((id) => teamMemberNameById.get(id))
+          .filter(Boolean) as string[],
       }));
 
       const allLogs = [...workLogs, ...shovelLogs].sort(
@@ -351,9 +379,11 @@ export default function WorkLogsPage() {
                               )}
                             </TableCell>
                             <TableCell>
-                              {log.employee
-                                ? `${log.employee.first_name} ${log.employee.last_name}`
-                                : '-'}
+                              {log.type === 'shovel' && log.teamMemberNames && log.teamMemberNames.length > 0
+                                ? log.teamMemberNames.join(', ')
+                                : log.employee
+                                  ? `${log.employee.first_name} ${log.employee.last_name}`
+                                  : '-'}
                             </TableCell>
                             <TableCell>{getServiceTypeBadge(log)}</TableCell>
                             <TableCell>
