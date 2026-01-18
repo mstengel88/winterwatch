@@ -123,44 +123,115 @@
 
   html {
     color-scheme: dark;
+    /* iOS scroll performance */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
     @apply bg-background text-foreground dark;
-    /* PWA mobile optimizations */
+    /* iOS native optimizations */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+    -webkit-text-size-adjust: 100%;
     overscroll-behavior-y: contain;
+    /* Prevent iOS rubber-banding */
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  /* Main scrollable container */
+  #root {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    /* iOS momentum scrolling */
+    overscroll-behavior: contain;
   }
 
-  /* Safe area support for notched devices */
+  /* Safe area support for notched devices (iPhone X+) */
   .safe-area-inset {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+  
+  /* iOS safe area utilities */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* iOS home indicator margin */
+  .mb-home-indicator {
+    margin-bottom: env(safe-area-inset-bottom, 0);
+  }
 
-  /* Prevent pull-to-refresh on PWA */
+  /* Prevent pull-to-refresh on iOS */
   html, body {
     overscroll-behavior: none;
   }
 
-  /* Smooth scrolling for mobile */
+  /* iOS momentum scrolling */
   * {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Better touch targets for mobile */
-  button, a, [role="button"] {
+  /* iOS HIG compliant touch targets (44pt minimum) */
+  button, a, [role="button"], input, select, textarea {
     min-height: 44px;
-    min-width: 44px;
+  }
+  
+  /* Inline button exceptions */
+  button.inline-btn, a.inline-link {
+    min-height: auto;
+    min-width: auto;
   }
 
   /* Prevent text selection on interactive elements */
   button, [role="button"] {
     user-select: none;
     -webkit-user-select: none;
+    /* iOS button press state */
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  
+  /* iOS-style active state feedback */
+  button:active, [role="button"]:active, a:active {
+    opacity: 0.7;
+    transform: scale(0.98);
+    transition: all 0.1s ease;
+  }
+  
+  /* iOS input styling */
+  input, textarea, select {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0.5rem;
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+  
+  /* iOS keyboard accessory bar spacing */
+  input:focus, textarea:focus {
+    outline: none;
   }
 }
 
@@ -175,16 +246,61 @@
     --primary: 271 81% 56%;
     --ring: 271 81% 56%;
   }
+  
+  /* iOS-style blur backgrounds */
+  .ios-blur {
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+  
+  .ios-blur-light {
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background-color: rgba(255, 255, 255, 0.72);
+  }
+  
+  .ios-blur-dark {
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background-color: rgba(0, 0, 0, 0.72);
+  }
+  
+  /* iOS-style card shadows */
+  .ios-shadow {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  }
+  
+  .ios-shadow-elevated {
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+  }
 }
 
-/* PWA Standalone mode adjustments */
+/* PWA Standalone mode adjustments (iOS home screen) */
 @media (display-mode: standalone) {
   body {
     padding-top: env(safe-area-inset-top);
   }
   
-  /* Extra bottom padding for home indicator */
+  /* iOS home indicator safe area */
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Capacitor native app detection */
+html.capacitor-ios {
+  /* iOS-specific overrides when running in Capacitor */
+  --ios-status-bar-height: env(safe-area-inset-top);
+}
+
+html.capacitor-ios body {
+  /* Ensure proper safe area handling in native iOS app */
+  padding-top: var(--ios-status-bar-height);
+}
+
+/* iOS Dynamic Island support (iPhone 14 Pro+) */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .dynamic-island-aware {
+    padding-top: max(env(safe-area-inset-top), 59px);
   }
 }
