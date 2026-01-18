@@ -35,4 +35,5 @@ export interface AuthContextType {
   hasRole: (role: AppRole) => boolean;
   isAdminOrManager: () => boolean;
   isStaff: () => boolean;
+  refreshProfile: () => Promise<void>;
 }

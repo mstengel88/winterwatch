@@ -18,6 +18,8 @@ const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
 const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
 const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
 const Pending = lazy(() => import("./pages/Pending"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
 const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
@@ -56,6 +58,10 @@ const App = () => (
               <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
               <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
               
+              {/* Profile and Settings (all users) */}
+              <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+
               <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
               
               {/* Admin routes */}

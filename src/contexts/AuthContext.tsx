@@ -127,6 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isStaff = () => hasRole('driver') || hasRole('shovel_crew');
 
+  const refreshProfile = async () => {
+    if (user) {
+      const profileData = await fetchProfile(user.id);
+      setProfile(profileData);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -141,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasRole,
         isAdminOrManager,
         isStaff,
+        refreshProfile,
       }}
     >
       {children}
