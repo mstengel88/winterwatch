@@ -359,21 +359,33 @@ export default function ReportsPage() {
   };
 
   const handleExportPDF = () => {
-    const rawLogs = filteredWorkLogs.map(log => ({
-      id: log.id,
-      date: format(new Date(log.date), 'MM/dd/yy'),
-      checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
-      checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
-      duration: formatDuration(log.check_in_time, log.check_out_time),
-      account: log.account_name,
-      serviceType: log.service_type,
-      snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
-      saltLbs: log.salt_used_lbs ? `${log.salt_used_lbs}lb` : log.ice_melt_used_lbs ? `${log.ice_melt_used_lbs}lb` : '-',
-      equipment: log.equipment_name || '-',
-      employee: log.employee_name,
-      conditions: log.weather_conditions || '-',
-      notes: log.notes || undefined,
-    }));
+    const rawLogs = filteredWorkLogs.map((log) => {
+      const employeeDisplay =
+        log.type === 'shovel' && log.team_member_names && log.team_member_names.length > 0
+          ? log.team_member_names.join(', ')
+          : log.employee_name;
+
+      return {
+        id: log.id,
+        date: format(new Date(log.date), 'MM/dd/yy'),
+        checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
+        checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
+        duration: formatDuration(log.check_in_time, log.check_out_time),
+        account: log.account_name,
+        serviceType: log.service_type,
+        snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
+        saltLbs: log.salt_used_lbs
+          ? `${log.salt_used_lbs}lb`
+          : log.ice_melt_used_lbs
+            ? `${log.ice_melt_used_lbs}lb`
+            : '-',
+        equipment: log.equipment_name || '-',
+        employee: employeeDisplay,
+        conditions: log.weather_conditions || '-',
+        notes: log.notes || undefined,
+      };
+    });
+
 
     const totalHours = filteredWorkLogs.reduce((sum, log) => {
       if (log.check_in_time && log.check_out_time) {
