@@ -77,11 +77,11 @@ export function InstallPrompt() {
         <div className="flex items-start gap-3 p-4">
           <img 
             src={logo} 
-            alt="WinterPath" 
+            alt="WinterWatch-Pro" 
             className="h-14 w-14 rounded-xl object-cover flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground">Install WinterPath</h3>
+            <h3 className="font-semibold text-foreground">Install WinterWatch-Pro</h3>
             <p className="text-sm text-muted-foreground mt-0.5">
               {isIOS 
                 ? 'Tap Share, then "Add to Home Screen"' 

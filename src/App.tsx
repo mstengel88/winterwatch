@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
@@ -40,6 +41,7 @@ const App = () => (
         <AuthProvider>
           <Toaster />
           <Sonner />
+          <OfflineIndicator />
           <InstallPrompt />
           <Suspense fallback={<PageLoader />}>
             <Routes>
