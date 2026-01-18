@@ -228,6 +228,7 @@ export type Database = {
         Row: {
           account_id: string
           areas_cleared: string[] | null
+          billed: boolean
           check_in_latitude: number | null
           check_in_longitude: number | null
           check_in_time: string | null
@@ -250,6 +251,7 @@ export type Database = {
         Insert: {
           account_id: string
           areas_cleared?: string[] | null
+          billed?: boolean
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -272,6 +274,7 @@ export type Database = {
         Update: {
           account_id?: string
           areas_cleared?: string[] | null
+          billed?: boolean
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -385,6 +388,7 @@ export type Database = {
       work_logs: {
         Row: {
           account_id: string
+          billed: boolean
           check_in_latitude: number | null
           check_in_longitude: number | null
           check_in_time: string | null
@@ -406,6 +410,7 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          billed?: boolean
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -427,6 +432,7 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          billed?: boolean
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null

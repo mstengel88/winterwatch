@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Loader2, FileDown, Filter, Clock, Plus, Eye, Pencil, Trash2, 
-  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown
+  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown, Archive, CheckCircle
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -60,6 +61,7 @@ interface WorkLogEntry {
   team_member_names: string[];
   photo_urls: string[] | null;
   notes: string | null;
+  billed: boolean;
 }
 
 interface Account {
@@ -98,6 +100,7 @@ export default function ReportsPage() {
   const [selectedEquipment, setSelectedEquipment] = useState('all');
   const [minSnow, setMinSnow] = useState('');
   const [minSalt, setMinSalt] = useState('');
+  const [activeTab, setActiveTab] = useState('current');
 
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
@@ -231,6 +234,7 @@ export default function ReportsPage() {
         team_member_names: [],
         photo_urls: log.photo_urls,
         notes: log.notes,
+        billed: log.billed || false,
       }));
 
       // For shovel logs, fetch team member names if available
@@ -265,6 +269,7 @@ export default function ReportsPage() {
             team_member_names: teamMemberNames,
             photo_urls: log.photo_urls,
             notes: log.notes,
+            billed: log.billed || false,
           };
         })
       );
@@ -294,6 +299,10 @@ export default function ReportsPage() {
 
   const filteredWorkLogs = useMemo(() => {
     return workLogs.filter(log => {
+      // Filter by billed status based on active tab
+      if (activeTab === 'current' && log.billed) return false;
+      if (activeTab === 'archived' && !log.billed) return false;
+      
       if (logType !== 'all' && log.type !== logType) return false;
       if (selectedServiceType !== 'all' && log.service_type !== selectedServiceType) return false;
       if (log.type === 'plow' && selectedPlowAccount !== 'all') {
@@ -319,7 +328,11 @@ export default function ReportsPage() {
       }
       return true;
     });
-  }, [workLogs, logType, selectedPlowAccount, selectedShovelLocation, selectedEmployee, selectedServiceType, selectedEquipment, minSnow, minSalt, accounts, employees, equipment]);
+  }, [workLogs, logType, selectedPlowAccount, selectedShovelLocation, selectedEmployee, selectedServiceType, selectedEquipment, minSnow, minSalt, accounts, employees, equipment, activeTab]);
+
+  // Counts for tabs
+  const currentCount = useMemo(() => workLogs.filter(l => !l.billed).length, [workLogs]);
+  const archivedCount = useMemo(() => workLogs.filter(l => l.billed).length, [workLogs]);
 
   // Stats
   const stats = useMemo(() => {
@@ -724,6 +737,55 @@ export default function ReportsPage() {
     setBulkDeleteDialogOpen(true);
   };
 
+  // Bulk mark as billed/unbilled
+  const handleBulkMarkBilled = async (billed: boolean) => {
+    const ids = Array.from(selectedWorkLogs);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      // Separate plow and shovel logs
+      const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
+      const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
+      
+      if (plowIds.length > 0) {
+        const { error } = await supabase.from('work_logs').update({ billed }).in('id', plowIds);
+        if (error) throw error;
+      }
+      if (shovelIds.length > 0) {
+        const { error } = await supabase.from('shovel_work_logs').update({ billed }).in('id', shovelIds);
+        if (error) throw error;
+      }
+      
+      toast.success(`${ids.length} work log(s) marked as ${billed ? 'billed' : 'unbilled'}`);
+      setSelectedWorkLogs(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating billed status:', error);
+      toast.error('Failed to update billed status');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Mark single work log as billed/unbilled
+  const handleToggleBilled = async (log: WorkLogEntry) => {
+    setIsSaving(true);
+    try {
+      const table = log.type === 'plow' ? 'work_logs' : 'shovel_work_logs';
+      const { error } = await supabase.from(table).update({ billed: !log.billed }).eq('id', log.id);
+      if (error) throw error;
+      
+      toast.success(`Work log marked as ${!log.billed ? 'billed' : 'unbilled'}`);
+      await fetchData();
+    } catch (error) {
+      console.error('Error toggling billed status:', error);
+      toast.error('Failed to update billed status');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Open dialog handlers
   const openAddShift = () => {
     setEditingShift(null);
@@ -1116,138 +1178,313 @@ export default function ReportsPage() {
       {/* Work Log Entries Section */}
       <Card className="bg-[hsl(var(--card))]/80 border-border/50">
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <span className="font-medium">Work Log Entries ({filteredWorkLogs.length})</span>
-            <div className="flex items-center gap-2">
-              {selectedWorkLogs.size > 0 && (
-                <Button size="sm" variant="destructive" onClick={openBulkDeleteWorkLogs}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete ({selectedWorkLogs.size})
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={openAddWorkLog}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Entry
-              </Button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border/50">
-                  <TableHead className="w-10">
-                    <Checkbox 
-                      checked={selectedWorkLogs.size === filteredWorkLogs.length && filteredWorkLogs.length > 0}
-                      onCheckedChange={toggleAllWorkLogs}
-                    />
-                  </TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>In</TableHead>
-                  <TableHead>Out</TableHead>
-                  <TableHead>Dur.</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Snow/Salt</TableHead>
-                  <TableHead>Weather</TableHead>
-                  <TableHead>Equipment</TableHead>
-                  <TableHead>Crew</TableHead>
-                  <TableHead>Photo</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWorkLogs.slice(0, 20).map(log => (
-                  <TableRow key={log.id} className="border-border/30">
-                    <TableCell>
-                      <Checkbox 
-                        checked={selectedWorkLogs.has(log.id)}
-                        onCheckedChange={(checked) => {
-                          const newSet = new Set(selectedWorkLogs);
-                          if (checked) newSet.add(log.id);
-                          else newSet.delete(log.id);
-                          setSelectedWorkLogs(newSet);
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={log.type === 'plow' ? 'bg-blue-600' : 'bg-purple-600'}>
-                        {log.type === 'plow' ? 'Plow' : 'Shov'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{format(new Date(log.date), 'MM/dd')}</TableCell>
-                    <TableCell>
-                      {log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
-                    </TableCell>
-                    <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
-                    <TableCell className="max-w-[100px] truncate" title={log.account_name}>
-                      {log.account_name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant="outline"
-                        className={
-                          log.service_type === 'plow' ? 'border-blue-500 text-blue-400' :
-                          log.service_type === 'salt' || log.service_type === 'ice_melt' ? 'border-green-500 text-green-400' :
-                          log.service_type === 'shovel' ? 'border-purple-500 text-purple-400' :
-                          'border-cyan-500 text-cyan-400'
-                        }
+          <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); setSelectedWorkLogs(new Set()); }}>
+            <div className="flex items-center justify-between mb-4">
+              <TabsList>
+                <TabsTrigger value="current" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Current ({currentCount})
+                </TabsTrigger>
+                <TabsTrigger value="archived" className="gap-2">
+                  <Archive className="h-4 w-4" />
+                  Archived ({archivedCount})
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex items-center gap-2">
+                {selectedWorkLogs.size > 0 && (
+                  <>
+                    {activeTab === 'current' ? (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => handleBulkMarkBilled(true)}
+                        disabled={isSaving}
                       >
-                        {log.type === 'plow' 
-                          ? (log.service_type === 'both' ? 'Plow/Salt' : 
-                             log.service_type === 'plow' ? 'Plow' : 
-                             log.service_type === 'salt' ? 'Salt' : log.service_type)
-                          : (log.service_type === 'both' ? 'Shovel/Salt' : 
-                             log.service_type === 'ice_melt' ? 'Salt' : 
-                             log.service_type === 'shovel' ? 'Shovel' : log.service_type)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {log.snow_depth_inches !== null ? `${log.snow_depth_inches}"` : '-'} / {' '}
-                      {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
-                       log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
-                      {log.weather_conditions || '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
-                      {log.equipment_name || '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
-                      {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
-                    </TableCell>
-                    <TableCell>
-                      <PhotoThumbnails 
-                        photoPaths={log.photo_urls || []} 
-                        onViewPhotos={openPhotoViewer}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
-                          <Pencil className="h-3 w-3 text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
-                          <Trash2 className="h-3 w-3 text-red-400" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredWorkLogs.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
-                      No work logs found for the selected filters
-                    </TableCell>
-                  </TableRow>
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Mark Billed ({selectedWorkLogs.size})
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => handleBulkMarkBilled(false)}
+                        disabled={isSaving}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        Unarchive ({selectedWorkLogs.size})
+                      </Button>
+                    )}
+                    <Button size="sm" variant="destructive" onClick={openBulkDeleteWorkLogs} disabled={isSaving}>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete ({selectedWorkLogs.size})
+                    </Button>
+                  </>
                 )}
-              </TableBody>
-            </Table>
-          </div>
+                <Button size="sm" variant="outline" onClick={openAddWorkLog}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Entry
+                </Button>
+              </div>
+            </div>
+
+            <TabsContent value="current" className="mt-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/50">
+                      <TableHead className="w-10">
+                        <Checkbox 
+                          checked={selectedWorkLogs.size === filteredWorkLogs.length && filteredWorkLogs.length > 0}
+                          onCheckedChange={toggleAllWorkLogs}
+                        />
+                      </TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>In</TableHead>
+                      <TableHead>Out</TableHead>
+                      <TableHead>Dur.</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Snow/Salt</TableHead>
+                      <TableHead>Weather</TableHead>
+                      <TableHead>Equipment</TableHead>
+                      <TableHead>Crew</TableHead>
+                      <TableHead>Photo</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredWorkLogs.slice(0, 50).map(log => (
+                      <TableRow key={log.id} className="border-border/30">
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedWorkLogs.has(log.id)}
+                            onCheckedChange={(checked) => {
+                              const newSet = new Set(selectedWorkLogs);
+                              if (checked) newSet.add(log.id);
+                              else newSet.delete(log.id);
+                              setSelectedWorkLogs(newSet);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={log.type === 'plow' ? 'bg-blue-600' : 'bg-purple-600'}>
+                            {log.type === 'plow' ? 'Plow' : 'Shov'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{format(new Date(log.date), 'MM/dd')}</TableCell>
+                        <TableCell>
+                          {log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
+                        <TableCell className="max-w-[100px] truncate" title={log.account_name}>
+                          {log.account_name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline"
+                            className={
+                              log.service_type === 'plow' ? 'border-blue-500 text-blue-400' :
+                              log.service_type === 'salt' || log.service_type === 'ice_melt' ? 'border-green-500 text-green-400' :
+                              log.service_type === 'shovel' ? 'border-purple-500 text-purple-400' :
+                              'border-cyan-500 text-cyan-400'
+                            }
+                          >
+                            {log.type === 'plow' 
+                              ? (log.service_type === 'both' ? 'Plow/Salt' : 
+                                 log.service_type === 'plow' ? 'Plow' : 
+                                 log.service_type === 'salt' ? 'Salt' : log.service_type)
+                              : (log.service_type === 'both' ? 'Shovel/Salt' : 
+                                 log.service_type === 'ice_melt' ? 'Salt' : 
+                                 log.service_type === 'shovel' ? 'Shovel' : log.service_type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.snow_depth_inches !== null ? `${log.snow_depth_inches}"` : '-'} / {' '}
+                          {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
+                           log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
+                          {log.weather_conditions || '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
+                          {log.equipment_name || '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
+                          {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
+                        </TableCell>
+                        <TableCell>
+                          <PhotoThumbnails 
+                            photoPaths={log.photo_urls || []} 
+                            onViewPhotos={openPhotoViewer}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7" 
+                              onClick={() => handleToggleBilled(log)}
+                              title="Mark as billed"
+                              disabled={isSaving}
+                            >
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                              <Pencil className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                              <Trash2 className="h-3 w-3 text-red-400" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredWorkLogs.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                          No unbilled work logs found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="archived" className="mt-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/50">
+                      <TableHead className="w-10">
+                        <Checkbox 
+                          checked={selectedWorkLogs.size === filteredWorkLogs.length && filteredWorkLogs.length > 0}
+                          onCheckedChange={toggleAllWorkLogs}
+                        />
+                      </TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>In</TableHead>
+                      <TableHead>Out</TableHead>
+                      <TableHead>Dur.</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Snow/Salt</TableHead>
+                      <TableHead>Weather</TableHead>
+                      <TableHead>Equipment</TableHead>
+                      <TableHead>Crew</TableHead>
+                      <TableHead>Photo</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredWorkLogs.slice(0, 50).map(log => (
+                      <TableRow key={log.id} className="border-border/30 opacity-75">
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedWorkLogs.has(log.id)}
+                            onCheckedChange={(checked) => {
+                              const newSet = new Set(selectedWorkLogs);
+                              if (checked) newSet.add(log.id);
+                              else newSet.delete(log.id);
+                              setSelectedWorkLogs(newSet);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={log.type === 'plow' ? 'bg-blue-600' : 'bg-purple-600'}>
+                            {log.type === 'plow' ? 'Plow' : 'Shov'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{format(new Date(log.date), 'MM/dd')}</TableCell>
+                        <TableCell>
+                          {log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
+                        <TableCell className="max-w-[100px] truncate" title={log.account_name}>
+                          {log.account_name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline"
+                            className={
+                              log.service_type === 'plow' ? 'border-blue-500 text-blue-400' :
+                              log.service_type === 'salt' || log.service_type === 'ice_melt' ? 'border-green-500 text-green-400' :
+                              log.service_type === 'shovel' ? 'border-purple-500 text-purple-400' :
+                              'border-cyan-500 text-cyan-400'
+                            }
+                          >
+                            {log.type === 'plow' 
+                              ? (log.service_type === 'both' ? 'Plow/Salt' : 
+                                 log.service_type === 'plow' ? 'Plow' : 
+                                 log.service_type === 'salt' ? 'Salt' : log.service_type)
+                              : (log.service_type === 'both' ? 'Shovel/Salt' : 
+                                 log.service_type === 'ice_melt' ? 'Salt' : 
+                                 log.service_type === 'shovel' ? 'Shovel' : log.service_type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.snow_depth_inches !== null ? `${log.snow_depth_inches}"` : '-'} / {' '}
+                          {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
+                           log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
+                          {log.weather_conditions || '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
+                          {log.equipment_name || '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
+                          {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
+                        </TableCell>
+                        <TableCell>
+                          <PhotoThumbnails 
+                            photoPaths={log.photo_urls || []} 
+                            onViewPhotos={openPhotoViewer}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7" 
+                              onClick={() => handleToggleBilled(log)}
+                              title="Mark as unbilled"
+                              disabled={isSaving}
+                            >
+                              <Archive className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                              <Pencil className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                              <Trash2 className="h-3 w-3 text-red-400" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredWorkLogs.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                          No archived work logs found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
