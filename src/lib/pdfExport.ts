@@ -123,7 +123,7 @@ export function generateWorkLogsPDF(
         textColor: [0, 0, 0],
       },
       alternateRowStyles: {
-        fillColor: [248, 250, 252],
+        fillColor: [226, 232, 240], // slate-200 for more contrast
       },
       columnStyles: {
         0: { cellWidth: 16 },  // Type
