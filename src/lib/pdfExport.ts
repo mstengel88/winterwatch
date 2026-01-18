@@ -37,25 +37,45 @@ export function generateWorkLogsPDF(
   // Landscape orientation for wider table
   const doc = new jsPDF({ orientation: 'landscape' });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Header
+  // WinterWatch color scheme
+  const primaryColor: [number, number, number] = [10, 132, 183];
+  const darkBg: [number, number, number] = [15, 23, 42];
+  const textLight: [number, number, number] = [226, 232, 240];
+  const textMuted: [number, number, number] = [148, 163, 184];
+
+  // Dark background for entire page
+  doc.setFillColor(...darkBg);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  // Header with primary color accent
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 8, 'F');
+
+  // Title
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...textLight);
   doc.text(title, 15, 20);
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(0);
+  doc.setTextColor(...textMuted);
   doc.text(`Generated: ${format(new Date(), 'M/d/yyyy h:mm:ss a')}`, 15, 28);
   doc.text(`Period: ${summary.dateRange}`, 15, 34);
   
   // Summary line
   doc.setFontSize(9);
+  doc.setTextColor(...textLight);
   doc.text(
     `Total Services: ${summary.totalJobs} | Plow: ${summary.plowCount} | Salt: ${summary.saltCount} | Properties: ${summary.propertyCount}`,
     15,
     43
   );
+
+  const cardBg: [number, number, number] = [19, 30, 54];
+  const mutedBg: [number, number, number] = [29, 39, 57];
 
   // Work logs table with columns matching the example
   if (workLogs.length > 0) {
@@ -79,18 +99,20 @@ export function generateWorkLogsPDF(
       styles: {
         fontSize: 6,
         cellPadding: 1.5,
+        textColor: textLight,
       },
       headStyles: {
-        fillColor: [255, 255, 255],
-        textColor: [0, 0, 0],
+        fillColor: primaryColor,
+        textColor: [255, 255, 255],
         fontStyle: 'bold',
         lineWidth: 0,
       },
       bodyStyles: {
-        textColor: [0, 0, 0],
+        fillColor: cardBg,
+        textColor: textLight,
       },
       alternateRowStyles: {
-        fillColor: [255, 255, 255],
+        fillColor: mutedBg,
       },
       columnStyles: {
         0: { cellWidth: 20 },  // Date
@@ -107,19 +129,18 @@ export function generateWorkLogsPDF(
         11: { cellWidth: 34 }, // Notes
       },
       didDrawPage: (data) => {
-        // Draw header line under column headers
-        if (data.pageNumber === 1) {
-          const headerBottom = (data.table?.head?.[0]?.cells?.[0]?.y ?? 50) + 
-            (data.table?.head?.[0]?.cells?.[0]?.height ?? 8);
-          doc.setDrawColor(0);
-          doc.setLineWidth(0.5);
-          doc.line(15, headerBottom, pageWidth - 15, headerBottom);
-        }
+        // Dark background for all pages
+        doc.setFillColor(...darkBg);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        
+        // Primary color accent bar at top
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, pageWidth, 8, 'F');
       },
     });
   } else {
     doc.setFontSize(12);
-    doc.setTextColor(100);
+    doc.setTextColor(...textMuted);
     doc.text('No work logs found for this period.', 15, 60);
   }
 
@@ -128,11 +149,11 @@ export function generateWorkLogsPDF(
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
-    doc.setTextColor(150);
+    doc.setTextColor(...textMuted);
     doc.text(
       `Page ${i} of ${pageCount}`,
       pageWidth / 2,
-      doc.internal.pageSize.getHeight() - 10,
+      pageHeight - 10,
       { align: 'center' }
     );
   }
