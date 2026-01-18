@@ -38,19 +38,7 @@ import {
 } from 'lucide-react';
 import { format, differenceInSeconds } from 'date-fns';
 import { Account, Employee } from '@/types/database';
-
-// Calculate distance between two coordinates in km
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
+import { calculateDistance, formatDistance } from '@/lib/distance';
 
 interface AccountWithDistance {
   account: Account;
@@ -536,9 +524,7 @@ export default function ShovelDashboard() {
                         <span className="text-purple-200">Nearest:</span> {nearestAccount.account.name}{' '}
                         <span className="text-purple-200">
                           {nearestAccount.distance !== null 
-                            ? nearestAccount.distance < 1 
-                              ? `${Math.round(nearestAccount.distance * 1000)}m`
-                              : `${nearestAccount.distance.toFixed(1)}km`
+                            ? formatDistance(nearestAccount.distance)
                             : ''}
                         </span>
                       </p>
@@ -583,9 +569,7 @@ export default function ShovelDashboard() {
                           <span>{account.name}</span>
                           {distance !== null && (
                             <span className="text-muted-foreground text-xs">
-                              {distance < 1 
-                                ? `${Math.round(distance * 1000)}m`
-                                : `${distance.toFixed(1)}km`}
+                              {formatDistance(distance)}
                             </span>
                           )}
                         </span>

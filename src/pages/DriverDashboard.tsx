@@ -30,23 +30,11 @@ import {
 import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Account, Employee } from '@/types/database';
+import { calculateDistance, formatDistance } from '@/lib/distance';
 
 // Format time with leading zeros
 function formatTime(value: number): string {
   return value.toString().padStart(2, '0');
-}
-
-// Calculate distance between two coordinates in km
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
 }
 
 interface AccountWithDistance extends Account {
@@ -573,7 +561,7 @@ export default function DriverDashboard() {
                     <>
                       <p className="font-medium text-primary-foreground">
                         <span className="text-primary-foreground/70">Nearest:</span> {nearestAccount.account.name}{' '}
-                        <span className="text-primary-foreground/70">{nearestAccount.distance.toFixed(1)}km</span>
+                        <span className="text-primary-foreground/70">{formatDistance(nearestAccount.distance)}</span>
                       </p>
                       <p className="text-sm text-primary-foreground/70">
                         GPS accuracy: ±{geoLocation?.accuracy?.toFixed(0) || 0} meters
@@ -617,7 +605,7 @@ export default function DriverDashboard() {
                           <span>{acc.name}</span>
                           {acc.distance !== undefined && (
                             <span className="text-xs text-muted-foreground ml-2">
-                              {acc.distance.toFixed(1)}km
+                              {formatDistance(acc.distance)}
                             </span>
                           )}
                         </div>
