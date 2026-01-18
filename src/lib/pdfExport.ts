@@ -1,5 +1,8 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
+// Version for cache busting - increment when making PDF changes
+const PDF_VERSION = '1.0.1';
 import { format } from 'date-fns';
 
 interface WorkLogData {
@@ -57,7 +60,7 @@ export function generateWorkLogsPDF(
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 100, 100);
-  doc.text(`Generated: ${format(new Date(), 'M/d/yyyy h:mm:ss a')}`, 15, 28);
+  doc.text(`Generated: ${format(new Date(), 'M/d/yyyy h:mm:ss a')} (v${PDF_VERSION})`, 15, 28);
   doc.text(`Period: ${summary.dateRange}`, 15, 34);
   
   // Summary line
