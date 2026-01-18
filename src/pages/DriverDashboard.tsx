@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
+import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
 import { 
   Snowflake, 
   Truck, 
@@ -492,49 +493,41 @@ export default function DriverDashboard() {
           </CardContent>
         </Card>
 
-        {/* Today's Overview */}
-        <div>
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Today's Overview
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card className="border-border/50 bg-card">
-              <CardContent className="py-4 px-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-2xl font-bold">{todayStats.total}</p>
-                <p className="text-xs text-muted-foreground">Total Services</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 bg-card">
-              <CardContent className="py-4 px-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Truck className="h-4 w-4 text-primary" />
-                </div>
-                <p className="text-2xl font-bold">{todayStats.plowed}</p>
-                <p className="text-xs text-muted-foreground">Plowed</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 bg-card">
-              <CardContent className="py-4 px-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Snowflake className="h-4 w-4 text-success" />
-                </div>
-                <p className="text-2xl font-bold">{todayStats.salted}</p>
-                <p className="text-xs text-muted-foreground">Salted</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 bg-card">
-              <CardContent className="py-4 px-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <MapPin className="h-4 w-4 text-success" />
-                </div>
-                <p className="text-2xl font-bold">{todayStats.accounts}</p>
-                <p className="text-xs text-muted-foreground">Properties</p>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Dashboard Widgets Row */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Stats Widget */}
+          <ShiftStatsWidget
+            totalJobs={todayStats.total}
+            completedJobs={recentWorkLogs.filter(l => l.status === 'completed').length}
+            primaryServiceCount={todayStats.plowed}
+            secondaryServiceCount={todayStats.salted}
+            hoursWorked={weeklyHours}
+            accountsAvailable={todayStats.accounts}
+            variant="driver"
+          />
+
+          {/* Weather Widget */}
+          <WeatherWidget
+            temperature={temperature}
+            conditions={weather}
+            windSpeed={windSpeed}
+            variant="driver"
+          />
+
+          {/* Quick Actions Widget */}
+          <QuickActionsWidget
+            isShiftActive={!!activeShift}
+            isCheckedIn={!!activeWorkLog}
+            hasAccountSelected={!!selectedAccountId}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+            onRefreshLocation={handleRefreshLocation}
+            isLoading={geoLoading}
+            variant="driver"
+            nearestAccountName={nearestAccount?.account.name}
+          />
         </div>
 
         {/* Main Content Grid */}

@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
 import { 
   Shovel, 
   Clock, 
@@ -456,55 +457,41 @@ export default function ShovelDashboard() {
           </CardContent>
         </Card>
 
-        {/* TODAY'S OVERVIEW */}
-        <div>
-          <h2 className="text-xs font-medium text-muted-foreground mb-3 tracking-wide">TODAY'S OVERVIEW</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-2xl font-bold">{completedToday}</p>
-                    <p className="text-xs text-muted-foreground">Total Services</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-3">
-                  <Footprints className="h-4 w-4 text-purple-400" />
-                  <div>
-                    <p className="text-2xl font-bold">{shoveled}</p>
-                    <p className="text-xs text-muted-foreground">Shoveled</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-3">
-                  <Snowflake className="h-4 w-4 text-blue-400" />
-                  <div>
-                    <p className="text-2xl font-bold">{salted}</p>
-                    <p className="text-xs text-muted-foreground">Salted</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[hsl(var(--card))]/50 border-border/30">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-3">
-                  <MapPin className="h-4 w-4 text-green-400" />
-                  <div>
-                    <p className="text-2xl font-bold">{accounts.length}</p>
-                    <p className="text-xs text-muted-foreground">Locations</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Dashboard Widgets Row */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Stats Widget */}
+          <ShiftStatsWidget
+            totalJobs={completedToday}
+            completedJobs={completedToday}
+            primaryServiceCount={shoveled}
+            secondaryServiceCount={salted}
+            hoursWorked={activeShift ? (shiftTimer.hours + shiftTimer.minutes / 60).toFixed(1) : '0.0'}
+            accountsAvailable={accounts.length}
+            variant="shovel"
+          />
+
+          {/* Weather Widget */}
+          <WeatherWidget
+            temperature={temperature}
+            conditions={weather}
+            windSpeed={wind}
+            variant="shovel"
+          />
+
+          {/* Quick Actions Widget */}
+          <QuickActionsWidget
+            isShiftActive={!!activeShift}
+            isCheckedIn={!!activeWorkLog}
+            hasAccountSelected={!!selectedAccount}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+            onRefreshLocation={handleRefreshLocation}
+            isLoading={geoLoading}
+            variant="shovel"
+            nearestAccountName={nearestAccount?.account?.name}
+          />
         </div>
 
         {/* Main Content - Two Columns */}
