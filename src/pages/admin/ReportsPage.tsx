@@ -367,6 +367,7 @@ export default function ReportsPage() {
 
       return {
         id: log.id,
+        type: log.type,
         date: format(new Date(log.date), 'MM/dd/yy'),
         checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
         checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',

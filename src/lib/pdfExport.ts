@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 
 interface WorkLogData {
   id: string;
+  type: 'plow' | 'shovel';
   date: string;
   checkIn: string;
   checkOut: string;
@@ -79,12 +80,20 @@ export function generateWorkLogsPDF(
     return [100, 100, 100]; // Default gray
   };
 
+  // Helper to get type color (plow vs shovel)
+  const getTypeColor = (type: string): [number, number, number] => {
+    if (type === 'plow') return plowColor;
+    if (type === 'shovel') return shovelColor;
+    return [100, 100, 100];
+  };
+
   // Work logs table
   if (workLogs.length > 0) {
     autoTable(doc, {
       startY: 50,
-      head: [['Date', 'Check In', 'Check Out', 'Duration', 'Account', 'Service', 'Snow', 'Salt', 'Equipment', 'Employee', 'Conditions', 'Notes']],
+      head: [['Type', 'Date', 'Check In', 'Check Out', 'Duration', 'Account', 'Service', 'Snow', 'Salt', 'Equipment', 'Employee', 'Conditions', 'Notes']],
       body: workLogs.map((log) => [
+        log.type === 'plow' ? 'Plow' : 'Shovel',
         log.date,
         log.checkIn,
         log.checkOut,
@@ -117,22 +126,30 @@ export function generateWorkLogsPDF(
         fillColor: [248, 250, 252],
       },
       columnStyles: {
-        0: { cellWidth: 20 },  // Date
-        1: { cellWidth: 16 },  // Check In
-        2: { cellWidth: 16 },  // Check Out
-        3: { cellWidth: 16 },  // Duration
-        4: { cellWidth: 35 },  // Account
-        5: { cellWidth: 22 },  // Service
-        6: { cellWidth: 14 },  // Snow
-        7: { cellWidth: 14 },  // Salt
-        8: { cellWidth: 26 },  // Equipment
-        9: { cellWidth: 30 },  // Employee
-        10: { cellWidth: 24 }, // Conditions
-        11: { cellWidth: 34 }, // Notes
+        0: { cellWidth: 16 },  // Type
+        1: { cellWidth: 18 },  // Date
+        2: { cellWidth: 14 },  // Check In
+        3: { cellWidth: 14 },  // Check Out
+        4: { cellWidth: 14 },  // Duration
+        5: { cellWidth: 32 },  // Account
+        6: { cellWidth: 20 },  // Service
+        7: { cellWidth: 12 },  // Snow
+        8: { cellWidth: 12 },  // Salt
+        9: { cellWidth: 24 },  // Equipment
+        10: { cellWidth: 28 }, // Employee
+        11: { cellWidth: 22 }, // Conditions
+        12: { cellWidth: 30 }, // Notes
       },
       didParseCell: (data) => {
-        // Color the Service column (index 5) based on service type
-        if (data.section === 'body' && data.column.index === 5) {
+        // Color the Type column (index 0) based on plow vs shovel
+        if (data.section === 'body' && data.column.index === 0) {
+          const type = String(data.cell.raw || '').toLowerCase();
+          data.cell.styles.fillColor = getTypeColor(type);
+          data.cell.styles.textColor = [255, 255, 255];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        // Color the Service column (index 6) based on service type
+        if (data.section === 'body' && data.column.index === 6) {
           const serviceType = String(data.cell.raw || '');
           data.cell.styles.fillColor = getServiceColor(serviceType);
           data.cell.styles.textColor = [255, 255, 255];
