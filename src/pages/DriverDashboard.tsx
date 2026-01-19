@@ -45,7 +45,13 @@ interface AccountWithDistance extends Account {
 export default function DriverDashboard() {
   const { profile } = useAuth();
   const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
-  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading, error: geoError } = useGeolocation();
+  const {
+  location: geoLocation,
+  isLoading: geoLoading,
+  error: geoError,
+  refreshOnce,
+} = useGeolocation();
+
   const { toast } = useToast();
   const {
     photos,
@@ -58,18 +64,6 @@ export default function DriverDashboard() {
     uploadPhotos,
     canAddMore,
   } = usePhotoUpload({ folder: 'work-logs' });
-
-  // Get location on mount and set up periodic refresh
-  useEffect(() => {
-    getCurrentLocation();
-    
-    // Refresh location every 30 seconds for real-time updates
-    const interval = setInterval(() => {
-      getCurrentLocation();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [getCurrentLocation]);
 
   // Form state
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -257,9 +251,13 @@ export default function DriverDashboard() {
 
   // Handle manual location refresh
   const handleRefreshLocation = useCallback(async () => {
-    await getCurrentLocation();
-    toast({ title: 'Location updated' });
-  }, [getCurrentLocation, toast]);
+  const loc = await refreshOnce();
+  if (loc) {
+    toast({ title: "Location updated" });
+  }
+}, [refreshOnce, toast]);
+
+
 
   // Today's stats
   const todayStats = useMemo(() => {
