@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
-import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
 import { 
   Snowflake, 
   Truck, 
@@ -493,42 +492,6 @@ export default function DriverDashboard() {
           </CardContent>
         </Card>
 
-        {/* Dashboard Widgets Row */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Stats Widget */}
-          <ShiftStatsWidget
-            totalJobs={todayStats.total}
-            completedJobs={recentWorkLogs.filter(l => l.status === 'completed').length}
-            primaryServiceCount={todayStats.plowed}
-            secondaryServiceCount={todayStats.salted}
-            hoursWorked={weeklyHours}
-            accountsAvailable={todayStats.accounts}
-            variant="driver"
-          />
-
-          {/* Weather Widget */}
-          <WeatherWidget
-            temperature={temperature}
-            conditions={weather}
-            windSpeed={windSpeed}
-            variant="driver"
-          />
-
-          {/* Quick Actions Widget */}
-          <QuickActionsWidget
-            isShiftActive={!!activeShift}
-            isCheckedIn={!!activeWorkLog}
-            hasAccountSelected={!!selectedAccountId}
-            onClockIn={handleClockIn}
-            onClockOut={handleClockOut}
-            onCheckIn={handleCheckIn}
-            onCheckOut={handleCheckOut}
-            onRefreshLocation={handleRefreshLocation}
-            isLoading={geoLoading}
-            variant="driver"
-            nearestAccountName={nearestAccount?.account.name}
-          />
-        </div>
 
         {/* Main Content Grid */}
         <div className="grid gap-6 lg:grid-cols-2">
