@@ -1,1 +1,0 @@
-import{j as t,O as o}from"./index-BTTndiCa.js";import{A as r}from"./AppLayout-CdmLHGoC.js";import"./index-C_FqIwIg.js";import"./Combination-BI3QGdrN.js";import"./truck-GV-QDD0s.js";import"./shovel-CsAXD17G.js";import"./user-MPZ2r4HK.js";import"./log-out-D3n32clD.js";import"./clock-91DdfKYf.js";function f(){return t.jsx(r,{children:t.jsx(o,{})})}export{f as default};
