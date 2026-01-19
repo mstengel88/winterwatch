@@ -5,7 +5,6 @@ import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useWidgetSync } from '@/hooks/useWidgetSync';
-import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { Button } from '@/components/ui/button';
@@ -74,7 +73,7 @@ export default function ShovelDashboard() {
     canAddMore,
   } = usePhotoUpload({ folder: 'shovel-logs' });
   const { toast } = useToast();
-  const haptic = useHapticFeedback();
+
   const [selectedAccount, setSelectedAccount] = useState('');
   const [serviceType, setServiceType] = useState<'shovel' | 'salt' | 'both'>('shovel');
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>([]);
@@ -267,45 +266,35 @@ export default function ShovelDashboard() {
   }, [getCurrentLocation, toast]);
 
   const handleClockIn = async () => {
-    haptic.onHeavy(); // Heavy haptic for significant action
     const success = await clockIn();
     if (success) {
-      haptic.onSuccess();
       toast({ title: 'Shift started successfully!' });
     } else {
-      haptic.onError();
       toast({ variant: 'destructive', title: 'Failed to start shift' });
     }
   };
 
   const handleClockOut = async () => {
-    haptic.onHeavy(); // Heavy haptic for significant action
     const success = await clockOut();
     if (success) {
-      haptic.onSuccess();
       toast({ title: 'Shift ended successfully!' });
     } else {
-      haptic.onError();
       toast({ variant: 'destructive', title: 'Failed to end shift' });
     }
   };
 
   const handleCheckIn = async () => {
     if (!selectedAccount) {
-      haptic.onWarning();
       toast({ variant: 'destructive', title: 'Please select an account' });
       return;
     }
-    haptic.onConfirm();
     // Map 'salt' to 'ice_melt' for database compatibility
     const dbServiceType = serviceType === 'salt' ? 'ice_melt' : serviceType;
     // Pass selected team members to the check-in
     const success = await checkIn(selectedAccount, dbServiceType, selectedTeamMembers);
     if (success) {
-      haptic.onSuccess();
       toast({ title: 'Checked in at account!' });
     } else {
-      haptic.onError();
       toast({ variant: 'destructive', title: 'Failed to check in' });
     }
   };
