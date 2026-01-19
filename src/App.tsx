@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
+import { IOSConfigProvider } from "@/components/ios/IOSConfigProvider";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
@@ -38,48 +39,50 @@ const PageLoader = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <OfflineIndicator />
-          <InstallPrompt />
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
-              
-              {/* Role-specific dashboards */}
-              <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
-              <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
-              
-              {/* Admin/Manager only pages */}
-              <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
-              <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
-              
-              {/* Profile and Settings (all users) */}
-              <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+    <IOSConfigProvider>
+      <BrowserRouter>
+        <TooltipProvider>
+          <AuthProvider>
+            <Toaster />
+            <Sonner />
+            <OfflineIndicator />
+            <InstallPrompt />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
+                
+                {/* Role-specific dashboards */}
+                <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['driver', 'admin', 'manager']}><DriverDashboard /></ProtectedRoute>} />
+                <Route path="/shovel" element={<ProtectedRoute allowedRoles={['shovel_crew', 'admin', 'manager']}><ShovelDashboard /></ProtectedRoute>} />
+                
+                {/* Admin/Manager only pages */}
+                <Route path="/work-logs" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><WorkLogsPage /></ProtectedRoute>} />
+                <Route path="/time-clock" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><TimeClockPage /></ProtectedRoute>} />
+                
+                {/* Profile and Settings (all users) */}
+                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
-              <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
-              
-              {/* Admin routes */}
-              <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AdminLayout /></ProtectedRoute>}>
-                <Route index element={<Navigate to="/admin/users" replace />} />
-                <Route path="users" element={<UsersPage />} />
-                <Route path="employees" element={<EmployeesPage />} />
-                <Route path="accounts" element={<AccountsPage />} />
-                <Route path="equipment" element={<EquipmentPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-              </Route>
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </AuthProvider>
+                <Route path="/pending" element={<ProtectedRoute><Pending /></ProtectedRoute>} />
+                
+                {/* Admin routes */}
+                <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AdminLayout /></ProtectedRoute>}>
+                  <Route index element={<Navigate to="/admin/users" replace />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="employees" element={<EmployeesPage />} />
+                  <Route path="accounts" element={<AccountsPage />} />
+                  <Route path="equipment" element={<EquipmentPage />} />
+                  <Route path="reports" element={<ReportsPage />} />
+                </Route>
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AuthProvider>
         </TooltipProvider>
-    </BrowserRouter>
+      </BrowserRouter>
+    </IOSConfigProvider>
   </QueryClientProvider>
 );
 
