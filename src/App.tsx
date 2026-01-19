@@ -13,7 +13,7 @@ import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 import { LocationBootstrap } from "@/components/LocationBootstrap";
 
-// Lazy load route components for code splitting
+// Lazy load pages
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
 const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
@@ -30,7 +30,6 @@ const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
 
 const queryClient = new QueryClient();
 
-// Loading fallback component
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -40,12 +39,12 @@ const PageLoader = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
-
-      {/* 👉 IMPORTANT: this must be here so it runs even on /auth */}
-      <LocationBootstrap />
-
       <TooltipProvider>
         <AuthProvider>
+
+          {/* 🔥 THIS MUST BE HERE — prompts immediately on open */}
+          <LocationBootstrap />
+
           <Toaster />
           <Sonner />
           <OfflineIndicator />
@@ -54,91 +53,55 @@ const App = () => (
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
 
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <RoleBasedRedirect />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/dashboard" element={
+                <ProtectedRoute allowedRoles={["driver", "admin", "manager"]}>
+                  <DriverDashboard />
+                </ProtectedRoute>
+              } />
 
-              {/* Role-specific dashboards */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={["driver", "admin", "manager"]}>
-                    <DriverDashboard />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/shovel" element={
+                <ProtectedRoute allowedRoles={["shovel_crew", "admin", "manager"]}>
+                  <ShovelDashboard />
+                </ProtectedRoute>
+              } />
 
-              <Route
-                path="/shovel"
-                element={
-                  <ProtectedRoute allowedRoles={["shovel_crew", "admin", "manager"]}>
-                    <ShovelDashboard />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/work-logs" element={
+                <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                  <WorkLogsPage />
+                </ProtectedRoute>
+              } />
 
-              {/* Admin/Manager only pages */}
-              <Route
-                path="/work-logs"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                    <WorkLogsPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/time-clock" element={
+                <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                  <TimeClockPage />
+                </ProtectedRoute>
+              } />
 
-              <Route
-                path="/time-clock"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                    <TimeClockPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } />
 
-              {/* Profile and Settings (all users) */}
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              } />
 
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <SettingsPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/pending" element={
+                <ProtectedRoute>
+                  <Pending />
+                </ProtectedRoute>
+              } />
 
-              <Route
-                path="/pending"
-                element={
-                  <ProtectedRoute>
-                    <Pending />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Admin routes */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
+              <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }>
                 <Route index element={<Navigate to="/admin/users" replace />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
@@ -146,7 +109,7 @@ const App = () => (
                 <Route path="equipment" element={<EquipmentPage />} />
                 <Route path="reports" element={<ReportsPage />} />
               </Route>
-              
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
