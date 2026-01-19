@@ -4,7 +4,6 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
-import { useWidgetSync } from '@/hooks/useWidgetSync';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
-// Widgets disabled
-// import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
+import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
 import { 
   Snowflake, 
   Truck, 
@@ -108,17 +106,6 @@ export default function DriverDashboard() {
     checkIn,
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
-
-  // Sync shift data with native home screen widgets
-  useWidgetSync({
-    temperature,
-    conditions: weather,
-    jobsCompleted: recentWorkLogs.length,
-    isCheckedIn: !!activeWorkLog,
-    currentLocation: selectedAccountId 
-      ? accounts.find(a => a.id === selectedAccountId)?.name 
-      : undefined,
-  });
 
   // Filter equipment based on selected service type and sort by number descending
   // Plow → show 'plow' and 'both', Salt/Both → show 'both' only
@@ -506,7 +493,42 @@ export default function DriverDashboard() {
           </CardContent>
         </Card>
 
-        {/* Widgets disabled */}
+        {/* Dashboard Widgets Row */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Stats Widget */}
+          <ShiftStatsWidget
+            totalJobs={todayStats.total}
+            completedJobs={recentWorkLogs.filter(l => l.status === 'completed').length}
+            primaryServiceCount={todayStats.plowed}
+            secondaryServiceCount={todayStats.salted}
+            hoursWorked={weeklyHours}
+            accountsAvailable={todayStats.accounts}
+            variant="driver"
+          />
+
+          {/* Weather Widget */}
+          <WeatherWidget
+            temperature={temperature}
+            conditions={weather}
+            windSpeed={windSpeed}
+            variant="driver"
+          />
+
+          {/* Quick Actions Widget */}
+          <QuickActionsWidget
+            isShiftActive={!!activeShift}
+            isCheckedIn={!!activeWorkLog}
+            hasAccountSelected={!!selectedAccountId}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+            onRefreshLocation={handleRefreshLocation}
+            isLoading={geoLoading}
+            variant="driver"
+            nearestAccountName={nearestAccount?.account.name}
+          />
+        </div>
 
         {/* Main Content Grid */}
         <div className="grid gap-6 lg:grid-cols-2">

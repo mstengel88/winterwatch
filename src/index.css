@@ -123,25 +123,17 @@
 
   html {
     color-scheme: dark;
-    /* iOS smooth scrolling momentum */
-    scroll-behavior: smooth;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     @apply bg-background text-foreground dark;
-    /* iOS PWA mobile optimizations */
+    /* PWA mobile optimizations */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     overscroll-behavior-y: contain;
-    /* iOS text rendering */
-    text-rendering: optimizeLegibility;
-    /* Prevent iOS zoom on input focus */
-    touch-action: manipulation;
   }
 
-  /* Safe area support for notched iOS devices */
+  /* Safe area support for notched devices */
   .safe-area-inset {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
@@ -149,38 +141,18 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* iOS-specific safe area utilities */
-  .pt-safe {
-    padding-top: env(safe-area-inset-top);
-  }
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .pl-safe {
-    padding-left: env(safe-area-inset-left);
-  }
-  .pr-safe {
-    padding-right: env(safe-area-inset-right);
-  }
-  .mt-safe {
-    margin-top: env(safe-area-inset-top);
-  }
-  .mb-safe {
-    margin-bottom: env(safe-area-inset-bottom);
-  }
-
   /* Prevent pull-to-refresh on PWA */
   html, body {
     overscroll-behavior: none;
   }
 
-  /* iOS smooth scrolling */
+  /* Smooth scrolling for mobile */
   * {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* iOS HIG touch targets (44pt minimum) */
-  button, a, [role="button"], input[type="checkbox"], input[type="radio"] {
+  /* Better touch targets for mobile */
+  button, a, [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
@@ -189,42 +161,6 @@
   button, [role="button"] {
     user-select: none;
     -webkit-user-select: none;
-  }
-
-  /* iOS input styling */
-  input, textarea, select {
-    /* Prevent iOS zoom on focus */
-    font-size: 16px !important;
-    /* iOS-style appearance */
-    -webkit-appearance: none;
-    appearance: none;
-    border-radius: 0;
-  }
-
-  /* iOS-style focus rings */
-  :focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-  }
-
-  /* iOS rubber band scrolling prevention for fixed elements */
-  .fixed, .sticky {
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
-  }
-
-  /* iOS blur effect utility */
-  .ios-blur {
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    background-color: rgba(0, 0, 0, 0.7);
-  }
-
-  /* iOS vibrancy effect for cards */
-  .ios-card {
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    background-color: hsl(var(--card) / 0.8);
   }
 }
 
@@ -242,88 +178,13 @@
 }
 
 /* PWA Standalone mode adjustments */
-/* PWA Standalone mode adjustments (iOS Home Screen app) */
 @media (display-mode: standalone) {
   body {
     padding-top: env(safe-area-inset-top);
   }
   
-  /* Extra bottom padding for iOS home indicator */
-  .pb-safe-standalone {
+  /* Extra bottom padding for home indicator */
+  .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
-
-  /* iOS fullscreen app styling */
-  .ios-fullscreen {
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-/* iOS-specific animations */
-@keyframes ios-slide-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes ios-slide-down {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-}
-
-@keyframes ios-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes ios-scale-up {
-  from {
-    transform: scale(0.95);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.animate-ios-slide-up {
-  animation: ios-slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-.animate-ios-slide-down {
-  animation: ios-slide-down 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-.animate-ios-fade-in {
-  animation: ios-fade-in 0.2s ease-out;
-}
-
-.animate-ios-scale-up {
-  animation: ios-scale-up 0.25s cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-/* iOS-style spring animations */
-.transition-ios {
-  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
-  transition-duration: 0.3s;
-}
-
-/* iOS selection color */
-::selection {
-  background-color: hsl(var(--primary) / 0.3);
 }

@@ -4,7 +4,6 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
-import { useWidgetSync } from '@/hooks/useWidgetSync';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { Button } from '@/components/ui/button';
@@ -23,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// Widgets disabled
-// import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
+import { ShiftStatsWidget, WeatherWidget, QuickActionsWidget } from '@/components/dashboard/widgets';
 import { 
   Shovel, 
   Clock, 
@@ -86,17 +84,6 @@ export default function ShovelDashboard() {
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
-
-  // Sync shift data with native home screen widgets
-  useWidgetSync({
-    temperature,
-    conditions: weather,
-    jobsCompleted: recentWorkLogs.filter(log => log.status === 'completed').length,
-    isCheckedIn: !!activeWorkLog,
-    currentLocation: selectedAccount 
-      ? accounts.find(a => a.id === selectedAccount)?.name 
-      : undefined,
-  });
 
   // Key for storing team members per shift in localStorage
   const shiftTeamStorageKey = activeShift ? `shovel-team-${activeShift.id}` : null;
@@ -470,7 +457,42 @@ export default function ShovelDashboard() {
           </CardContent>
         </Card>
 
-        {/* Widgets disabled */}
+        {/* Dashboard Widgets Row */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Stats Widget */}
+          <ShiftStatsWidget
+            totalJobs={completedToday}
+            completedJobs={completedToday}
+            primaryServiceCount={shoveled}
+            secondaryServiceCount={salted}
+            hoursWorked={activeShift ? (shiftTimer.hours + shiftTimer.minutes / 60).toFixed(1) : '0.0'}
+            accountsAvailable={accounts.length}
+            variant="shovel"
+          />
+
+          {/* Weather Widget */}
+          <WeatherWidget
+            temperature={temperature}
+            conditions={weather}
+            windSpeed={wind}
+            variant="shovel"
+          />
+
+          {/* Quick Actions Widget */}
+          <QuickActionsWidget
+            isShiftActive={!!activeShift}
+            isCheckedIn={!!activeWorkLog}
+            hasAccountSelected={!!selectedAccount}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+            onRefreshLocation={handleRefreshLocation}
+            isLoading={geoLoading}
+            variant="shovel"
+            nearestAccountName={nearestAccount?.account?.name}
+          />
+        </div>
 
         {/* Main Content - Two Columns */}
         <div className="grid lg:grid-cols-2 gap-6">
