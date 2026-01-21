@@ -14,7 +14,7 @@ Welcome to WinterWatch‑Pro — bookmark this to keep an eye on my project upda
 
 ## About
 
-This is a simple home page. Edit this file to change the text.
+This is a simple home page. 
 
 ## Latest posts
 
