@@ -12,6 +12,9 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 import { LocationBootstrap } from "@/components/LocationBootstrap";
+import { useEffect } from "react";
+import { initDeepLinkAuth } from "./deepLinkAuth";
+
 
 // Lazy load pages
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
@@ -30,13 +33,28 @@ const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
 
 const queryClient = new QueryClient();
 
+
+function App() {
+  useEffect(() => {
+    initDeepLinkAuth();
+  }, []);
+
+  return (
+    <>
+      {/* your app UI */}
+    </>
+  );
+}
+
+
+
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
   </div>
 );
 
-const App = () => (
+const AppRoutes = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <TooltipProvider>

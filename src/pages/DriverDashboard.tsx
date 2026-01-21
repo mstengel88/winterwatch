@@ -51,6 +51,16 @@ export default function DriverDashboard() {
   refreshOnce,
 } = useGeolocation();
 
+  useEffect(() => {
+    refreshOnce(); // initial prompt + fetch
+
+    const interval = setInterval(() => {
+      refreshOnce(); // keep it updated
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [refreshOnce]);
+
   const { toast } = useToast();
   const {
     photos,
