@@ -1,20 +1,25 @@
 ---
-title: "WinterWatch-Pro"
 layout: default
+title: Home
+permalink: /
 ---
 
 # WinterWatch-Pro
 
-Welcome to WinterWatch-Pro — a simple web app to bookmark and track project updates.
+Welcome to WinterWatch‑Pro — bookmark this to keep an eye on my project updates.
 
-What this app does:
+## Quick Links
 
-- Let you save and organize project update bookmarks
-- Provide quick links to project activity and releases
-- Keep a small changelog for things you care about
+- [Privacy](/privacy/)  
 
-Learn more and view our policies:
+## About
 
-- [Privacy Policy](/privacy/)
+This is a simple home page. Edit this file to change the text.
 
-If you want any changes to the content or styling, tell me what to update.
+## Latest posts
+
+<ul>
+{% for post in site.posts %}
+  <li><a href="{{ post.url }}">{{ post.title }}</a> — {{ post.date | date: "%Y-%m-%d" }}</li>
+{% endfor %}
+</ul>
