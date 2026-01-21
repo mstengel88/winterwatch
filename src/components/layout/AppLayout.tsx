@@ -1,5 +1,13 @@
 import { ReactNode } from 'react';
 import { AppHeader } from './AppHeader';
+import { LocationBootstrap } from "@/components/LocationBootstrap";
+
+// inside your layout return:
+<>
+  <LocationBootstrap />
+  {/* rest of layout */}
+</>
+
 
 interface AppLayoutProps {
   children: ReactNode;

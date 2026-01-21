@@ -44,7 +44,23 @@ interface AccountWithDistance extends Account {
 export default function DriverDashboard() {
   const { profile } = useAuth();
   const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
-  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading, error: geoError } = useGeolocation();
+  const {
+  location: geoLocation,
+  isLoading: geoLoading,
+  error: geoError,
+  refreshOnce,
+} = useGeolocation();
+
+  useEffect(() => {
+    refreshOnce(); // initial prompt + fetch
+
+    const interval = setInterval(() => {
+      refreshOnce(); // keep it updated
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [refreshOnce]);
+
   const { toast } = useToast();
   const {
     photos,
@@ -57,18 +73,6 @@ export default function DriverDashboard() {
     uploadPhotos,
     canAddMore,
   } = usePhotoUpload({ folder: 'work-logs' });
-
-  // Get location on mount and set up periodic refresh
-  useEffect(() => {
-    getCurrentLocation();
-    
-    // Refresh location every 30 seconds for real-time updates
-    const interval = setInterval(() => {
-      getCurrentLocation();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [getCurrentLocation]);
 
   // Form state
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -105,6 +109,25 @@ export default function DriverDashboard() {
     checkIn,
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
+// 🔍 DEBUG: check what accounts DriverDashboard is actually receiving
+  useEffect(() => {
+    const withCoords = accounts.filter(
+      (a) => a.latitude != null && a.longitude != null
+    );
+
+    console.log("📍 DriverDashboard accounts TOTAL:", accounts.length);
+    console.log("📍 DriverDashboard accounts WITH coords:", withCoords.length);
+    console.log(
+      "📍 Sample coords:",
+      withCoords.slice(0, 3).map((a) => ({
+        name: a.name,
+        latitude: a.latitude,
+        longitude: a.longitude,
+      }))
+    );
+  }, [accounts]);
+
+
 
   // Filter equipment based on selected service type and sort by number descending
   // Plow → show 'plow' and 'both', Salt/Both → show 'both' only
@@ -208,44 +231,46 @@ export default function DriverDashboard() {
   }, [activeWorkLog]);
 
   // Calculate sorted accounts by distance
-  const sortedAccounts = useMemo((): AccountWithDistance[] => {
-    if (!geoLocation || accounts.length === 0) {
-      return accounts.map(acc => ({ ...acc, distance: undefined }));
-    }
-    
-    return accounts
-      .map((acc) => {
-        let distance: number | undefined = undefined;
-        if (acc.latitude && acc.longitude) {
-          distance = calculateDistance(
-            geoLocation.latitude,
-            geoLocation.longitude,
-            acc.latitude,
-            acc.longitude
-          );
-        }
-        return { ...acc, distance };
-      })
-      .sort((a, b) => {
-        // Accounts with distance first, sorted by distance
-        if (a.distance !== undefined && b.distance !== undefined) {
-          return a.distance - b.distance;
-        }
-        if (a.distance !== undefined) return -1;
-        if (b.distance !== undefined) return 1;
-        return a.name.localeCompare(b.name);
-      });
-  }, [geoLocation, accounts]);
+const sortedAccounts = useMemo((): AccountWithDistance[] => {
+  if (!geoLocation || accounts.length === 0) {
+    return accounts.map((acc) => ({ ...acc, distance: undefined }));
+  }
+
+  return accounts
+    .map((acc) => {
+      let distance: number | undefined = undefined;
+
+      const lat = Number(acc.latitude);
+      const lng = Number(acc.longitude);
+
+if (Number.isFinite(lat) && Number.isFinite(lng)) {
+  distance = calculateDistance(
+    geoLocation.latitude,
+    geoLocation.longitude,
+    lat,
+    lng
+  );
+}
+
+
+      return { ...acc, distance };
+    })
+    .sort((a, b) => {
+      if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
+      if (a.distance !== undefined) return -1;
+      if (b.distance !== undefined) return 1;
+      return a.name.localeCompare(b.name);
+    });
+}, [geoLocation, accounts]);
+
 
   // Get nearest account
   const nearestAccount = useMemo(() => {
-    if (sortedAccounts.length === 0) return null;
-    const first = sortedAccounts[0];
-    if (first.distance !== undefined) {
-      return { account: first, distance: first.distance };
-    }
-    return null;
-  }, [sortedAccounts]);
+  const firstWithDistance = sortedAccounts.find((a) => a.distance !== undefined);
+  if (!firstWithDistance || firstWithDistance.distance === undefined) return null;
+  return { account: firstWithDistance, distance: firstWithDistance.distance };
+}, [sortedAccounts]);
+
 
   // Auto-select nearest account when location updates and no account selected
   useEffect(() => {
@@ -256,9 +281,13 @@ export default function DriverDashboard() {
 
   // Handle manual location refresh
   const handleRefreshLocation = useCallback(async () => {
-    await getCurrentLocation();
-    toast({ title: 'Location updated' });
-  }, [getCurrentLocation, toast]);
+  const loc = await refreshOnce();
+  if (loc) {
+    toast({ title: "Location updated" });
+  }
+}, [refreshOnce, toast]);
+
+
 
   // Today's stats
   const todayStats = useMemo(() => {
@@ -284,7 +313,7 @@ export default function DriverDashboard() {
     if (success) {
       toast({ title: 'Shift started!' });
       // Refresh location after clocking in
-      getCurrentLocation();
+      refreshOnce();
     } else {
       toast({ variant: 'destructive', title: 'Failed to start shift' });
     }
