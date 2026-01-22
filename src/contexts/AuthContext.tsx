@@ -42,52 +42,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+  let cancelled = false;
 
-        // Defer Supabase calls with setTimeout to prevent deadlock
-        if (session?.user) {
-          setTimeout(async () => {
-            const [profileData, rolesData] = await Promise.all([
-              fetchProfile(session.user.id),
-              fetchRoles(session.user.id),
-            ]);
-            setProfile(profileData);
-            setRoles(rolesData);
-            setIsLoading(false);
-          }, 0);
-        } else {
-          setProfile(null);
-          setRoles([]);
-          setIsLoading(false);
-        }
+  const applySession = async (session: Session | null) => {
+    setSession(session);
+    setUser(session?.user ?? null);
+
+    if (session?.user) {
+      const [profileData, rolesData] = await Promise.all([
+        fetchProfile(session.user.id),
+        fetchRoles(session.user.id),
+      ]);
+      if (!cancelled) {
+        setProfile(profileData);
+        setRoles(rolesData);
       }
-    );
+    } else {
+      if (!cancelled) {
+        setProfile(null);
+        setRoles([]);
+      }
+    }
+  };
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    async (_event, newSession) => {
+      try {
+        await applySession(newSession);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+  );
 
-      if (session?.user) {
-        Promise.all([
-          fetchProfile(session.user.id),
-          fetchRoles(session.user.id),
-        ]).then(([profileData, rolesData]) => {
-          setProfile(profileData);
-          setRoles(rolesData);
-          setIsLoading(false);
-        });
+  (async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        // This is the iOS blank-screen killer — reset to signed-out cleanly
+        await supabase.auth.signOut();
+        await applySession(null);
       } else {
-        setIsLoading(false);
+        await applySession(data.session ?? null);
       }
-    });
+    } catch {
+      await applySession(null);
+    } finally {
+      if (!cancelled) setIsLoading(false);
+    }
+  })();
 
-    return () => subscription.unsubscribe();
-  }, []);
+  return () => {
+    cancelled = true;
+    subscription.unsubscribe();
+  };
+}, []);
+
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({

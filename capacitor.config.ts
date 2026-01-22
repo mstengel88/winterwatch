@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.winterwatch.pro',
+  appId: 'com.winterwatchapp',
   appName: 'WinterWatch Pro',
   webDir: 'dist'
 };

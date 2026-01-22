@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, Users, Building2 } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
+import { getOAuthRedirectTo } from "@/Auth/redirect";
 
 const authSchema = z.object({
   email: z.string().trim().email({ message: 'Please enter a valid email address' }),
@@ -121,19 +122,34 @@ export default function Auth() {
 
   const handleGoogleSignIn = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
+      provider: "google",
+      options: { redirectTo: getOAuthRedirectTo() },
     });
+
     if (error) {
       toast({
-        variant: 'destructive',
-        title: 'Google sign in failed',
+        variant: "destructive",
+        title: "Google sign in failed",
         description: error.message,
       });
     }
   };
+
+const handleAppleSignIn = async () => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "apple",
+    options: { redirectTo: getOAuthRedirectTo() },
+  });
+
+  if (error) {
+    toast({
+      variant: "destructive",
+      title: "Apple sign in failed",
+      description: error.message,
+    });
+  }
+};
+
 
   if (isLoading) {
     return (
@@ -339,6 +355,23 @@ export default function Auth() {
           </p>
         </CardContent>
       </Card>
+
+      <Button
+        variant="outline"
+        className="w-full gap-2 bg-muted/30 border-border/50 mt-3"
+        onClick={handleAppleSignIn}
+        disabled={isSubmitting}
+      >
+        {/* Simple Apple icon */}
+        <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M16.7 13.2c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.1-1.7-1.3-.1-2.6.8-3.2.8-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.8-.4 6.9 1.1 9.2.8 1.1 1.6 2.3 2.8 2.3 1.1 0 1.6-.7 3- .7 1.4 0 1.8.7 3.1.7 1.3 0 2.1-1.1 2.8-2.2.8-1.2 1.2-2.4 1.2-2.4-.1 0-2.9-1.1-2.9-4.4zM14.8 5.7c.6-.8 1-1.9.9-3-.9.1-2 .6-2.6 1.4-.6.7-1 1.8-.9 2.9 1 0 2-.5 2.6-1.3z"
+          />
+        </svg>
+        Continue with Apple
+      </Button>
+
 
       {/* Footer */}
       <p className="mt-8 text-center text-xs text-muted-foreground">

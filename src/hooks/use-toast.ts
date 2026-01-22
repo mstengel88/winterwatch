@@ -168,13 +168,12 @@ function useToast() {
 
   React.useEffect(() => {
     listeners.push(setState);
+
     return () => {
       const index = listeners.indexOf(setState);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
+      if (index > -1) listeners.splice(index, 1);
     };
-  }, [state]);
+  }, []); // ✅ IMPORTANT: only subscribe once
 
   return {
     ...state,
@@ -182,5 +181,6 @@ function useToast() {
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   };
 }
+
 
 export { useToast, toast };
