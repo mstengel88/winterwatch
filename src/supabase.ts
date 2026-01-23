@@ -1,6 +1,2 @@
-import { createClient } from "@supabase/supabase-js";
-
+// src/supabase.ts
 export { supabase } from "@/integrations/supabase/client";
-  }
-);
-
