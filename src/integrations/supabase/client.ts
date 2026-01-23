@@ -1,9 +1,11 @@
-import { supabase } from "@/lib/supabase";
+// src/integrations/supabase/client.ts
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
 
-if (!supabaseUrl) throw new Error("VITE_SUPABASE_URL is required.");
-if (!supabaseKey) throw new Error("VITE_SUPABASE_ANON_KEY is required.");
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error("Supabase env vars missing");
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
