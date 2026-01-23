@@ -6,11 +6,10 @@ import { supabase } from "@/lib/supabase";
 const CALLBACK_PREFIX = "winterwatch://auth/callback";
 
 async function handleAuthCallbackUrl(url: string) {
-  if (!url.startsWith(CALLBACK_PREFIX)) return;
+  if (!url.startsWith(CALLBACK_PREFIX)) return false;
 
   console.log("✅ DEEPLINK AUTH URL:", url);
 
-  // Close the OAuth browser view (if still open)
   try {
     await Browser.close();
   } catch {
@@ -18,51 +17,47 @@ async function handleAuthCallbackUrl(url: string) {
   }
 
   const u = new URL(url);
-
   const errorDesc =
     u.searchParams.get("error_description") || u.searchParams.get("error");
+
   if (errorDesc) {
-    console.error("❌ OAuth error from callback:", errorDesc);
-    return;
+    console.error("❌ OAuth callback error:", errorDesc);
+    return false;
   }
 
-  // PKCE flow: ?code=...
   const code = u.searchParams.get("code");
+
   if (code) {
     console.log("🔁 Exchanging code for session...");
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error("❌ exchangeCodeForSession error:", error);
-      return;
+      return false;
     }
-    console.log("✅ Code exchanged; session should be stored.");
-  } else {
-    // Fallback: token-in-url flows
-    console.log("🔁 getSessionFromUrl fallback...");
-    const { error } = await supabase.auth.getSessionFromUrl({
-      url,
-      storeSession: true,
-    });
-    if (error) {
-      console.error("❌ getSessionFromUrl error:", error);
-      return;
+
+    // Confirm session exists
+    const { data, error: sessionErr } = await supabase.auth.getSession();
+    if (sessionErr) {
+      console.error("❌ getSession error after callback:", sessionErr);
+      return false;
+    }
+
+    console.log("✅ Session user:", data.session?.user?.id ?? "NONE");
+
+    // Force app to land on home and re-evaluate auth state cleanly
+    if (data.session) {
+      window.location.replace("/");
+      return true;
     }
   }
 
-  // Verify we actually have a session after exchange
-  const { data, error: sessionErr } = await supabase.auth.getSession();
-  if (sessionErr) {
-    console.error("❌ getSession error after callback:", sessionErr);
-    return;
-  }
-
-  console.log("✅ Session after callback:", data.session?.user?.id ?? "NONE");
+  return false;
 }
 
 export async function initDeepLinkAuth() {
   if (!Capacitor.isNativePlatform()) return;
 
-  // 1) Handle cold-start deep links (app fully closed)
+  // Cold start
   try {
     const launch = await CapApp.getLaunchUrl();
     if (launch?.url) {
@@ -73,7 +68,7 @@ export async function initDeepLinkAuth() {
     console.error("❌ getLaunchUrl failed:", e);
   }
 
-  // 2) Handle warm-start deep links (app already running/backgrounded)
+  // Warm start
   CapApp.addListener("appUrlOpen", async ({ url }) => {
     try {
       if (!url) return;
