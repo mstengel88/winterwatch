@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>WinterWatch</string>
+	<string>WinterWatch Pro</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,27 +26,35 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.winterwatch.pro</string>
+			<string>winterwatch://auth/callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>winterwatch</string>
+				<string>winterwatch-pro.info</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>ITSEncryptionExportComplianceCode</key>
-	<string>None</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothServices</key>
+	<array>
+		<string></string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We use your photo library to select work log photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We save work log photos to your photo library if you choose.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We us the camera to attach photos to work logs.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>WinterWatch-Pro uses your location to tag work logs and support route/crew tracking.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>WinterWatch-Pro uses your location to tag work logs and support route/crew tracking.</string>
+	<string>WinterWatch-Pro uses your location to record job site check-ins and track work activity while you are using the app.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>WinterWatch-Pro uses your location to record job site check-ins and track work activity while you are using the app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>WinterWatch-Pro uses your location to tag work logs and support route/crew tracking.</string>
+	<string>WinterWatch-Pro uses your location to record job site check-ins and track work activity while you are using the app.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
