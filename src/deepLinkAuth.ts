@@ -1,5 +1,5 @@
 import { App as CapacitorApp } from "@capacitor/app";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 
 export function initDeepLinkAuth() {
   CapacitorApp.addListener("appUrlOpen", async ({ url }) => {
