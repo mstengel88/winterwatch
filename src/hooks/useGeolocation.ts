@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Geolocation } from "@capacitor/geolocation";
+import { Capacitor } from "@capacitor/core";
 
 export function useGeolocation() {
   const [location, setLocation] = useState<{
@@ -15,8 +16,10 @@ export function useGeolocation() {
     try {
       setIsLoading(true);
 
-      // Make sure permissions are requested (important for iOS/TestFlight)
-      await Geolocation.requestPermissions();
+      // Only request permissions on native platforms (iOS/Android)
+      if (Capacitor.isNativePlatform()) {
+        await Geolocation.requestPermissions();
+      }
 
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
