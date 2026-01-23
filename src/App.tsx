@@ -34,20 +34,6 @@ const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
 const queryClient = new QueryClient();
 
 
-function App() {
-  useEffect(() => {
-    initDeepLinkAuth();
-  }, []);
-
-  return (
-    <>
-      {/* your app UI */}
-    </>
-  );
-}
-
-
-
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -137,4 +123,4 @@ const AppRoutes = () => (
   </QueryClientProvider>
 );
 
-export default App;
+export default AppRoutes;
