@@ -7,8 +7,9 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const run = async () => {
-      // This reads the OAuth result from the URL and finalizes the session
-      // (Supabase v2 can also use getSession, but detectSessionInUrl is safest here)
+      // Give Supabase a moment to process hash params
+      await new Promise((r) => setTimeout(r, 0));
+
       const { data, error } = await supabase.auth.getSession();
 
       if (error) {
@@ -17,19 +18,11 @@ export default function AuthCallback() {
         return;
       }
 
-      if (data.session) {
-        navigate("/dashboard", { replace: true });
-      } else {
-        navigate("/auth", { replace: true });
-      }
+      navigate(data.session ? "/dashboard" : "/auth", { replace: true });
     };
 
     run();
   }, [navigate]);
 
-  return (
-    <div style={{ padding: 16 }}>
-      Signing you in…
-    </div>
-  );
+  return <div style={{ padding: 16 }}>Signing you in…</div>;
 }
