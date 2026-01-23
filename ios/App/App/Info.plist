@@ -26,27 +26,23 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>winterwatch://auth/callback</string>
+			<string>winterwatch</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>winterwatch-pro.info</string>
+				<string>winterwatch</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSBluetoothServices</key>
 	<array>
 		<string></string>
 	</array>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We use your photo library to select work log photos.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>We save work log photos to your photo library if you choose.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We us the camera to attach photos to work logs.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -55,6 +51,10 @@
 	<string>WinterWatch-Pro uses your location to record job site check-ins and track work activity while you are using the app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>WinterWatch-Pro uses your location to record job site check-ins and track work activity while you are using the app.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We save work log photos to your photo library if you choose.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We use your photo library to select work log photos.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
