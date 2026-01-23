@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,12 +12,14 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 import { LocationBootstrap } from "@/components/LocationBootstrap";
-import { useEffect } from "react";
 import { initDeepLinkAuth } from "./deepLinkAuth";
+import { Capacitor } from "@capacitor/core";
+import AuthCallback from "./pages/AuthCallback"; 
+
 
 
 // Lazy load pages
-const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
+import DriverDashboard from "./pages/DriverDashboard";
 const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
 const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
 const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
@@ -30,8 +32,26 @@ const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
 const AccountsPage = lazy(() => import("./pages/admin/AccountsPage"));
 const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
 const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
-
 const queryClient = new QueryClient();
+
+function App() {
+  useEffect(() => {
+    initDeepLinkAuth();
+
+    // ✅ move this here (hooks only inside components)
+    if (Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
+    }
+  }, []);
+
+  return (
+    <AppRoutes />
+  );
+}
+
+
 
 
 const PageLoader = () => (
@@ -58,7 +78,8 @@ const AppRoutes = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
-
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              
               <Route path="/dashboard" element={
                 <ProtectedRoute allowedRoles={["driver", "admin", "manager"]}>
                   <DriverDashboard />
