@@ -1,14 +1,48 @@
-import { App as capacitorApp } from "@capacitor/app";
+import { App as CapApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/lib/supabase";
 
-export function initDeepLinkAuth() {
-  capacitorApp.addListener("appUrlOpen", async ({ url }) => {
-    const parsed = new URL(url);
-    const code = parsed.searchParams.get("code");
+const CALLBACK_PREFIX = "winterwatch://auth/callback";
 
-    if (code) {
-      await supabase.auth.exchangeCodeForSession(code);
+export function initDeepLinkAuth() {
+  if (!Capacitor.isNativePlatform()) return;
+
+  CapApp.addListener("appUrlOpen", async ({ url }) => {
+    try {
+      if (!url || !url.startsWith(CALLBACK_PREFIX)) return;
+
+      // close the OAuth browser view
+      try {
+        await Browser.close();
+      } catch {
+        // ignore
+      }
+
+      const u = new URL(url);
+
+      const errorDesc = u.searchParams.get("error_description");
+      if (errorDesc) {
+        console.error("OAuth error:", errorDesc);
+        return;
+      }
+
+      // PKCE: ?code=...
+      const code = u.searchParams.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+        return;
+      }
+
+      // Fallback: token-in-url flows
+      const { error } = await supabase.auth.getSessionFromUrl({
+        url,
+        storeSession: true,
+      });
+      if (error) throw error;
+    } catch (e) {
+      console.error("Deep link auth handling failed:", e);
     }
   });
 }
-

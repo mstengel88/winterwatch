@@ -14,9 +14,7 @@ import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 import { LocationBootstrap } from "@/components/LocationBootstrap";
 import { initDeepLinkAuth } from "./deepLinkAuth";
 import { Capacitor } from "@capacitor/core";
-import AuthCallback from "./pages/AuthCallback"; 
-
-
+import AuthCallback from "./pages/AuthCallback";
 
 // Lazy load pages
 import DriverDashboard from "./pages/DriverDashboard";
@@ -32,27 +30,8 @@ const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
 const AccountsPage = lazy(() => import("./pages/admin/AccountsPage"));
 const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
 const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
+
 const queryClient = new QueryClient();
-
-function App() {
-  useEffect(() => {
-    initDeepLinkAuth();
-
-    // ✅ move this here (hooks only inside components)
-    if (Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((r) => r.unregister());
-      });
-    }
-  }, []);
-
-  return (
-    <AppRoutes />
-  );
-}
-
-
-
 
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -65,8 +44,6 @@ const AppRoutes = () => (
     <BrowserRouter>
       <TooltipProvider>
         <AuthProvider>
-
-          {/* 🔥 THIS MUST BE HERE — prompts immediately on open */}
           <LocationBootstrap />
 
           <Toaster />
@@ -77,56 +54,87 @@ const AppRoutes = () => (
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<ProtectedRoute><RoleBasedRedirect /></ProtectedRoute>} />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <RoleBasedRedirect />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/auth/callback" element={<AuthCallback />} />
-              
-              <Route path="/dashboard" element={
-                <ProtectedRoute allowedRoles={["driver", "admin", "manager"]}>
-                  <DriverDashboard />
-                </ProtectedRoute>
-              } />
 
-              <Route path="/shovel" element={
-                <ProtectedRoute allowedRoles={["shovel_crew", "admin", "manager"]}>
-                  <ShovelDashboard />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["driver", "admin", "manager"]}>
+                    <DriverDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/work-logs" element={
-                <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                  <WorkLogsPage />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/shovel"
+                element={
+                  <ProtectedRoute allowedRoles={["shovel_crew", "admin", "manager"]}>
+                    <ShovelDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/time-clock" element={
-                <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                  <TimeClockPage />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/work-logs"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                    <WorkLogsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/time-clock"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                    <TimeClockPage />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/pending" element={
-                <ProtectedRoute>
-                  <Pending />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/admin" element={
-                <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }>
+              <Route
+                path="/pending"
+                element={
+                  <ProtectedRoute>
+                    <Pending />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
                 <Route index element={<Navigate to="/admin/users" replace />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
@@ -144,4 +152,19 @@ const AppRoutes = () => (
   </QueryClientProvider>
 );
 
-export default AppRoutes;
+function App() {
+  useEffect(() => {
+    initDeepLinkAuth();
+
+    // Ensure SW can't interfere on native
+    if (Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
+    }
+  }, []);
+
+  return <AppRoutes />;
+}
+
+export default App;
