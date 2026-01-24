@@ -23,6 +23,8 @@ const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
 const Pending = lazy(() => import("./pages/Pending"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
 const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
@@ -55,6 +57,8 @@ const AppRoutes = () => (
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route
                 path="/"
                 element={
