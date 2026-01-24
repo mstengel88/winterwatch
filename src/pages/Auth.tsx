@@ -245,17 +245,24 @@ export default function Auth() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form 
+            onSubmit={handleSubmit} 
+            className="space-y-4"
+            name={isLogin ? 'login' : 'signup'}
+            autoComplete="on"
+          >
             {!isLogin && (
               <div className="space-y-2">
                 <Label htmlFor="fullName" className="text-foreground">Full Name</Label>
                 <Input
                   id="fullName"
+                  name="fullName"
                   type="text"
                   placeholder="John Smith"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   disabled={isSubmitting}
+                  autoComplete="name"
                   className="bg-muted/50 border-border/50"
                 />
                 {errors.fullName && (
@@ -268,12 +275,13 @@ export default function Auth() {
               <Label htmlFor="email" className="text-foreground">Email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}
-                autoComplete="email"
+                autoComplete={isLogin ? 'username email' : 'email'}
                 className="bg-muted/50 border-border/50"
               />
               {errors.email && (
@@ -286,6 +294,7 @@ export default function Auth() {
               <div className="relative">
                 <Input
                   id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
