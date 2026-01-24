@@ -191,6 +191,11 @@
 
 /* iOS WKWebView input fix - prevents gesture recognizer conflicts */
 @supports (-webkit-touch-callout: none) {
+  /* Allow text interaction on iOS; blocking callouts can cause activationDenied in WKWebView */
+  body {
+    -webkit-touch-callout: default;
+  }
+
   input,
   textarea,
   select {

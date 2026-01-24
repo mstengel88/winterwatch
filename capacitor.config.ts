@@ -9,6 +9,18 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     hostname: "localhost",
   },
+  // iOS 18+ WKWebView input/gesture stability
+  ios: {
+    allowsLinkPreview: false,
+    scrollEnabled: true,
+  },
+  plugins: {
+    Keyboard: {
+      // Keeps layout stable and improves focus/keyboard behavior in WKWebView
+      resize: "body",
+      resizeOnFullScreen: true,
+    },
+  },
 };
 
 export default config;

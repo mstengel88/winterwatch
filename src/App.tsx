@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 import { LocationBootstrap } from "@/components/LocationBootstrap";
+import { IosInputFocusFix } from "@/components/ios/IosInputFocusFix";
 import { Capacitor } from "@capacitor/core";
 import AuthCallback from "./pages/AuthCallback";
 
@@ -48,6 +49,7 @@ const AppRoutes = () => (
       <TooltipProvider>
         <AuthProvider>
           <LocationBootstrap />
+          <IosInputFocusFix />
 
           <Toaster />
           <Sonner />
