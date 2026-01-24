@@ -110,9 +110,14 @@ async function handleAuthCallbackUrl(url: string) {
   console.log("✅ Final session check:", { userId: data.session?.user?.id ?? "NONE" });
 
   if (data.session) {
-    // Force a small delay to ensure state is propagated before navigation
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    window.location.replace("/");
+    // The onAuthStateChange listener in AuthContext should detect this session.
+    // Give a small delay to ensure storage is flushed, then trigger a soft reload
+    // that doesn't race with localStorage writes.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    
+    // Use history.replaceState + reload to avoid caching issues in Capacitor webview
+    window.history.replaceState(null, "", "/");
+    window.location.reload();
     return true;
   }
 
