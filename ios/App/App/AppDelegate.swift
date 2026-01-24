@@ -13,15 +13,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         
-        // Initialize OneSignal
+        // Initialize OneSignal (do NOT request permission here - defer to user action in Settings)
+        // Requesting permissions at startup can interfere with WKWebView focus on iOS 18.x
         OneSignal.initialize(
             "aca519b5-1d17-4332-bc19-a54978fff31c",
             withLaunchOptions: launchOptions
         )
-        // Prompt for push permission
-                OneSignal.Notifications.requestPermission({ accepted in
-                    print("User accepted notifications: \(accepted)")
-                }, fallbackToSettings: false)
+        // Permission will be requested when user taps "Enable" in app Settings
         return true
     }
     
