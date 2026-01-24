@@ -50,10 +50,10 @@ export default function Auth() {
   useEffect(() => {
     const handleNativeAuthSuccess = () => {
       console.log("📱 Native auth success event received, navigating...");
-      // The AuthContext should already have the session from onAuthStateChange
-      // Give it a moment to update, then navigate
+      // Navigate to "/" which uses RoleBasedRedirect to determine the correct destination
+      // This ensures users without roles go to /pending instead of /dashboard
       setTimeout(() => {
-        navigate(from, { replace: true });
+        navigate("/", { replace: true });
       }, 100);
     };
 
