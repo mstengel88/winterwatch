@@ -254,6 +254,66 @@ export type Database = {
         }
         Relationships: []
       }
+      overtime_notification_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          is_enabled: boolean
+          notify_admins: boolean
+          notify_employee: boolean
+          threshold_hours: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          is_enabled?: boolean
+          notify_admins?: boolean
+          notify_employee?: boolean
+          threshold_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          is_enabled?: boolean
+          notify_admins?: boolean
+          notify_employee?: boolean
+          threshold_hours?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      overtime_notifications_sent: {
+        Row: {
+          employee_id: string
+          id: string
+          sent_at: string
+          threshold_hours: number
+          time_clock_id: string
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          sent_at?: string
+          threshold_hours: number
+          time_clock_id: string
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          sent_at?: string
+          threshold_hours?: number
+          time_clock_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
