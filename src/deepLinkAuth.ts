@@ -5,29 +5,48 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CALLBACK_PREFIX = "winterwatch://auth/callback";
 
-function normalizeUrlForMatch(url: string) {
-  // iOS can occasionally uppercase the scheme or include a trailing slash.
-  return url.trim();
-}
+function extractParamsFromUrl(urlString: string) {
+  // For custom URL schemes, the URL constructor may not handle hash fragments correctly.
+  // Manually parse the URL to extract query and hash params.
+  
+  let queryString = "";
+  let hashString = "";
+  
+  const hashIndex = urlString.indexOf("#");
+  const queryIndex = urlString.indexOf("?");
+  
+  if (hashIndex !== -1) {
+    hashString = urlString.slice(hashIndex + 1);
+    // If there's a query before the hash
+    if (queryIndex !== -1 && queryIndex < hashIndex) {
+      queryString = urlString.slice(queryIndex + 1, hashIndex);
+    }
+  } else if (queryIndex !== -1) {
+    queryString = urlString.slice(queryIndex + 1);
+  }
 
-function extractParams(url: URL) {
-  // Some providers/flows may deliver params in the hash fragment.
-  const query = url.searchParams;
-  const hashParams = new URLSearchParams(url.hash?.startsWith("#") ? url.hash.slice(1) : url.hash);
+  const queryParams = new URLSearchParams(queryString);
+  const hashParams = new URLSearchParams(hashString);
 
-  const get = (key: string) => query.get(key) ?? hashParams.get(key);
+  console.log("🔍 Parsed URL parts:", {
+    hasHash: hashIndex !== -1,
+    hasQuery: queryIndex !== -1,
+    hashParamKeys: Array.from(hashParams.keys()),
+    queryParamKeys: Array.from(queryParams.keys()),
+  });
+
+  const get = (key: string) => queryParams.get(key) ?? hashParams.get(key);
 
   return {
     get,
-    raw: {
-      query,
-      hashParams,
-    },
+    queryParams,
+    hashParams,
   };
 }
 
 async function handleAuthCallbackUrl(url: string) {
-  const normalized = normalizeUrlForMatch(url);
+  const normalized = url.trim();
+  
   // Accept both exact prefix and a trailing slash variant.
   if (!(normalized.startsWith(CALLBACK_PREFIX) || normalized.startsWith(`${CALLBACK_PREFIX}/`))) {
     return false;
@@ -43,8 +62,7 @@ async function handleAuthCallbackUrl(url: string) {
     // ignore
   }
 
-  const u = new URL(normalized);
-  const params = extractParams(u);
+  const params = extractParamsFromUrl(normalized);
 
   const errorDesc = params.get("error_description") || params.get("error");
   if (errorDesc) {
@@ -53,6 +71,14 @@ async function handleAuthCallbackUrl(url: string) {
   }
 
   const code = params.get("code");
+  const access_token = params.get("access_token");
+  const refresh_token = params.get("refresh_token");
+
+  console.log("🔑 Token check:", {
+    hasCode: !!code,
+    hasAccessToken: !!access_token,
+    hasRefreshToken: !!refresh_token,
+  });
 
   if (code) {
     console.log("🔁 Exchanging code for session...");
@@ -61,28 +87,17 @@ async function handleAuthCallbackUrl(url: string) {
       console.error("❌ exchangeCodeForSession error:", error);
       return false;
     }
-  } else {
-    // Fallback: some flows may return tokens directly in the hash.
-    const access_token = params.get("access_token");
-    const refresh_token = params.get("refresh_token");
-
-    if (!access_token || !refresh_token) {
-      console.warn(
-        "⚠️ No code or tokens found in callback URL; cannot establish session.",
-        {
-          hasQueryParams: Array.from(params.raw.query.keys()),
-          hasHashParams: Array.from(params.raw.hashParams.keys()),
-        },
-      );
-      return false;
-    }
-
+  } else if (access_token && refresh_token) {
     console.log("🔁 Setting session from tokens...");
-    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+    const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
     if (error) {
       console.error("❌ setSession error:", error);
       return false;
     }
+    console.log("✅ setSession result:", { userId: data.user?.id, hasSession: !!data.session });
+  } else {
+    console.warn("⚠️ No code or tokens found in callback URL; cannot establish session.");
+    return false;
   }
 
   // Confirm session exists
@@ -92,9 +107,11 @@ async function handleAuthCallbackUrl(url: string) {
     return false;
   }
 
-  console.log("✅ Session user:", data.session?.user?.id ?? "NONE");
+  console.log("✅ Final session check:", { userId: data.session?.user?.id ?? "NONE" });
 
   if (data.session) {
+    // Force a small delay to ensure state is propagated before navigation
+    await new Promise((resolve) => setTimeout(resolve, 100));
     window.location.replace("/");
     return true;
   }
