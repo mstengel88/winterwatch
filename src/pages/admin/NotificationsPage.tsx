@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bell, Send, History } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Bell, Send, History, Settings2 } from 'lucide-react';
 import { NotificationHistory } from '@/components/admin/NotificationHistory';
 import { SendNotificationForm } from '@/components/admin/SendNotificationForm';
 import { NotificationMandatorySettings } from '@/components/admin/NotificationMandatorySettings';
@@ -10,14 +12,22 @@ export default function NotificationsPage() {
 
   return (
     <div className="container py-6 px-4 max-w-6xl">
-      <div className="flex items-center gap-4 mb-6">
-        <div className="p-3 bg-primary/10 rounded-full">
-          <Bell className="h-6 w-6 text-primary" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary/10 rounded-full">
+            <Bell className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Notification Center</h1>
+            <p className="text-muted-foreground">View sent notifications and send new ones</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">Notification Center</h1>
-          <p className="text-muted-foreground">View sent notifications and send new ones</p>
-        </div>
+        <Button variant="outline" asChild>
+          <Link to="/admin/notification-types">
+            <Settings2 className="h-4 w-4 mr-2" />
+            Manage Types
+          </Link>
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -227,6 +227,45 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_types: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_mandatory: boolean
+          is_system: boolean
+          label: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          is_system?: boolean
+          label: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          is_system?: boolean
+          label?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications_log: {
         Row: {
           body: string

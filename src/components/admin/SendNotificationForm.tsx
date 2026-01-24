@@ -17,36 +17,58 @@ interface Employee {
   user_id: string | null;
 }
 
+interface NotificationType {
+  id: string;
+  name: string;
+  label: string;
+}
+
 export function SendNotificationForm() {
   const { toast } = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [notificationTypes, setNotificationTypes] = useState<NotificationType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  const [notificationType, setNotificationType] = useState<string>('admin_announcement');
+  const [notificationType, setNotificationType] = useState<string>('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [sendToAll, setSendToAll] = useState(true);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchEmployees();
+    fetchData();
   }, []);
 
-  const fetchEmployees = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('id, first_name, last_name, user_id')
-        .eq('is_active', true)
-        .not('user_id', 'is', null)
-        .order('first_name');
+      const [employeesRes, typesRes] = await Promise.all([
+        supabase
+          .from('employees')
+          .select('id, first_name, last_name, user_id')
+          .eq('is_active', true)
+          .not('user_id', 'is', null)
+          .order('first_name'),
+        supabase
+          .from('notification_types')
+          .select('id, name, label')
+          .eq('is_active', true)
+          .order('label'),
+      ]);
 
-      if (error) throw error;
-      setEmployees(data || []);
+      if (employeesRes.error) throw employeesRes.error;
+      if (typesRes.error) throw typesRes.error;
+
+      setEmployees(employeesRes.data || []);
+      setNotificationTypes(typesRes.data || []);
+      
+      // Set default type to first available
+      if (typesRes.data && typesRes.data.length > 0 && !notificationType) {
+        setNotificationType(typesRes.data[0].name);
+      }
     } catch (err) {
-      console.error('Error fetching employees:', err);
+      console.error('Error fetching data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -64,6 +86,15 @@ export function SendNotificationForm() {
         variant: 'destructive',
         title: 'Validation Error',
         description: 'Please fill in both title and message',
+      });
+      return;
+    }
+
+    if (!notificationType) {
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Please select a notification type',
       });
       return;
     }
@@ -138,9 +169,11 @@ export function SendNotificationForm() {
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="admin_announcement">Admin Announcement</SelectItem>
-              <SelectItem value="shift_status">Shift Status</SelectItem>
-              <SelectItem value="geofence_alert">Geofence Alert</SelectItem>
+              {notificationTypes.map((type) => (
+                <SelectItem key={type.id} value={type.name}>
+                  {type.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
