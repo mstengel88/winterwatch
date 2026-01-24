@@ -9,6 +9,9 @@ interface NotificationPreferences {
   geofence_alerts_enabled: boolean;
   admin_announcements_enabled: boolean;
   notification_sound: 'default' | 'chime' | 'bell' | 'alert' | 'none';
+  mandatory_shift_status: boolean;
+  mandatory_geofence_alerts: boolean;
+  mandatory_admin_announcements: boolean;
 }
 
 const DEFAULT_PREFERENCES: NotificationPreferences = {
@@ -16,6 +19,9 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
   geofence_alerts_enabled: true,
   admin_announcements_enabled: true,
   notification_sound: 'default',
+  mandatory_shift_status: false,
+  mandatory_geofence_alerts: false,
+  mandatory_admin_announcements: false,
 };
 
 export function usePushNotifications() {
@@ -48,6 +54,9 @@ export function usePushNotifications() {
           geofence_alerts_enabled: data.geofence_alerts_enabled,
           admin_announcements_enabled: data.admin_announcements_enabled,
           notification_sound: data.notification_sound as NotificationPreferences['notification_sound'],
+          mandatory_shift_status: data.mandatory_shift_status || false,
+          mandatory_geofence_alerts: data.mandatory_geofence_alerts || false,
+          mandatory_admin_announcements: data.mandatory_admin_announcements || false,
         });
       }
     } catch (err) {

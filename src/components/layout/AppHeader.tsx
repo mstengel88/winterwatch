@@ -229,6 +229,10 @@ export function AppHeader() {
                     <Wrench className="mr-2 h-4 w-4" />
                     Equipment
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/notifications')}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Notifications
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/time-clock')}>
                     <Clock className="mr-2 h-4 w-4" />
                     Time Clock
