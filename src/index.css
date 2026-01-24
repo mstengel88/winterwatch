@@ -188,3 +188,24 @@
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
+
+/* iOS WKWebView input fix - prevents gesture recognizer conflicts */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    /* Ensure inputs are tappable on iOS 18.2+ */
+    -webkit-user-select: text;
+    user-select: text;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Force focus state on iOS */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    -webkit-appearance: none;
+  }
+}
