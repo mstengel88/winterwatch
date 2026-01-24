@@ -23,6 +23,15 @@ export function LocationBootstrap() {
           return;
         }
 
+        // iOS: We've seen WKWebView/WebProcess crashes immediately after calling
+        // Geolocation.checkPermissions() during early startup on iOS 18.x.
+        // Since we already defer permission prompts to explicit user action,
+        // we also skip the *status check* on iOS to avoid taking down the WebView.
+        if (Capacitor.getPlatform() === "ios") {
+          console.log("iOS detected - skipping Geolocation.checkPermissions on startup");
+          return;
+        }
+
         const { Geolocation } = await import("@capacitor/geolocation");
 
         // Only CHECK current permission status - do NOT request
