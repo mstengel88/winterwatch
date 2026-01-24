@@ -115,21 +115,28 @@ export function usePushNotifications() {
       const OneSignalMod = await import('onesignal-cordova-plugin');
       const OneSignal = OneSignalMod.default;
 
+      console.log('[Push] Initializing OneSignal...');
+      
       // Ensure initialized (native side also initializes, but JS init is safe and ensures the JS bridge is ready)
       try {
         OneSignal.initialize(ONESIGNAL_APP_ID);
+        console.log('[Push] OneSignal initialized with app ID:', ONESIGNAL_APP_ID);
       } catch (e) {
-        // ignore if already initialized
+        console.log('[Push] OneSignal already initialized or error:', e);
       }
 
       // Associate OneSignal user with our Supabase user
+      console.log('[Push] Logging in user:', user.id);
       OneSignal.login(user.id);
 
       const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+      console.log('[Push] Current permission status:', hasPermission);
       setPermissionStatus(hasPermission ? 'granted' : 'prompt');
 
       if (!hasPermission) {
+        console.log('[Push] Requesting permission...');
         const accepted = await OneSignal.Notifications.requestPermission(true);
+        console.log('[Push] Permission result:', accepted);
         setPermissionStatus(accepted ? 'granted' : 'denied');
         if (!accepted) {
           setIsLoading(false);
@@ -137,23 +144,37 @@ export function usePushNotifications() {
         }
       }
 
-      // Wait for subscription id to be available
-      const subscriptionId = await OneSignal.User.pushSubscription.getIdAsync();
+      // Wait for subscription id with retry logic
+      let subscriptionId: string | null = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        console.log(`[Push] Attempt ${attempt + 1} to get subscription ID...`);
+        subscriptionId = await OneSignal.User.pushSubscription.getIdAsync();
+        if (subscriptionId) {
+          console.log('[Push] Got subscription ID:', subscriptionId);
+          break;
+        }
+        // Wait 1 second before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       const pushToken = await OneSignal.User.pushSubscription.getTokenAsync();
+      console.log('[Push] Push token available:', !!pushToken);
 
       if (!subscriptionId) {
-        console.warn('OneSignal subscription id not available yet');
+        console.warn('[Push] OneSignal subscription id not available after retries');
         toast({
           variant: 'destructive',
           title: 'Push Setup Incomplete',
-          description: 'Notification permission granted, but device is not registered yet. Try again in a moment.',
+          description: 'Notification permission granted, but device is not registered yet. Please try again.',
         });
         setIsLoading(false);
         return;
       }
 
       const platform = Capacitor.getPlatform();
-      const { error } = await supabase
+      console.log('[Push] Upserting to database...', { user_id: user.id, player_id: subscriptionId, platform });
+      
+      const { data, error } = await supabase
         .from('push_device_tokens')
         .upsert(
           {
@@ -166,10 +187,11 @@ export function usePushNotifications() {
           {
             onConflict: 'user_id,player_id',
           }
-        );
+        )
+        .select();
 
       if (error) {
-        console.error('Error storing OneSignal subscription id:', error);
+        console.error('[Push] Error storing OneSignal subscription id:', error);
         toast({
           variant: 'destructive',
           title: 'Error',
@@ -178,11 +200,21 @@ export function usePushNotifications() {
         return;
       }
 
-      console.log('OneSignal registered', { subscriptionId, hasPushToken: !!pushToken, platform });
+      console.log('[Push] Successfully registered!', { subscriptionId, data });
       setIsRegistered(true);
+      
+      toast({
+        title: 'Push Notifications Enabled',
+        description: 'You will now receive notifications on this device',
+      });
 
     } catch (err) {
-      console.error('Error registering for push:', err);
+      console.error('[Push] Error registering for push:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: `Failed to set up push notifications: ${err}`,
+      });
     } finally {
       setIsLoading(false);
     }
