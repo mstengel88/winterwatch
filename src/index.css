@@ -146,8 +146,10 @@
     overscroll-behavior: none;
   }
 
-  /* Smooth scrolling for mobile */
-  * {
+  /* iOS note: applying `-webkit-overflow-scrolling: touch` globally (on `*`)
+     can break tap-to-focus in WKWebView on newer iOS versions.
+     Only apply it to the main page scroller. */
+  body {
     -webkit-overflow-scrolling: touch;
   }
 
