@@ -34,6 +34,33 @@ export function usePushNotifications() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'prompt'>('prompt');
 
+  // Check if user already has an active device token in the database
+  const checkExistingRegistration = useCallback(async () => {
+    if (!user) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('push_device_tokens')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (error) {
+        console.error('[Push] Error checking existing registration:', error);
+        return false;
+      }
+
+      const registered = data && data.length > 0;
+      console.log('[Push] Existing registration check:', registered);
+      setIsRegistered(registered);
+      return registered;
+    } catch (err) {
+      console.error('[Push] Failed to check existing registration:', err);
+      return false;
+    }
+  }, [user]);
+
   // Load preferences from database
   const loadPreferences = useCallback(async () => {
     if (!user) return;
@@ -248,11 +275,42 @@ export function usePushNotifications() {
 
   // Initialize on mount
   useEffect(() => {
-    if (user) {
-      loadPreferences();
-      registerDevice();
-    }
-  }, [user, loadPreferences, registerDevice]);
+    const init = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Always load preferences
+      await loadPreferences();
+      
+      // Check if already registered in DB
+      const alreadyRegistered = await checkExistingRegistration();
+      
+      // Only attempt device registration on native platforms
+      if (Capacitor.isNativePlatform()) {
+        // If not registered in DB, try to register
+        if (!alreadyRegistered) {
+          await registerDevice();
+        } else {
+          // Already registered, just update permission status
+          try {
+            const OneSignalMod = await import('onesignal-cordova-plugin');
+            const OneSignal = OneSignalMod.default;
+            const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+            setPermissionStatus(hasPermission ? 'granted' : 'prompt');
+          } catch (e) {
+            console.log('[Push] Could not check permission:', e);
+          }
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
+    };
+    
+    init();
+  }, [user, loadPreferences, checkExistingRegistration, registerDevice]);
 
   return {
     isRegistered,
