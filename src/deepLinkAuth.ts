@@ -110,14 +110,12 @@ async function handleAuthCallbackUrl(url: string) {
   console.log("✅ Final session check:", { userId: data.session?.user?.id ?? "NONE" });
 
   if (data.session) {
-    // The onAuthStateChange listener in AuthContext should detect this session.
-    // Give a small delay to ensure storage is flushed, then trigger a soft reload
-    // that doesn't race with localStorage writes.
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    
-    // Use history.replaceState + reload to avoid caching issues in Capacitor webview
-    window.history.replaceState(null, "", "/");
-    window.location.reload();
+    // The setSession call above triggers onAuthStateChange in AuthContext,
+    // which will update the user/session state and cause the app to re-render.
+    // We just need to navigate to the home page without a full reload.
+    // Dispatch a custom event that the Auth page can listen for to trigger navigation.
+    console.log("🏠 Session established, dispatching auth success event...");
+    window.dispatchEvent(new CustomEvent("nativeAuthSuccess"));
     return true;
   }
 

@@ -39,11 +39,27 @@ export default function Auth() {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
+  // Redirect when authenticated
   useEffect(() => {
     if (user && !isLoading) {
       navigate(from, { replace: true });
     }
   }, [user, isLoading, navigate, from]);
+
+  // Listen for native OAuth success event (from deepLinkAuth.ts)
+  useEffect(() => {
+    const handleNativeAuthSuccess = () => {
+      console.log("📱 Native auth success event received, navigating...");
+      // The AuthContext should already have the session from onAuthStateChange
+      // Give it a moment to update, then navigate
+      setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 100);
+    };
+
+    window.addEventListener("nativeAuthSuccess", handleNativeAuthSuccess);
+    return () => window.removeEventListener("nativeAuthSuccess", handleNativeAuthSuccess);
+  }, [navigate, from]);
 
   const validateForm = () => {
     try {
