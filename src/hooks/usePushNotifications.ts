@@ -247,7 +247,8 @@ export function usePushNotifications() {
     }
   }, [user, toast]);
 
-  // Initialize on mount
+  // Initialize on mount - ONLY check status, do NOT request permissions
+  // On iOS 18.2+, requesting permissions during early lifecycle breaks WKWebView input focus
   useEffect(() => {
     if (initRef.current) return;
     
@@ -263,7 +264,6 @@ export function usePushNotifications() {
       await loadPreferences();
       
       // Check if already registered in DB
-      let alreadyRegistered = false;
       try {
         const { data, error } = await supabase
           .from('push_device_tokens')
@@ -273,7 +273,6 @@ export function usePushNotifications() {
           .limit(1);
 
         if (!error && data && data.length > 0) {
-          alreadyRegistered = true;
           setIsRegistered(true);
           console.log('[Push] Already registered in database');
         }
@@ -281,30 +280,25 @@ export function usePushNotifications() {
         console.error('[Push] Error checking existing registration:', err);
       }
       
-      // Only attempt device registration on native platforms
+      // On native platforms, only CHECK permission status - do NOT auto-register
+      // Registration should only happen via explicit user action (registerDevice)
       if (Capacitor.isNativePlatform()) {
-        // If not registered in DB, try to register
-        if (!alreadyRegistered) {
-          await registerDevice();
-        } else {
-          // Already registered, just update permission status
-          try {
-            const OneSignalMod = await import('onesignal-cordova-plugin');
-            const OneSignal = OneSignalMod.default;
-            const hasPermission = await OneSignal.Notifications.getPermissionAsync();
-            setPermissionStatus(hasPermission ? 'granted' : 'prompt');
-          } catch (e) {
-            console.log('[Push] Could not check permission:', e);
-          }
-          setIsLoading(false);
+        try {
+          const OneSignalMod = await import('onesignal-cordova-plugin');
+          const OneSignal = OneSignalMod.default;
+          const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+          setPermissionStatus(hasPermission ? 'granted' : 'prompt');
+          console.log('[Push] Permission status checked (not requested):', hasPermission);
+        } catch (e) {
+          console.log('[Push] Could not check permission:', e);
         }
-      } else {
-        setIsLoading(false);
       }
+      
+      setIsLoading(false);
     };
     
     init();
-  }, [user, loadPreferences, registerDevice]);
+  }, [user, loadPreferences]);
 
   return {
     isRegistered,
