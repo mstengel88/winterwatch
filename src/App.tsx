@@ -154,15 +154,13 @@ const AppRoutes = () => (
 
 function App() {
   useEffect(() => {
-    initDeepLinkAuth();
+  if (Capacitor.isNativePlatform()) {
+    import("./deepLinkAuth").then(({ initDeepLinkAuth }) => {
+      initDeepLinkAuth();
+    });
+  }
+}, []);
 
-    // Ensure SW can't interfere on native
-    if (Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((r) => r.unregister());
-      });
-    }
-  }, []);
 
   return <AppRoutes />;
 }

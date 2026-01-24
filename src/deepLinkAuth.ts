@@ -10,6 +10,7 @@ async function handleAuthCallbackUrl(url: string) {
 
   console.log("✅ DEEPLINK AUTH URL:", url);
 
+  // Close OAuth browser if open (native only)
   try {
     await Browser.close();
   } catch {
@@ -27,6 +28,7 @@ async function handleAuthCallbackUrl(url: string) {
 
   const code = u.searchParams.get("code");
 
+  // PKCE flow: ?code=...
   if (code) {
     console.log("🔁 Exchanging code for session...");
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -34,27 +36,38 @@ async function handleAuthCallbackUrl(url: string) {
       console.error("❌ exchangeCodeForSession error:", error);
       return false;
     }
-
-    // Confirm session exists
-    const { data, error: sessionErr } = await supabase.auth.getSession();
-    if (sessionErr) {
-      console.error("❌ getSession error after callback:", sessionErr);
+  } else {
+    // Fallback: token-in-url flow
+    const { error } = await supabase.auth.getSessionFromUrl({
+      url,
+      storeSession: true,
+    });
+    if (error) {
+      console.error("❌ getSessionFromUrl error:", error);
       return false;
     }
+  }
 
-    console.log("✅ Session user:", data.session?.user?.id ?? "NONE");
+  // Confirm session exists
+  const { data, error: sessionErr } = await supabase.auth.getSession();
+  if (sessionErr) {
+    console.error("❌ getSession error after callback:", sessionErr);
+    return false;
+  }
 
-    // Force app to land on home and re-evaluate auth state cleanly
-    if (data.session) {
-      window.location.replace("/");
-      return true;
-    }
+  console.log("✅ Session user:", data.session?.user?.id ?? "NONE");
+
+  // Kick back to app root to let routing/auth refresh cleanly
+  if (data.session) {
+    window.location.replace("/");
+    return true;
   }
 
   return false;
 }
 
 export async function initDeepLinkAuth() {
+  // HARD web guard
   if (!Capacitor.isNativePlatform()) return;
 
   // Cold start
