@@ -10,10 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Users, Plus, Loader2, Truck, Shovel, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Users, Plus, Loader2, Truck, Shovel, Search, Upload, MoreHorizontal, Pencil, Trash2, Clock } from 'lucide-react';
 import { Employee, EmployeeCategory } from '@/types/database';
 import { Profile } from '@/types/auth';
 import { employeeSchema, getValidationError } from '@/lib/validations';
+import { OvertimeNotificationSettings } from '@/components/admin/OvertimeNotificationSettings';
 
 const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both'];
 
@@ -194,6 +195,10 @@ export default function EmployeesPage() {
             <Users className="h-4 w-4" />
             Users & Roles
           </TabsTrigger>
+          <TabsTrigger value="overtime" className="data-[state=active]:bg-secondary gap-2">
+            <Clock className="h-4 w-4" />
+            Overtime Alerts
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="employees" className="mt-6 space-y-6">
@@ -357,6 +362,10 @@ export default function EmployeesPage() {
               <p>User & Role management coming soon</p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="overtime" className="mt-6">
+          <OvertimeNotificationSettings />
         </TabsContent>
       </Tabs>
 
