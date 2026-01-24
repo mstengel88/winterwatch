@@ -185,6 +185,75 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          admin_announcements_enabled: boolean
+          created_at: string
+          geofence_alerts_enabled: boolean
+          id: string
+          notification_sound: Database["public"]["Enums"]["notification_sound"]
+          shift_status_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_announcements_enabled?: boolean
+          created_at?: string
+          geofence_alerts_enabled?: boolean
+          id?: string
+          notification_sound?: Database["public"]["Enums"]["notification_sound"]
+          shift_status_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_announcements_enabled?: boolean
+          created_at?: string
+          geofence_alerts_enabled?: boolean
+          id?: string
+          notification_sound?: Database["public"]["Enums"]["notification_sound"]
+          shift_status_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications_log: {
+        Row: {
+          body: string
+          data: Json | null
+          id: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          onesignal_id: string | null
+          read_at: string | null
+          sent_at: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          data?: Json | null
+          id?: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          onesignal_id?: string | null
+          read_at?: string | null
+          sent_at?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          data?: Json | null
+          id?: string
+          notification_type?: Database["public"]["Enums"]["notification_type"]
+          onesignal_id?: string | null
+          read_at?: string | null
+          sent_at?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -221,6 +290,39 @@ export type Database = {
           notification_sms?: boolean | null
           phone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      push_device_tokens: {
+        Row: {
+          created_at: string
+          device_name: string | null
+          id: string
+          is_active: boolean
+          platform: string
+          player_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean
+          platform: string
+          player_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean
+          platform?: string
+          player_id?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -500,6 +602,11 @@ export type Database = {
     Enums: {
       app_role: "admin" | "manager" | "driver" | "shovel_crew" | "client"
       employee_category: "plow" | "shovel" | "both"
+      notification_sound: "default" | "chime" | "bell" | "alert" | "none"
+      notification_type:
+        | "shift_status"
+        | "geofence_alert"
+        | "admin_announcement"
       service_type: "plow" | "salt" | "both" | "shovel" | "ice_melt"
       work_status: "pending" | "in_progress" | "completed" | "cancelled"
     }
@@ -631,6 +738,12 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "manager", "driver", "shovel_crew", "client"],
       employee_category: ["plow", "shovel", "both"],
+      notification_sound: ["default", "chime", "bell", "alert", "none"],
+      notification_type: [
+        "shift_status",
+        "geofence_alert",
+        "admin_announcement",
+      ],
       service_type: ["plow", "salt", "both", "shovel", "ice_melt"],
       work_status: ["pending", "in_progress", "completed", "cancelled"],
     },
