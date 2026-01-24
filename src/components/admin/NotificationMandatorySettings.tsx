@@ -120,7 +120,9 @@ export function NotificationMandatorySettings() {
               <div>
                 <Label className="text-sm font-medium">Shift Status Notifications</Label>
                 <p className="text-xs text-muted-foreground">
-                  Employees cannot disable shift start/end alerts
+                  {settings.mandatory_shift_status 
+                    ? "Mandatory - employees cannot disable" 
+                    : "Optional - employees can disable"}
                 </p>
               </div>
             </div>
@@ -138,7 +140,9 @@ export function NotificationMandatorySettings() {
               <div>
                 <Label className="text-sm font-medium">Geofence Alert Notifications</Label>
                 <p className="text-xs text-muted-foreground">
-                  Employees cannot disable location-based alerts
+                  {settings.mandatory_geofence_alerts 
+                    ? "Mandatory - employees cannot disable" 
+                    : "Optional - employees can disable"}
                 </p>
               </div>
             </div>
@@ -156,7 +160,9 @@ export function NotificationMandatorySettings() {
               <div>
                 <Label className="text-sm font-medium">Admin Announcement Notifications</Label>
                 <p className="text-xs text-muted-foreground">
-                  Employees cannot disable admin announcements
+                  {settings.mandatory_admin_announcements 
+                    ? "Mandatory - employees cannot disable" 
+                    : "Optional - employees can disable"}
                 </p>
               </div>
             </div>
