@@ -94,6 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextSession?.user ?? null);
 
       if (nextSession?.user) {
+        // Set loading true while we fetch roles/profile to prevent premature redirects
+        setIsLoading(true);
+
         // IMPORTANT: do not call async Supabase operations directly in onAuthStateChange
         setTimeout(() => {
           if (!mounted) return;
