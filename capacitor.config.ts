@@ -4,10 +4,15 @@ const config: CapacitorConfig = {
   appId: "com.winterwatch.pro",
   appName: "WinterWatch Pro",
   webDir: "dist",
+  // IMPORTANT:
+  // - The WebView should load the built app (file://) or an https dev server.
+  // - The custom `winterwatch://` scheme is for deep links (OAuth callbacks),
+  //   NOT for the WebView origin.
+  // Setting hostname=localhost here can cause iOS to try loading winterwatch://localhost
+  // which results in a blank/white screen.
   server: {
-    iosScheme: "winterwatch",
+    iosScheme: "https",
     androidScheme: "https",
-    hostname: "localhost",
   },
   // iOS 18+ WKWebView input/gesture stability
   ios: {
