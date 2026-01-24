@@ -1,5 +1,15 @@
 import { useEffect } from "react";
 
+/**
+ * LocationBootstrap - Deferred location permission handling
+ * 
+ * IMPORTANT: On iOS 18.2+, requesting permissions (location, push, etc.) during 
+ * early app lifecycle can break WKWebView text input interactions.
+ * 
+ * This component now only CHECKS existing permission status without prompting.
+ * Actual permission requests should happen from explicit user actions (e.g., 
+ * when starting a work log that requires location).
+ */
 export function LocationBootstrap() {
   useEffect(() => {
     let watchId: string | null = null;
@@ -9,18 +19,20 @@ export function LocationBootstrap() {
         const { Capacitor } = await import("@capacitor/core");
 
         if (!Capacitor.isNativePlatform()) {
-          console.log("Web platform detected - skipping native location permission request");
+          console.log("Web platform detected - skipping native location check");
           return;
         }
 
         const { Geolocation } = await import("@capacitor/geolocation");
 
-        const permission = await Geolocation.requestPermissions({
-          permissions: ["location", "coarseLocation"],
-        });
+        // Only CHECK current permission status - do NOT request
+        // Requesting permissions on launch breaks WKWebView input focus on iOS 18.2+
+        const status = await Geolocation.checkPermissions();
+        console.log("Location permission status:", status);
 
-        if (permission.location === "granted") {
-          console.log("Location permission granted");
+        // Only start watching if already granted (from a previous session)
+        if (status.location === "granted") {
+          console.log("Location already granted - starting position watch");
 
           await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
 
@@ -32,10 +44,10 @@ export function LocationBootstrap() {
             }
           );
         } else {
-          console.warn("Location permission denied");
+          console.log("Location not yet granted - will request when needed");
         }
       } catch (error) {
-        console.error("Location permission error:", error);
+        console.error("Location check error:", error);
       }
     }
 
