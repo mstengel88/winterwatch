@@ -21,6 +21,9 @@ interface NotificationPreference {
   geofence_alerts_enabled: boolean;
   admin_announcements_enabled: boolean;
   notification_sound: string;
+  mandatory_shift_status: boolean;
+  mandatory_geofence_alerts: boolean;
+  mandatory_admin_announcements: boolean;
 }
 
 interface DeviceToken {
@@ -130,11 +133,12 @@ Deno.serve(async (req) => {
       
       switch (notification_type) {
         case "shift_status":
-          return prefs.shift_status_enabled;
+          // Send if mandatory OR user has it enabled
+          return prefs.mandatory_shift_status || prefs.shift_status_enabled;
         case "geofence_alert":
-          return prefs.geofence_alerts_enabled;
+          return prefs.mandatory_geofence_alerts || prefs.geofence_alerts_enabled;
         case "admin_announcement":
-          return prefs.admin_announcements_enabled;
+          return prefs.mandatory_admin_announcements || prefs.admin_announcements_enabled;
         default:
           return true;
       }
