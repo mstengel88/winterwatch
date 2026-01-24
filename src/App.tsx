@@ -12,7 +12,6 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
 import { LocationBootstrap } from "@/components/LocationBootstrap";
-import { initDeepLinkAuth } from "./deepLinkAuth";
 import { Capacitor } from "@capacitor/core";
 import AuthCallback from "./pages/AuthCallback";
 
@@ -154,12 +153,17 @@ const AppRoutes = () => (
 
 function App() {
   useEffect(() => {
-  if (Capacitor.isNativePlatform()) {
-    import("./deepLinkAuth").then(({ initDeepLinkAuth }) => {
-      initDeepLinkAuth();
-    });
-  }
-}, []);
+    if (Capacitor.isNativePlatform()) {
+      import("./deepLinkAuth").then(({ initDeepLinkAuth }) => {
+        initDeepLinkAuth();
+      });
+    }
+    if (Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
+    }
+  }, []);
 
 
   return <AppRoutes />;
