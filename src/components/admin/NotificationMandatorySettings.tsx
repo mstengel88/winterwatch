@@ -7,51 +7,45 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, Loader2, Clock, MapPin, Megaphone, Save } from 'lucide-react';
 
-interface MandatorySettings {
-  mandatory_shift_status: boolean;
-  mandatory_geofence_alerts: boolean;
-  mandatory_admin_announcements: boolean;
+interface SystemNotificationType {
+  name: string;
+  is_mandatory: boolean;
 }
+
+const SYSTEM_TYPES = [
+  { name: 'shift_status', label: 'Shift Status Notifications', icon: Clock, color: 'text-blue-500' },
+  { name: 'geofence_alert', label: 'Geofence Alert Notifications', icon: MapPin, color: 'text-orange-500' },
+  { name: 'admin_announcement', label: 'Admin Announcement Notifications', icon: Megaphone, color: 'text-purple-500' },
+];
 
 export function NotificationMandatorySettings() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [settings, setSettings] = useState<MandatorySettings>({
-    mandatory_shift_status: false,
-    mandatory_geofence_alerts: false,
-    mandatory_admin_announcements: false,
-  });
+  const [settings, setSettings] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetchGlobalSettings();
+    fetchSystemTypes();
   }, []);
 
-  const fetchGlobalSettings = async () => {
+  const fetchSystemTypes = async () => {
     setIsLoading(true);
     try {
-      // Get an aggregated view - if any user has mandatory settings, we consider it set
-      // For simplicity, we'll use a settings approach with the first admin's preferences
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
-
       const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('mandatory_shift_status, mandatory_geofence_alerts, mandatory_admin_announcements')
-        .eq('user_id', user.user.id)
-        .single();
+        .from('notification_types')
+        .select('name, is_mandatory')
+        .eq('is_system', true);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching settings:', error);
+      if (error) {
+        console.error('Error fetching notification types:', error);
+        return;
       }
 
-      if (data) {
-        setSettings({
-          mandatory_shift_status: data.mandatory_shift_status || false,
-          mandatory_geofence_alerts: data.mandatory_geofence_alerts || false,
-          mandatory_admin_announcements: data.mandatory_admin_announcements || false,
-        });
-      }
+      const settingsMap: Record<string, boolean> = {};
+      data?.forEach((type) => {
+        settingsMap[type.name] = type.is_mandatory;
+      });
+      setSettings(settingsMap);
     } catch (err) {
       console.error('Error:', err);
     } finally {
@@ -62,17 +56,21 @@ export function NotificationMandatorySettings() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Update all notification_preferences to set mandatory flags
-      const { error } = await supabase
-        .from('notification_preferences')
-        .update({
-          mandatory_shift_status: settings.mandatory_shift_status,
-          mandatory_geofence_alerts: settings.mandatory_geofence_alerts,
-          mandatory_admin_announcements: settings.mandatory_admin_announcements,
-        })
-        .neq('user_id', '00000000-0000-0000-0000-000000000000'); // Update all rows
+      // Update each system notification type's is_mandatory flag
+      const updates = Object.entries(settings).map(([name, is_mandatory]) =>
+        supabase
+          .from('notification_types')
+          .update({ is_mandatory })
+          .eq('name', name)
+          .eq('is_system', true)
+      );
 
-      if (error) throw error;
+      const results = await Promise.all(updates);
+      const hasError = results.some((r) => r.error);
+
+      if (hasError) {
+        throw new Error('Failed to update some settings');
+      }
 
       toast({
         title: 'Settings Saved',
@@ -114,65 +112,27 @@ export function NotificationMandatorySettings() {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-blue-500" />
-              <div>
-                <Label className="text-sm font-medium">Shift Status Notifications</Label>
-                <p className="text-xs text-muted-foreground">
-                  {settings.mandatory_shift_status 
-                    ? "Mandatory - employees cannot disable" 
-                    : "Optional - employees can disable"}
-                </p>
+          {SYSTEM_TYPES.map(({ name, label, icon: Icon, color }) => (
+            <div key={name} className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <Icon className={`h-5 w-5 ${color}`} />
+                <div>
+                  <Label className="text-sm font-medium">{label}</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {settings[name]
+                      ? 'Mandatory - employees cannot disable'
+                      : 'Optional - employees can disable'}
+                  </p>
+                </div>
               </div>
+              <Switch
+                checked={settings[name] || false}
+                onCheckedChange={(checked) =>
+                  setSettings((prev) => ({ ...prev, [name]: checked }))
+                }
+              />
             </div>
-            <Switch
-              checked={settings.mandatory_shift_status}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, mandatory_shift_status: checked }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="flex items-center gap-3">
-              <MapPin className="h-5 w-5 text-orange-500" />
-              <div>
-                <Label className="text-sm font-medium">Geofence Alert Notifications</Label>
-                <p className="text-xs text-muted-foreground">
-                  {settings.mandatory_geofence_alerts 
-                    ? "Mandatory - employees cannot disable" 
-                    : "Optional - employees can disable"}
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={settings.mandatory_geofence_alerts}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, mandatory_geofence_alerts: checked }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="flex items-center gap-3">
-              <Megaphone className="h-5 w-5 text-purple-500" />
-              <div>
-                <Label className="text-sm font-medium">Admin Announcement Notifications</Label>
-                <p className="text-xs text-muted-foreground">
-                  {settings.mandatory_admin_announcements 
-                    ? "Mandatory - employees cannot disable" 
-                    : "Optional - employees can disable"}
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={settings.mandatory_admin_announcements}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, mandatory_admin_announcements: checked }))
-              }
-            />
-          </div>
+          ))}
         </div>
 
         <Button onClick={handleSave} disabled={isSaving} className="w-full">
