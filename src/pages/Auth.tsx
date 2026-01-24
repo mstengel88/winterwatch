@@ -12,6 +12,8 @@ import { Loader2, Eye, EyeOff, Users, Building2 } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { getOAuthRedirectTo } from '@/Auth/redirect';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 
 const authSchema = z.object({
   email: z.string().trim().email({ message: 'Please enter a valid email address' }),
@@ -121,12 +123,21 @@ export default function Auth() {
   };
 
   const handleGoogleSignIn = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
+    const redirectTo = getOAuthRedirectTo();
+    const isNative = Capacitor.isNativePlatform();
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: getOAuthRedirectTo(),
+        redirectTo,
+        ...(isNative ? { skipBrowserRedirect: true } : {}),
       },
     });
+
+    if (!error && isNative && data?.url) {
+      await Browser.open({ url: data.url, windowName: '_self' });
+    }
+
     if (error) {
       toast({
         variant: 'destructive',
@@ -137,12 +148,21 @@ export default function Auth() {
   };
 
   const handleAppleSignIn = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
+    const redirectTo = getOAuthRedirectTo();
+    const isNative = Capacitor.isNativePlatform();
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: {
-        redirectTo: getOAuthRedirectTo(),
+        redirectTo,
+        ...(isNative ? { skipBrowserRedirect: true } : {}),
       },
     });
+
+    if (!error && isNative && data?.url) {
+      await Browser.open({ url: data.url, windowName: '_self' });
+    }
+
     if (error) {
       toast({
         variant: 'destructive',
