@@ -5,8 +5,33 @@ import { supabase } from "@/integrations/supabase/client";
 
 const CALLBACK_PREFIX = "winterwatch://auth/callback";
 
+function normalizeUrlForMatch(url: string) {
+  // iOS can occasionally uppercase the scheme or include a trailing slash.
+  return url.trim();
+}
+
+function extractParams(url: URL) {
+  // Some providers/flows may deliver params in the hash fragment.
+  const query = url.searchParams;
+  const hashParams = new URLSearchParams(url.hash?.startsWith("#") ? url.hash.slice(1) : url.hash);
+
+  const get = (key: string) => query.get(key) ?? hashParams.get(key);
+
+  return {
+    get,
+    raw: {
+      query,
+      hashParams,
+    },
+  };
+}
+
 async function handleAuthCallbackUrl(url: string) {
-  if (!url.startsWith(CALLBACK_PREFIX)) return false;
+  const normalized = normalizeUrlForMatch(url);
+  // Accept both exact prefix and a trailing slash variant.
+  if (!(normalized.startsWith(CALLBACK_PREFIX) || normalized.startsWith(`${CALLBACK_PREFIX}/`))) {
+    return false;
+  }
 
   console.log("✅ DEEPLINK AUTH URL:", url);
 
@@ -18,29 +43,46 @@ async function handleAuthCallbackUrl(url: string) {
     // ignore
   }
 
-  const u = new URL(url);
+  const u = new URL(normalized);
+  const params = extractParams(u);
 
-  const errorDesc =
-    u.searchParams.get("error_description") || u.searchParams.get("error");
+  const errorDesc = params.get("error_description") || params.get("error");
   if (errorDesc) {
     console.error("❌ OAuth callback error:", errorDesc);
     return false;
   }
 
-  const code = u.searchParams.get("code");
+  const code = params.get("code");
 
-  // If there's no code, nothing to exchange.
-  // (Some providers use token-in-url on web, but native/Supabase+Apple should be PKCE with code.)
-  if (!code) {
-    console.warn("⚠️ No code found in callback URL; skipping exchange.");
-    return false;
-  }
+  if (code) {
+    console.log("🔁 Exchanging code for session...");
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      console.error("❌ exchangeCodeForSession error:", error);
+      return false;
+    }
+  } else {
+    // Fallback: some flows may return tokens directly in the hash.
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
 
-  console.log("🔁 Exchanging code for session...");
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) {
-    console.error("❌ exchangeCodeForSession error:", error);
-    return false;
+    if (!access_token || !refresh_token) {
+      console.warn(
+        "⚠️ No code or tokens found in callback URL; cannot establish session.",
+        {
+          hasQueryParams: Array.from(params.raw.query.keys()),
+          hasHashParams: Array.from(params.raw.hashParams.keys()),
+        },
+      );
+      return false;
+    }
+
+    console.log("🔁 Setting session from tokens...");
+    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+    if (error) {
+      console.error("❌ setSession error:", error);
+      return false;
+    }
   }
 
   // Confirm session exists
