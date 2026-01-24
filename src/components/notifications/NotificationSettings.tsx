@@ -2,10 +2,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Bell, Clock, MapPin, Megaphone, Volume2 } from 'lucide-react';
+import { Bell, Clock, MapPin, Megaphone, Volume2, Lock } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const SOUND_OPTIONS = [
   { value: 'default', label: 'Default' },
@@ -66,6 +67,11 @@ export function NotificationSettings() {
     );
   }
 
+  // Check if any notification type is mandatory
+  const isMandatoryShiftStatus = preferences.mandatory_shift_status;
+  const isMandatoryGeofence = preferences.mandatory_geofence_alerts;
+  const isMandatoryAnnouncements = preferences.mandatory_admin_announcements;
+
   return (
     <Card>
       <CardHeader>
@@ -112,8 +118,18 @@ export function NotificationSettings() {
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <Label htmlFor="shift-status" className="text-sm font-medium">
+                    <Label htmlFor="shift-status" className="text-sm font-medium flex items-center gap-2">
                       Shift Status
+                      {isMandatoryShiftStatus && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Lock className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>This notification is required by your administrator</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       When shifts are started, completed, or modified
@@ -122,7 +138,8 @@ export function NotificationSettings() {
                 </div>
                 <Switch
                   id="shift-status"
-                  checked={preferences.shift_status_enabled}
+                  checked={isMandatoryShiftStatus || preferences.shift_status_enabled}
+                  disabled={isMandatoryShiftStatus}
                   onCheckedChange={(checked) => 
                     savePreferences({ shift_status_enabled: checked })
                   }
@@ -134,8 +151,18 @@ export function NotificationSettings() {
                 <div className="flex items-center gap-3">
                   <MapPin className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <Label htmlFor="geofence" className="text-sm font-medium">
+                    <Label htmlFor="geofence" className="text-sm font-medium flex items-center gap-2">
                       Geofence Alerts
+                      {isMandatoryGeofence && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Lock className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>This notification is required by your administrator</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       When approaching or leaving job sites
@@ -144,7 +171,8 @@ export function NotificationSettings() {
                 </div>
                 <Switch
                   id="geofence"
-                  checked={preferences.geofence_alerts_enabled}
+                  checked={isMandatoryGeofence || preferences.geofence_alerts_enabled}
+                  disabled={isMandatoryGeofence}
                   onCheckedChange={(checked) => 
                     savePreferences({ geofence_alerts_enabled: checked })
                   }
@@ -156,8 +184,18 @@ export function NotificationSettings() {
                 <div className="flex items-center gap-3">
                   <Megaphone className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <Label htmlFor="announcements" className="text-sm font-medium">
+                    <Label htmlFor="announcements" className="text-sm font-medium flex items-center gap-2">
                       Admin Announcements
+                      {isMandatoryAnnouncements && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Lock className="h-3 w-3 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>This notification is required by your administrator</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       Messages from managers and administrators
@@ -166,7 +204,8 @@ export function NotificationSettings() {
                 </div>
                 <Switch
                   id="announcements"
-                  checked={preferences.admin_announcements_enabled}
+                  checked={isMandatoryAnnouncements || preferences.admin_announcements_enabled}
+                  disabled={isMandatoryAnnouncements}
                   onCheckedChange={(checked) => 
                     savePreferences({ admin_announcements_enabled: checked })
                   }
