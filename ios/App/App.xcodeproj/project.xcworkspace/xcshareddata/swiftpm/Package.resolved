@@ -1,5 +1,5 @@
 {
-  "originHash" : "055d4cc5820d0cd1e42db88df9cda3f14d99af830fb440de08fa6db75fd1c712",
+  "originHash" : "92f6627c0d91887f0e0d625a43551761a34bafc1b82464848143df8c7ee55a6c",
   "pins" : [
     {
       "identity" : "capacitor-swift-pm",
@@ -17,6 +17,33 @@
       "state" : {
         "revision" : "5b722138d4ddc81275e0405acfd812a497519970",
         "version" : "2.0.0"
+      }
+    },
+    {
+      "identity" : "onesignal-xcframework",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/OneSignal/OneSignal-XCFramework",
+      "state" : {
+        "revision" : "7bd5d96e7e3c4342598e28f8364ebfa024fea566",
+        "version" : "5.2.16"
+      }
+    },
+    {
+      "identity" : "swift-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-algorithms.git",
+      "state" : {
+        "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+        "version" : "1.2.1"
+      }
+    },
+    {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics.git",
+      "state" : {
+        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+        "version" : "1.1.1"
       }
     }
   ],
