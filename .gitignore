@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 *.xcworkspacedata
 *.resolved
+*.xcworkspace/
+**/xcshareddata/swiftpm/Package.resolved
+
