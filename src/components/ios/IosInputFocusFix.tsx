@@ -13,7 +13,7 @@ export function IosInputFocusFix() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
 
-    const focusIfInput = (target: EventTarget | null) => {
+    const resolveControl = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return;
 
       // Direct input tap
@@ -23,11 +23,7 @@ export function IosInputFocusFix() {
         | HTMLSelectElement
         | null;
 
-      if (el && !el.disabled) {
-        // Defer to allow WebKit to finish its gesture pipeline
-        requestAnimationFrame(() => el.focus());
-        return;
-      }
+      if (el && !el.disabled) return el;
 
       // Label tap -> focus referenced control
       const label = target.closest("label") as HTMLLabelElement | null;
@@ -38,17 +34,80 @@ export function IosInputFocusFix() {
           | HTMLTextAreaElement
           | HTMLSelectElement
           | null;
-        if (linked && !linked.disabled) requestAnimationFrame(() => linked.focus());
+        if (linked && !linked.disabled) return linked;
       }
     };
 
-    const onTouchEnd = (e: TouchEvent) => focusIfInput(e.target);
-    const onPointerUp = (e: PointerEvent) => focusIfInput(e.target);
+    const focusControl = (
+      control:
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | HTMLSelectElement
+        | undefined,
+    ) => {
+      if (!control) return;
+      if (control === document.activeElement) return;
 
+      // Synchronous focus is important: iOS can reject focus if it doesn't happen
+      // within a user-gesture event (causing `activationDenied`).
+      try {
+        // preventScroll avoids a scroll-jump during focus.
+        // TS DOM lib doesn't always include the option, so we cast.
+        (control as any).focus?.({ preventScroll: true });
+      } catch {
+        control.focus();
+      }
+
+      // Some WKWebView states only start a text input session after a click.
+      // Click is safe here since it's still inside a user gesture handler.
+      try {
+        control.click?.();
+      } catch {
+        // ignore
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      const control = resolveControl(e.target);
+      if (!control) return;
+
+      // IMPORTANT: do not block scrolling globally; only prevent default when
+      // the target is actually a form control.
+      // This helps WebKit treat the focus as a legitimate user interaction.
+      e.preventDefault();
+      focusControl(control);
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      const control = resolveControl(e.target);
+      if (!control) return;
+      // Pointer events can be passive by default; we attach as non-passive.
+      e.preventDefault();
+      focusControl(control);
+    };
+
+    // Fallback: sometimes touchstart is swallowed but touchend fires.
+    const onTouchEnd = (e: TouchEvent) => {
+      const control = resolveControl(e.target);
+      if (!control) return;
+      requestAnimationFrame(() => focusControl(control));
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      const control = resolveControl(e.target);
+      if (!control) return;
+      requestAnimationFrame(() => focusControl(control));
+    };
+
+    // Capture phase so we run before WebKit's deferrers.
+    document.addEventListener("touchstart", onTouchStart, { passive: false, capture: true });
+    document.addEventListener("pointerdown", onPointerDown, { passive: false, capture: true });
     document.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
     document.addEventListener("pointerup", onPointerUp, { passive: true, capture: true });
 
     return () => {
+      document.removeEventListener("touchstart", onTouchStart, { capture: true } as any);
+      document.removeEventListener("pointerdown", onPointerDown, { capture: true } as any);
       document.removeEventListener("touchend", onTouchEnd, { capture: true } as any);
       document.removeEventListener("pointerup", onPointerUp, { capture: true } as any);
     };
