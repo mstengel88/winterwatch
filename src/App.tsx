@@ -153,17 +153,20 @@ const AppRoutes = () => (
 
 function App() {
   useEffect(() => {
+  (async () => {
+    const { Capacitor } = await import("@capacitor/core");
     if (Capacitor.isNativePlatform()) {
-      import("./deepLinkAuth").then(({ initDeepLinkAuth }) => {
-        initDeepLinkAuth();
-      });
+      const { initDeepLinkAuth } = await import("./deepLinkAuth");
+      await initDeepLinkAuth();
+
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
     }
-    if (Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((r) => r.unregister());
-      });
-    }
-  }, []);
+  })();
+}, []);
+
 
 
   return <AppRoutes />;

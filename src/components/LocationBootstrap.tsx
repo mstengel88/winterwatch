@@ -1,49 +1,61 @@
 import { useEffect } from "react";
-import { Geolocation } from "@capacitor/geolocation";
-import { Capacitor } from "@capacitor/core";
 
 export function LocationBootstrap() {
   useEffect(() => {
-    async function requestLocation() {
+    let watchId: string | null = null;
+
+    async function run() {
       try {
-        // Only request permissions on native platforms (iOS/Android)
-        if (Capacitor.isNativePlatform()) {
-          const permission = await Geolocation.requestPermissions({
-            permissions: ["location", "coarseLocation"],
-          });
+        const { Capacitor } = await import("@capacitor/core");
 
-          if (permission.location === "granted") {
-            console.log("Location permission granted");
-
-            // Get initial location
-            await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
-
-            // Start watching position in background
-            Geolocation.watchPosition(
-              { enableHighAccuracy: true },
-              (position, err) => {
-                if (position) {
-                  console.log("Live location:", position.coords);
-                }
-                if (err) {
-                  console.error("Location error:", err);
-                }
-              }
-            );
-          } else {
-            console.warn("Location permission denied");
-          }
-        } else {
-          // On web, just log that we're skipping native permission request
+        if (!Capacitor.isNativePlatform()) {
           console.log("Web platform detected - skipping native location permission request");
+          return;
+        }
+
+        const { Geolocation } = await import("@capacitor/geolocation");
+
+        const permission = await Geolocation.requestPermissions({
+          permissions: ["location", "coarseLocation"],
+        });
+
+        if (permission.location === "granted") {
+          console.log("Location permission granted");
+
+          await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+
+          watchId = await Geolocation.watchPosition(
+            { enableHighAccuracy: true },
+            (position, err) => {
+              if (position) console.log("Live location:", position.coords);
+              if (err) console.error("Location error:", err);
+            }
+          );
+        } else {
+          console.warn("Location permission denied");
         }
       } catch (error) {
         console.error("Location permission error:", error);
       }
     }
 
-    requestLocation();
+    run();
+
+    return () => {
+      // best-effort cleanup
+      (async () => {
+        try {
+          if (!watchId) return;
+          const { Capacitor } = await import("@capacitor/core");
+          if (!Capacitor.isNativePlatform()) return;
+          const { Geolocation } = await import("@capacitor/geolocation");
+          await Geolocation.clearWatch({ id: watchId });
+        } catch {
+          // ignore
+        }
+      })();
+    };
   }, []);
 
-  return null; // This component does not render UI
+  return null;
 }

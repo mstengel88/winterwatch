@@ -1,6 +1,3 @@
-import { App as CapApp } from "@capacitor/app";
-import { Browser } from "@capacitor/browser";
-import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/lib/supabase";
 
 const CALLBACK_PREFIX = "winterwatch://auth/callback";
@@ -12,15 +9,16 @@ async function handleAuthCallbackUrl(url: string) {
 
   // Close OAuth browser if open (native only)
   try {
+    const { Browser } = await import("@capacitor/browser");
     await Browser.close();
   } catch {
     // ignore
   }
 
   const u = new URL(url);
+
   const errorDesc =
     u.searchParams.get("error_description") || u.searchParams.get("error");
-
   if (errorDesc) {
     console.error("❌ OAuth callback error:", errorDesc);
     return false;
@@ -28,24 +26,18 @@ async function handleAuthCallbackUrl(url: string) {
 
   const code = u.searchParams.get("code");
 
-  // PKCE flow: ?code=...
-  if (code) {
-    console.log("🔁 Exchanging code for session...");
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      console.error("❌ exchangeCodeForSession error:", error);
-      return false;
-    }
-  } else {
-    // Fallback: token-in-url flow
-    const { error } = await supabase.auth.getSessionFromUrl({
-      url,
-      storeSession: true,
-    });
-    if (error) {
-      console.error("❌ getSessionFromUrl error:", error);
-      return false;
-    }
+  // If there's no code, nothing to exchange.
+  // (Some providers use token-in-url on web, but native/Supabase+Apple should be PKCE with code.)
+  if (!code) {
+    console.warn("⚠️ No code found in callback URL; skipping exchange.");
+    return false;
+  }
+
+  console.log("🔁 Exchanging code for session...");
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    console.error("❌ exchangeCodeForSession error:", error);
+    return false;
   }
 
   // Confirm session exists
@@ -57,7 +49,6 @@ async function handleAuthCallbackUrl(url: string) {
 
   console.log("✅ Session user:", data.session?.user?.id ?? "NONE");
 
-  // Kick back to app root to let routing/auth refresh cleanly
   if (data.session) {
     window.location.replace("/");
     return true;
@@ -67,12 +58,14 @@ async function handleAuthCallbackUrl(url: string) {
 }
 
 export async function initDeepLinkAuth() {
-  // HARD web guard
+  const { Capacitor } = await import("@capacitor/core");
   if (!Capacitor.isNativePlatform()) return;
+
+  const { App } = await import("@capacitor/app");
 
   // Cold start
   try {
-    const launch = await CapApp.getLaunchUrl();
+    const launch = await App.getLaunchUrl();
     if (launch?.url) {
       console.log("🚀 Launch URL:", launch.url);
       await handleAuthCallbackUrl(launch.url);
@@ -82,7 +75,7 @@ export async function initDeepLinkAuth() {
   }
 
   // Warm start
-  CapApp.addListener("appUrlOpen", async ({ url }) => {
+  App.addListener("appUrlOpen", async ({ url }) => {
     try {
       if (!url) return;
       await handleAuthCallbackUrl(url);
