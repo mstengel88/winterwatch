@@ -29,6 +29,7 @@ const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
 const AccountsPage = lazy(() => import("./pages/admin/AccountsPage"));
 const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
 const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
+const NotificationsPage = lazy(() => import("./pages/admin/NotificationsPage"));
 
 const queryClient = new QueryClient();
 
@@ -140,6 +141,7 @@ const AppRoutes = () => (
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="equipment" element={<EquipmentPage />} />
                 <Route path="reports" element={<ReportsPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

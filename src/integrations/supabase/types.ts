@@ -191,6 +191,9 @@ export type Database = {
           created_at: string
           geofence_alerts_enabled: boolean
           id: string
+          mandatory_admin_announcements: boolean | null
+          mandatory_geofence_alerts: boolean | null
+          mandatory_shift_status: boolean | null
           notification_sound: Database["public"]["Enums"]["notification_sound"]
           shift_status_enabled: boolean
           updated_at: string
@@ -201,6 +204,9 @@ export type Database = {
           created_at?: string
           geofence_alerts_enabled?: boolean
           id?: string
+          mandatory_admin_announcements?: boolean | null
+          mandatory_geofence_alerts?: boolean | null
+          mandatory_shift_status?: boolean | null
           notification_sound?: Database["public"]["Enums"]["notification_sound"]
           shift_status_enabled?: boolean
           updated_at?: string
@@ -211,6 +217,9 @@ export type Database = {
           created_at?: string
           geofence_alerts_enabled?: boolean
           id?: string
+          mandatory_admin_announcements?: boolean | null
+          mandatory_geofence_alerts?: boolean | null
+          mandatory_shift_status?: boolean | null
           notification_sound?: Database["public"]["Enums"]["notification_sound"]
           shift_status_enabled?: boolean
           updated_at?: string
@@ -222,6 +231,7 @@ export type Database = {
         Row: {
           body: string
           data: Json | null
+          delivery_status: string | null
           id: string
           notification_type: Database["public"]["Enums"]["notification_type"]
           onesignal_id: string | null
@@ -233,6 +243,7 @@ export type Database = {
         Insert: {
           body: string
           data?: Json | null
+          delivery_status?: string | null
           id?: string
           notification_type: Database["public"]["Enums"]["notification_type"]
           onesignal_id?: string | null
@@ -244,6 +255,7 @@ export type Database = {
         Update: {
           body?: string
           data?: Json | null
+          delivery_status?: string | null
           id?: string
           notification_type?: Database["public"]["Enums"]["notification_type"]
           onesignal_id?: string | null
@@ -383,6 +395,51 @@ export type Database = {
           player_id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      scheduled_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          data: Json | null
+          employee_id: string | null
+          id: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          send_at: string | null
+          sent_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          data?: Json | null
+          employee_id?: string | null
+          id?: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          send_at?: string | null
+          sent_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          data?: Json | null
+          employee_id?: string | null
+          id?: string
+          notification_type?: Database["public"]["Enums"]["notification_type"]
+          send_at?: string | null
+          sent_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
