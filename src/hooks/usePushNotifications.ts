@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
+const ONESIGNAL_APP_ID = 'aca519b5-1d17-4332-bc19-a54978fff31c';
+
 interface NotificationPreferences {
   shift_status_enabled: boolean;
   geofence_alerts_enabled: boolean;
@@ -108,78 +110,76 @@ export function usePushNotifications() {
     }
 
     try {
+      // Use OneSignal SDK for subscription id (player_id). This is what our edge functions target.
       // Dynamic import for native only
-      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const OneSignalMod = await import('onesignal-cordova-plugin');
+      const OneSignal = OneSignalMod.default;
 
-      // Check permission status
-      const permResult = await PushNotifications.checkPermissions();
-      setPermissionStatus(permResult.receive as 'granted' | 'denied' | 'prompt');
+      // Ensure initialized (native side also initializes, but JS init is safe and ensures the JS bridge is ready)
+      try {
+        OneSignal.initialize(ONESIGNAL_APP_ID);
+      } catch (e) {
+        // ignore if already initialized
+      }
 
-      if (permResult.receive === 'prompt') {
-        const requestResult = await PushNotifications.requestPermissions();
-        setPermissionStatus(requestResult.receive as 'granted' | 'denied' | 'prompt');
-        
-        if (requestResult.receive !== 'granted') {
-          console.log('Push notification permission denied');
+      // Associate OneSignal user with our Supabase user
+      OneSignal.login(user.id);
+
+      const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+      setPermissionStatus(hasPermission ? 'granted' : 'prompt');
+
+      if (!hasPermission) {
+        const accepted = await OneSignal.Notifications.requestPermission(true);
+        setPermissionStatus(accepted ? 'granted' : 'denied');
+        if (!accepted) {
           setIsLoading(false);
           return;
         }
-      } else if (permResult.receive !== 'granted') {
+      }
+
+      // Wait for subscription id to be available
+      const subscriptionId = await OneSignal.User.pushSubscription.getIdAsync();
+      const pushToken = await OneSignal.User.pushSubscription.getTokenAsync();
+
+      if (!subscriptionId) {
+        console.warn('OneSignal subscription id not available yet');
+        toast({
+          variant: 'destructive',
+          title: 'Push Setup Incomplete',
+          description: 'Notification permission granted, but device is not registered yet. Try again in a moment.',
+        });
         setIsLoading(false);
         return;
       }
 
-      // Register for push notifications
-      await PushNotifications.register();
-
-      // Listen for registration
-      PushNotifications.addListener('registration', async (token) => {
-        console.log('Push registration success, token:', token.value);
-        
-        // Store token in database
-        const platform = Capacitor.getPlatform();
-        const { error } = await supabase
-          .from('push_device_tokens')
-          .upsert({
+      const platform = Capacitor.getPlatform();
+      const { error } = await supabase
+        .from('push_device_tokens')
+        .upsert(
+          {
             user_id: user.id,
-            player_id: token.value,
+            player_id: subscriptionId,
             platform,
             device_name: navigator.userAgent,
             is_active: true,
-          }, {
+          },
+          {
             onConflict: 'user_id,player_id',
-          });
+          }
+        );
 
-        if (error) {
-          console.error('Error storing device token:', error);
-        } else {
-          setIsRegistered(true);
-        }
-      });
-
-      // Listen for registration errors
-      PushNotifications.addListener('registrationError', (error) => {
-        console.error('Push registration error:', error);
-      });
-
-      // Listen for push notifications received
-      PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        console.log('Push notification received:', notification);
+      if (error) {
+        console.error('Error storing OneSignal subscription id:', error);
         toast({
-          title: notification.title || 'Notification',
-          description: notification.body,
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to register device for push notifications',
         });
-      });
+        return;
+      }
 
-      // Listen for action performed on notification
-      PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-        console.log('Push notification action:', action);
-        // Handle navigation based on notification data
-        const notificationData = action.notification.data;
-        if (notificationData?.navigation_path) {
-          window.location.href = notificationData.navigation_path;
-        }
-      });
+      console.log('OneSignal registered', { subscriptionId, hasPushToken: !!pushToken, platform });
+      setIsRegistered(true);
 
     } catch (err) {
       console.error('Error registering for push:', err);
