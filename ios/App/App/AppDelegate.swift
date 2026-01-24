@@ -18,11 +18,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             "aca519b5-1d17-4332-bc19-a54978fff31c",
             withLaunchOptions: launchOptions
         )
-        
-        // Prompt for push permission
-        OneSignal.Notifications.requestPermission({ accepted in
-            print("User accepted notifications: \(accepted)")
-        }, fallbackToSettings: false)
+
+        // IMPORTANT:
+        // Do NOT prompt for notification permission on launch.
+        // On iOS (especially 18.2+), showing system prompts during early app lifecycle
+        // can break WKWebView text interactions (taps/focus/keyboard).
+        // Permission should be requested only from an explicit user action in the UI.
         
         return true
     }
