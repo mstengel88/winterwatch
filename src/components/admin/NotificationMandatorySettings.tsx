@@ -4,46 +4,54 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, Loader2, Clock, MapPin, Megaphone, Save } from 'lucide-react';
+import { Shield, Loader2, Save, Lock, Bell } from 'lucide-react';
 
-interface SystemNotificationType {
+interface NotificationType {
+  id: string;
   name: string;
+  label: string;
+  is_system: boolean;
   is_mandatory: boolean;
+  is_active: boolean;
 }
-
-const SYSTEM_TYPES = [
-  { name: 'shift_status', label: 'Shift Status Notifications', icon: Clock, color: 'text-blue-500' },
-  { name: 'geofence_alert', label: 'Geofence Alert Notifications', icon: MapPin, color: 'text-orange-500' },
-  { name: 'admin_announcement', label: 'Admin Announcement Notifications', icon: Megaphone, color: 'text-purple-500' },
-];
 
 export function NotificationMandatorySettings() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [types, setTypes] = useState<NotificationType[]>([]);
   const [settings, setSettings] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetchSystemTypes();
+    fetchNotificationTypes();
   }, []);
 
-  const fetchSystemTypes = async () => {
+  const fetchNotificationTypes = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('notification_types')
-        .select('name, is_mandatory')
-        .eq('is_system', true);
+        .select('id, name, label, is_system, is_mandatory, is_active')
+        .eq('is_active', true)
+        .order('is_system', { ascending: false })
+        .order('label');
 
       if (error) {
         console.error('Error fetching notification types:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load notification types',
+        });
         return;
       }
 
+      setTypes(data || []);
       const settingsMap: Record<string, boolean> = {};
       data?.forEach((type) => {
-        settingsMap[type.name] = type.is_mandatory;
+        settingsMap[type.id] = type.is_mandatory;
       });
       setSettings(settingsMap);
     } catch (err) {
@@ -56,13 +64,12 @@ export function NotificationMandatorySettings() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Update each system notification type's is_mandatory flag
-      const updates = Object.entries(settings).map(([name, is_mandatory]) =>
+      // Update each notification type's is_mandatory flag
+      const updates = Object.entries(settings).map(([id, is_mandatory]) =>
         supabase
           .from('notification_types')
           .update({ is_mandatory })
-          .eq('name', name)
-          .eq('is_system', true)
+          .eq('id', id)
       );
 
       const results = await Promise.all(updates);
@@ -111,31 +118,45 @@ export function NotificationMandatorySettings() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-4">
-          {SYSTEM_TYPES.map(({ name, label, icon: Icon, color }) => (
-            <div key={name} className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center gap-3">
-                <Icon className={`h-5 w-5 ${color}`} />
-                <div>
-                  <Label className="text-sm font-medium">{label}</Label>
-                  <p className="text-xs text-muted-foreground">
-                    {settings[name]
-                      ? 'Mandatory - employees cannot disable'
-                      : 'Optional - employees can disable'}
-                  </p>
+        {types.length === 0 ? (
+          <p className="text-center text-muted-foreground py-4">
+            No active notification types found
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {types.map((type) => (
+              <div key={type.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">{type.label}</Label>
+                      {type.is_system && (
+                        <Badge variant="secondary" className="gap-1 text-xs">
+                          <Lock className="h-3 w-3" />
+                          System
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {settings[type.id]
+                        ? 'Mandatory - employees cannot disable'
+                        : 'Optional - employees can disable'}
+                    </p>
+                  </div>
                 </div>
+                <Switch
+                  checked={settings[type.id] || false}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, [type.id]: checked }))
+                  }
+                />
               </div>
-              <Switch
-                checked={settings[name] || false}
-                onCheckedChange={(checked) =>
-                  setSettings((prev) => ({ ...prev, [name]: checked }))
-                }
-              />
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        <Button onClick={handleSave} disabled={isSaving} className="w-full">
+        <Button onClick={handleSave} disabled={isSaving || types.length === 0} className="w-full">
           {isSaving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
