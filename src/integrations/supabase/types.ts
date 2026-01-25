@@ -363,7 +363,15 @@ export type Database = {
           threshold_hours?: number
           time_clock_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "overtime_notifications_sent_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
