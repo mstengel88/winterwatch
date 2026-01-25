@@ -95,6 +95,47 @@ Deno.serve(async (req) => {
 
     const { user_ids, notification_type, title, body, data, broadcast } = payload;
 
+    // Input validation
+    const validTypes = ['shift_status', 'geofence_alert', 'admin_announcement'];
+    if (!notification_type || !validTypes.includes(notification_type)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid notification type" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate title (required, 1-100 characters)
+    if (!title || typeof title !== 'string' || title.trim().length === 0 || title.length > 100) {
+      return new Response(
+        JSON.stringify({ error: "Title must be 1-100 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate body (required, 1-500 characters)
+    if (!body || typeof body !== 'string' || body.trim().length === 0 || body.length > 500) {
+      return new Response(
+        JSON.stringify({ error: "Body must be 1-500 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate user_ids array size if provided
+    if (user_ids && Array.isArray(user_ids) && user_ids.length > 1000) {
+      return new Response(
+        JSON.stringify({ error: "Cannot send to more than 1000 users at once" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate data payload size if provided
+    if (data && JSON.stringify(data).length > 10000) {
+      return new Response(
+        JSON.stringify({ error: "Data payload too large (max 10KB)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Get target users
     let targetUserIds: string[] = [];
     
