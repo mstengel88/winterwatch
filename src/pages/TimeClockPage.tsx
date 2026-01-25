@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
 import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Play, Square, LogOut, Pencil } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInMinutes, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
@@ -69,6 +70,8 @@ export default function TimeClockPage() {
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('7');
   const [clockingOut, setClockingOut] = useState<string | null>(null);
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
+  const [pendingClockOut, setPendingClockOut] = useState<{ entryId: string; employeeName: string } | null>(null);
 
   const fetchEntries = async () => {
     setIsLoading(true);
@@ -98,8 +101,17 @@ export default function TimeClockPage() {
     fetchEntries();
   }, [dateFilter]);
 
-  const handleClockOut = async (entryId: string) => {
+  const handleClockOutClick = (entryId: string, employeeName: string) => {
+    setPendingClockOut({ entryId, employeeName });
+    setShowClockOutConfirm(true);
+  };
+
+  const handleClockOutConfirm = async () => {
+    if (!pendingClockOut) return;
+    
+    const { entryId } = pendingClockOut;
     setClockingOut(entryId);
+    
     try {
       // Capture GPS location
       let clockOutLocation: { latitude: number; longitude: number } | null = null;
@@ -145,6 +157,7 @@ export default function TimeClockPage() {
       toast.error('Failed to clock out employee');
     } finally {
       setClockingOut(null);
+      setPendingClockOut(null);
     }
   };
 
@@ -429,7 +442,12 @@ export default function TimeClockPage() {
                               <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => handleClockOut(entry.id)}
+                                onClick={() => handleClockOutClick(
+                                  entry.id, 
+                                  entry.employee 
+                                    ? `${entry.employee.first_name} ${entry.employee.last_name}` 
+                                    : 'Employee'
+                                )}
                                 disabled={clockingOut === entry.id}
                                 className="h-7 px-2"
                               >
@@ -454,6 +472,13 @@ export default function TimeClockPage() {
           </Card>
         </div>
       </div>
+      
+      <ClockOutConfirmDialog
+        open={showClockOutConfirm}
+        onOpenChange={setShowClockOutConfirm}
+        onConfirm={handleClockOutConfirm}
+        employeeName={pendingClockOut?.employeeName}
+      />
     </AppLayout>
   );
 }
