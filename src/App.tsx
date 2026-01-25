@@ -15,7 +15,7 @@ import { LocationBootstrap } from "@/components/LocationBootstrap";
 import { IosInputFocusFix } from "@/components/ios/IosInputFocusFix";
 import { Capacitor } from "@capacitor/core";
 import AuthCallback from "./pages/AuthCallback";
-import { NativeDebugOverlay } from "@/components/debug/NativeDebugOverlay";
+import { PostLoginNotificationPrompt } from "@/components/notifications/PostLoginNotificationPrompt";
 
 // Lazy load pages
 import DriverDashboard from "./pages/DriverDashboard";
@@ -49,7 +49,7 @@ const AppRoutes = () => (
     <BrowserRouter>
       <TooltipProvider>
         <AuthProvider>
-          <NativeDebugOverlay />
+          
           {/*
             Native iOS "safe mode": we've observed WebKit/WebProcess instability on
             iOS 18.x where early native-bridge calls can lead to WebView process termination
@@ -69,6 +69,7 @@ const AppRoutes = () => (
           <Sonner />
           <OfflineIndicator />
           <InstallPrompt />
+          <PostLoginNotificationPrompt />
 
           <Suspense fallback={<PageLoader />}>
             <Routes>
