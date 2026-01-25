@@ -6,6 +6,13 @@ import OneSignalFramework
 /// Custom bridge controller to mitigate iOS 18+ WKWebView gesture deferral issues
 /// that can make the UI feel completely non-interactive (taps not delivered).
 class BridgeViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        // Ensure our local Swift plugin is always registered at runtime.
+        // This is the most reliable approach when auto-registration is flaky.
+        bridge?.registerPluginInstance(OneSignalBridgePlugin())
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         applyTouchMitigationsIfPossible()
