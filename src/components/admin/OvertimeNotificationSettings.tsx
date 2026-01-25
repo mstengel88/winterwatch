@@ -45,8 +45,8 @@ export function OvertimeNotificationSettings() {
     notify_admins: true,
   });
 
-  // Get the global setting if it exists
-  const globalSetting = settings.find(s => s.employee_id === null);
+  // Separate global settings from individual settings
+  const globalSettings = settings.filter(s => s.employee_id === null);
   const individualSettings = settings.filter(s => s.employee_id !== null);
 
   const fetchData = useCallback(async () => {
@@ -200,8 +200,8 @@ export function OvertimeNotificationSettings() {
     emp => !individualSettings.some(s => s.employee_id === emp.id) || editingSetting?.employee_id === emp.id
   );
 
-  // Check if global setting option should be available
-  const canAddGlobal = !globalSetting || editingSetting?.employee_id === null;
+  // Global setting is always available (can have multiple)
+  const canAddGlobal = true;
 
   if (isLoading) {
     return (
@@ -253,9 +253,9 @@ export function OvertimeNotificationSettings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {/* Show global setting first if exists */}
-                  {globalSetting && (
-                    <tr className="hover:bg-muted/20 transition-colors bg-primary/5">
+                  {/* Show global settings first */}
+                  {globalSettings.map((globalSetting) => (
+                    <tr key={globalSetting.id} className="hover:bg-muted/20 transition-colors bg-primary/5">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
@@ -318,7 +318,7 @@ export function OvertimeNotificationSettings() {
                         </div>
                       </td>
                     </tr>
-                  )}
+                  ))}
                   {/* Individual employee settings */}
                   {individualSettings.map((setting) => (
                     <tr key={setting.id} className="hover:bg-muted/20 transition-colors">
