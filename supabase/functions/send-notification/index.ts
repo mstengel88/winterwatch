@@ -5,6 +5,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface ActionButton {
+  id: string;
+  text: string;
+}
+
 interface NotificationPayload {
   user_ids?: string[];
   notification_type: "shift_status" | "geofence_alert" | "admin_announcement";
@@ -13,6 +18,9 @@ interface NotificationPayload {
   data?: Record<string, unknown>;
   // For broadcast to all users (admin announcements)
   broadcast?: boolean;
+  // iOS action buttons
+  ios_category?: string;
+  buttons?: ActionButton[];
 }
 
 interface NotificationPreference {
@@ -93,7 +101,7 @@ Deno.serve(async (req) => {
     const payload: NotificationPayload = await req.json();
     console.log("Notification payload:", JSON.stringify(payload));
 
-    const { user_ids, notification_type, title, body, data, broadcast } = payload;
+    const { user_ids, notification_type, title, body, data, broadcast, ios_category, buttons } = payload;
 
     // Input validation
     const validTypes = ['shift_status', 'geofence_alert', 'admin_announcement'];
@@ -103,7 +111,6 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
     // Validate title (required, 1-100 characters)
     if (!title || typeof title !== 'string' || title.trim().length === 0 || title.length > 100) {
       return new Response(
@@ -226,8 +233,8 @@ Deno.serve(async (req) => {
     const firstUserPrefs = prefsMap.get(eligibleUserIds[0]);
     const iosSound = soundMap[firstUserPrefs?.notification_sound || "default"] || "default";
 
-    // Send via OneSignal
-    const oneSignalPayload = {
+    // Build OneSignal payload
+    const oneSignalPayload: Record<string, unknown> = {
       app_id: oneSignalAppId,
       include_player_ids: uniquePlayerIds,
       headings: { en: title },
@@ -238,6 +245,14 @@ Deno.serve(async (req) => {
       },
       ios_sound: iosSound,
     };
+
+    // Add action buttons if provided (for overtime notifications)
+    if (ios_category) {
+      oneSignalPayload.ios_category = ios_category;
+    }
+    if (buttons && buttons.length > 0) {
+      oneSignalPayload.buttons = buttons;
+    }
 
     console.log("OneSignal payload:", JSON.stringify(oneSignalPayload));
 
