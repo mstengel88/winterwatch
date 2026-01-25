@@ -3,18 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-
-const ONESIGNAL_APP_ID = 'aca519b5-1d17-4332-bc19-a54978fff31c';
-
-// Type declaration for OneSignal global
-declare global {
-  interface Window {
-    plugins?: {
-      OneSignal?: any;
-    };
-    OneSignalDeferred?: any[];
-  }
-}
+import OneSignalBridge from '@/plugins/OneSignalBridge';
 
 interface NotificationPreferences {
   shift_status_enabled: boolean;
@@ -35,103 +24,6 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
   mandatory_geofence_alerts: false,
   mandatory_admin_announcements: false,
 };
-
-/**
- * Wait for Cordova deviceready event
- * CRITICAL: Plugins only become available AFTER this event fires
- */
-async function waitForDeviceReady(timeoutMs = 10000): Promise<boolean> {
-  // If not in Cordova environment, resolve immediately
-  if (typeof (window as any).cordova === 'undefined') {
-    // Check if plugins already exist (may be pre-loaded)
-    if (window.plugins?.OneSignal) {
-      console.log('[Push] deviceready: Plugins already available');
-      return true;
-    }
-    console.log('[Push] deviceready: No Cordova detected, checking for plugins...');
-    // Wait a bit and check again - Capacitor may load plugins differently
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return !!window.plugins?.OneSignal;
-  }
-  
-  return new Promise((resolve) => {
-    // Check if already fired
-    if ((document as any).deviceReadyFired || (window as any).cordova?.platformId) {
-      console.log('[Push] deviceready: Already fired or platform initialized');
-      resolve(true);
-      return;
-    }
-    
-    const timer = setTimeout(() => {
-      console.log('[Push] deviceready: Timeout after', timeoutMs, 'ms');
-      resolve(false);
-    }, timeoutMs);
-    
-    document.addEventListener('deviceready', () => {
-      clearTimeout(timer);
-      (document as any).deviceReadyFired = true;
-      console.log('[Push] deviceready: Event fired!');
-      resolve(true);
-    }, { once: true });
-  });
-}
-
-/**
- * Get OneSignal instance from the global window object
- * Cordova plugins register themselves globally, not as ES modules
- */
-function getOneSignalSync(): any | null {
-  // Try the standard Cordova plugin location (most common for v5)
-  if (window.plugins?.OneSignal) {
-    return window.plugins.OneSignal;
-  }
-  // Try direct window reference (check it has expected methods)
-  if ((window as any).OneSignal && typeof (window as any).OneSignal.initialize === 'function') {
-    return (window as any).OneSignal;
-  }
-  // Try cordova.plugins path
-  if ((window as any).cordova?.plugins?.OneSignal) {
-    return (window as any).cordova.plugins.OneSignal;
-  }
-  return null;
-}
-
-/**
- * Wait for OneSignal to be available on the window object
- * Cordova plugins may take time to initialize after deviceready
- */
-async function waitForOneSignal(maxAttempts = 20, delayMs = 500): Promise<any | null> {
-  // First wait for deviceready
-  const deviceReady = await waitForDeviceReady();
-  console.log('[Push] Device ready result:', deviceReady);
-  
-  // Give plugins extra time to register after deviceready
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const oneSignal = getOneSignalSync();
-    if (oneSignal) {
-      console.log(`[Push] OneSignal found on attempt ${attempt}`);
-      return oneSignal;
-    }
-    
-    // Log detailed debug info
-    const debugInfo = {
-      hasWindowPlugins: !!window.plugins,
-      windowPluginsKeys: Object.keys(window.plugins || {}),
-      hasCordova: !!(window as any).cordova,
-      cordovaPlatform: (window as any).cordova?.platformId,
-      cordovaPluginsKeys: Object.keys((window as any).cordova?.plugins || {}),
-      hasDirectOneSignal: !!(window as any).OneSignal,
-    };
-    console.log(`[Push] Attempt ${attempt}/${maxAttempts}:`, JSON.stringify(debugInfo));
-    
-    if (attempt < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-  return null;
-}
 
 export function usePushNotifications() {
   const { user } = useAuth();
@@ -210,7 +102,7 @@ export function usePushNotifications() {
     }
   }, [user, preferences, toast]);
 
-  // Register device with OneSignal
+  // Register device with OneSignal using native Capacitor plugin
   const registerDevice = useCallback(async () => {
     if (!user || !Capacitor.isNativePlatform()) {
       console.log('[Push] Skipping registration - not native or no user');
@@ -219,49 +111,20 @@ export function usePushNotifications() {
     }
 
     try {
-      // Wait for OneSignal plugin to be available (may take time after app launch)
-      const OneSignal = await waitForOneSignal();
+      console.log('[Push] Starting native registration via Capacitor plugin...');
       
-      if (!OneSignal) {
-        const availablePlugins = Object.keys(window.plugins || {});
-        const hasCordova = !!(window as any).cordova;
-        console.error('[Push] OneSignal not found after retries. Debug info:', {
-          hasWindowPlugins: !!window.plugins,
-          hasWindowOneSignal: !!(window as any).OneSignal,
-          hasCordova,
-          availablePlugins,
-          cordovaPlugins: hasCordova ? Object.keys((window as any).cordova?.plugins || {}) : []
-        });
-        toast({
-          variant: 'destructive',
-          title: 'Push Not Available',
-          description: `OneSignal plugin not found. Available: ${availablePlugins.join(', ') || 'none'}. Rebuild with: npx cap sync ios`,
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      console.log('[Push] Found OneSignal plugin, initializing...');
-      
-      // Ensure initialized
-      try {
-        OneSignal.initialize(ONESIGNAL_APP_ID);
-        console.log('[Push] OneSignal initialized with app ID:', ONESIGNAL_APP_ID);
-      } catch (e) {
-        console.log('[Push] OneSignal already initialized or error:', e);
-      }
-
       // Associate OneSignal user with our Supabase user
       console.log('[Push] Logging in user:', user.id);
-      OneSignal.login(user.id);
+      await OneSignalBridge.login({ externalId: user.id });
 
-      const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+      // Check current permission status
+      const { granted: hasPermission } = await OneSignalBridge.getPermissionStatus();
       console.log('[Push] Current permission status:', hasPermission);
       setPermissionStatus(hasPermission ? 'granted' : 'prompt');
 
       if (!hasPermission) {
         console.log('[Push] Requesting permission...');
-        const accepted = await OneSignal.Notifications.requestPermission(true);
+        const { accepted } = await OneSignalBridge.requestPermission();
         console.log('[Push] Permission result:', accepted);
         setPermissionStatus(accepted ? 'granted' : 'denied');
         if (!accepted) {
@@ -270,20 +133,22 @@ export function usePushNotifications() {
         }
       }
 
-      // Wait for subscription id with retry logic
+      // Get subscription ID with retry logic (may take time to become available)
       let subscriptionId: string | null = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        console.log(`[Push] Attempt ${attempt + 1} to get subscription ID...`);
-        subscriptionId = await OneSignal.User.pushSubscription.getIdAsync();
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        console.log(`[Push] Attempt ${attempt}/10 to get subscription ID...`);
+        const result = await OneSignalBridge.getSubscriptionId();
+        subscriptionId = result.subscriptionId;
         if (subscriptionId) {
           console.log('[Push] Got subscription ID:', subscriptionId);
           break;
         }
-        // Wait 1 second before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait 500ms before retrying
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const pushToken = await OneSignal.User.pushSubscription.getTokenAsync();
+      // Also get push token for logging
+      const { token: pushToken } = await OneSignalBridge.getPushToken();
       console.log('[Push] Push token available:', !!pushToken);
 
       if (!subscriptionId) {
@@ -362,6 +227,15 @@ export function usePushNotifications() {
         return;
       }
 
+      // Logout from OneSignal on native
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await OneSignalBridge.logout();
+        } catch (e) {
+          console.log('[Push] OneSignal logout error (may be fine):', e);
+        }
+      }
+
       setIsRegistered(false);
       toast({
         title: 'Unregistered',
@@ -404,17 +278,12 @@ export function usePushNotifications() {
         console.error('[Push] Error checking existing registration:', err);
       }
       
-      // On native platforms, check permission status using global OneSignal
+      // On native platforms, check permission status using the Capacitor plugin
       if (Capacitor.isNativePlatform()) {
         try {
-          const OneSignal = getOneSignalSync();
-          if (OneSignal) {
-            const hasPermission = await OneSignal.Notifications.getPermissionAsync();
-            setPermissionStatus(hasPermission ? 'granted' : 'prompt');
-            console.log('[Push] Permission status checked:', hasPermission);
-          } else {
-            console.log('[Push] OneSignal not available for permission check');
-          }
+          const { granted } = await OneSignalBridge.getPermissionStatus();
+          setPermissionStatus(granted ? 'granted' : 'prompt');
+          console.log('[Push] Permission status checked:', granted);
         } catch (e) {
           console.log('[Push] Could not check permission:', e);
         }
