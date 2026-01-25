@@ -23,9 +23,34 @@ serve(async (req) => {
   try {
     const { latitude, longitude } = await req.json();
 
-    if (!latitude || !longitude) {
+    // Validate latitude and longitude are provided
+    if (latitude === undefined || latitude === null || longitude === undefined || longitude === null) {
       return new Response(
         JSON.stringify({ error: "Latitude and longitude are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate types - must be numbers
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      return new Response(
+        JSON.stringify({ error: "Latitude and longitude must be numbers" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate latitude range (-90 to 90)
+    if (latitude < -90 || latitude > 90) {
+      return new Response(
+        JSON.stringify({ error: "Latitude must be between -90 and 90" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate longitude range (-180 to 180)
+    if (longitude < -180 || longitude > 180) {
+      return new Response(
+        JSON.stringify({ error: "Longitude must be between -180 and 180" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
