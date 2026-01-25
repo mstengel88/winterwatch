@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -5,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Bell, Clock, MapPin, Megaphone, Volume2, Lock } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const SOUND_OPTIONS = [
@@ -27,6 +27,8 @@ export function NotificationSettings() {
     unregisterDevice,
     isNativePlatform,
   } = usePushNotifications();
+  
+  const [isToggling, setIsToggling] = useState(false);
 
   if (!isNativePlatform) {
     return (
@@ -72,6 +74,21 @@ export function NotificationSettings() {
   const isMandatoryGeofence = preferences.mandatory_geofence_alerts;
   const isMandatoryAnnouncements = preferences.mandatory_admin_announcements;
 
+  const handleMasterToggle = async (enabled: boolean) => {
+    setIsToggling(true);
+    try {
+      if (enabled) {
+        await registerDevice();
+      } else {
+        await unregisterDevice();
+      }
+    } catch (err) {
+      console.error('[NotificationSettings] Toggle failed:', err);
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -100,12 +117,26 @@ export function NotificationSettings() {
           </div>
         )}
 
-        {/* Master Toggle */}
-        {permissionStatus === 'granted' && !isRegistered && (
-          <Button onClick={registerDevice} className="w-full">
-            Enable Push Notifications
-          </Button>
-        )}
+        {/* Master Enable/Disable Switch */}
+        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-primary" />
+            <div>
+              <Label htmlFor="push-master" className="text-sm font-medium">
+                Push Notifications
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {isRegistered ? 'Receiving notifications on this device' : 'Enable to receive alerts'}
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="push-master"
+            checked={isRegistered}
+            disabled={isToggling || permissionStatus === 'denied'}
+            onCheckedChange={handleMasterToggle}
+          />
+        </div>
 
         {isRegistered && (
           <>
@@ -238,17 +269,6 @@ export function NotificationSettings() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Disable Button */}
-            <div className="pt-4 border-t">
-              <Button 
-                variant="outline" 
-                onClick={unregisterDevice}
-                className="w-full text-muted-foreground"
-              >
-                Disable Push Notifications
-              </Button>
             </div>
           </>
         )}
