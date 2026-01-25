@@ -106,15 +106,28 @@ export function usePushNotifications() {
   // Register device with OneSignal
   const registerDevice = useCallback(async () => {
     if (!user || !Capacitor.isNativePlatform()) {
+      console.log('[Push] Skipping registration - not native or no user');
       setIsLoading(false);
       return;
     }
 
     try {
       // Use OneSignal SDK for subscription id (player_id). This is what our edge functions target.
-      // Dynamic import for native only
-      const OneSignalMod = await import('onesignal-cordova-plugin');
-      const OneSignal = OneSignalMod.default;
+      // Dynamic import for native only - this will fail on web builds where the plugin is externalized
+      let OneSignal: any;
+      try {
+        const OneSignalMod = await import('onesignal-cordova-plugin');
+        OneSignal = OneSignalMod.default;
+      } catch (importError) {
+        console.error('[Push] Failed to import OneSignal plugin:', importError);
+        toast({
+          variant: 'destructive',
+          title: 'Push Not Available',
+          description: 'Push notifications require the native app. Please rebuild with npx cap sync.',
+        });
+        setIsLoading(false);
+        return;
+      }
 
       console.log('[Push] Initializing OneSignal...');
       
