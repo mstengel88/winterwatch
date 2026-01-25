@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Clock, Bell, Loader2, Plus, Pencil, Trash2, Users, Play } from 'lucide-react';
+import { OvertimeNotificationHistory } from './OvertimeNotificationHistory';
 
 interface OvertimeSetting {
   id: string;
@@ -539,6 +540,9 @@ export function OvertimeNotificationSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Notification History */}
+      <OvertimeNotificationHistory />
     </div>
   );
 }

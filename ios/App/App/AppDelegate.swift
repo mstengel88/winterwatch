@@ -12,6 +12,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        // Register notification categories with action buttons BEFORE OneSignal initializes
+        registerNotificationCategories()
+        
+        // Set ourselves as the notification center delegate
+        UNUserNotificationCenter.current().delegate = self
+        
         // Initialize OneSignal (do NOT request permission here - defer to user action in Settings)
         // Requesting permissions at startup can interfere with WKWebView focus on iOS 18.x
         OneSignal.initialize(
@@ -20,6 +26,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         )
         // Permission will be requested when user taps "Enable" in app Settings
         return true
+    }
+    
+    // MARK: - Notification Categories
+    
+    private func registerNotificationCategories() {
+        // Define actions for overtime notifications
+        let stayOnShiftAction = UNNotificationAction(
+            identifier: "stay_on_shift",
+            title: "Stay on Shift",
+            options: [.foreground]
+        )
+        
+        let stopShiftAction = UNNotificationAction(
+            identifier: "stop_shift",
+            title: "Stop Shift",
+            options: [.foreground, .destructive]
+        )
+        
+        // Create the overtime action category
+        let overtimeCategory = UNNotificationCategory(
+            identifier: "overtime_action",
+            actions: [stayOnShiftAction, stopShiftAction],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+        
+        // Register the category
+        UNUserNotificationCenter.current().setNotificationCategories([overtimeCategory])
     }
     
     
