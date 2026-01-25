@@ -40,7 +40,7 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
  * Get OneSignal instance from the global window object
  * Cordova plugins register themselves globally, not as ES modules
  */
-function getOneSignal(): any | null {
+function getOneSignalSync(): any | null {
   // Try the standard Cordova plugin location
   if (window.plugins?.OneSignal) {
     return window.plugins.OneSignal;
@@ -48,6 +48,29 @@ function getOneSignal(): any | null {
   // Try direct window reference (some versions)
   if ((window as any).OneSignal) {
     return (window as any).OneSignal;
+  }
+  // Try cordova.plugins path
+  if ((window as any).cordova?.plugins?.OneSignal) {
+    return (window as any).cordova.plugins.OneSignal;
+  }
+  return null;
+}
+
+/**
+ * Wait for OneSignal to be available on the window object
+ * Cordova plugins may take time to initialize after app launch
+ */
+async function waitForOneSignal(maxAttempts = 10, delayMs = 300): Promise<any | null> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const oneSignal = getOneSignalSync();
+    if (oneSignal) {
+      console.log(`[Push] OneSignal found on attempt ${attempt}`);
+      return oneSignal;
+    }
+    console.log(`[Push] OneSignal not found, attempt ${attempt}/${maxAttempts}. window.plugins:`, Object.keys(window.plugins || {}));
+    if (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
   }
   return null;
 }
@@ -138,19 +161,23 @@ export function usePushNotifications() {
     }
 
     try {
-      // Get OneSignal from global window object (Cordova plugins register globally)
-      const OneSignal = getOneSignal();
+      // Wait for OneSignal plugin to be available (may take time after app launch)
+      const OneSignal = await waitForOneSignal();
       
       if (!OneSignal) {
-        console.error('[Push] OneSignal not found on window. Available:', {
-          plugins: !!window.plugins,
-          OneSignal: !!(window as any).OneSignal,
-          keys: Object.keys(window.plugins || {})
+        const availablePlugins = Object.keys(window.plugins || {});
+        const hasCordova = !!(window as any).cordova;
+        console.error('[Push] OneSignal not found after retries. Debug info:', {
+          hasWindowPlugins: !!window.plugins,
+          hasWindowOneSignal: !!(window as any).OneSignal,
+          hasCordova,
+          availablePlugins,
+          cordovaPlugins: hasCordova ? Object.keys((window as any).cordova?.plugins || {}) : []
         });
         toast({
           variant: 'destructive',
           title: 'Push Not Available',
-          description: 'OneSignal plugin not loaded. Please rebuild: npm run build && npx cap sync ios',
+          description: `OneSignal plugin not found. Available: ${availablePlugins.join(', ') || 'none'}. Rebuild with: npx cap sync ios`,
         });
         setIsLoading(false);
         return;
@@ -322,7 +349,7 @@ export function usePushNotifications() {
       // On native platforms, check permission status using global OneSignal
       if (Capacitor.isNativePlatform()) {
         try {
-          const OneSignal = getOneSignal();
+          const OneSignal = getOneSignalSync();
           if (OneSignal) {
             const hasPermission = await OneSignal.Notifications.getPermissionAsync();
             setPermissionStatus(hasPermission ? 'granted' : 'prompt');
