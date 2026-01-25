@@ -1,9 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { useOvertimeAction } from '@/hooks/useOvertimeAction';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2 } from 'lucide-react';
+
+interface PendingStopShift {
+  timeClockId: string;
+  employeeId: string;
+}
 
 /**
  * Listens for push notification action button taps (e.g., "Stop Shift", "Stay on Shift")
@@ -14,6 +30,38 @@ export function NotificationActionHandler() {
   const { user } = useAuth();
   const { toast } = useToast();
   const listenerRef = useRef<PluginListenerHandle | null>(null);
+  
+  // State for confirmation dialog
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingStopShift, setPendingStopShift] = useState<PendingStopShift | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Handle confirmed stop shift
+  const handleConfirmStopShift = async () => {
+    if (!pendingStopShift) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await stopShift(pendingStopShift.timeClockId, pendingStopShift.employeeId);
+      if (result.success) {
+        // Force a page refresh to update the UI
+        window.location.reload();
+      }
+    } finally {
+      setIsProcessing(false);
+      setShowConfirmDialog(false);
+      setPendingStopShift(null);
+    }
+  };
+
+  const handleCancelStopShift = () => {
+    setShowConfirmDialog(false);
+    setPendingStopShift(null);
+    toast({
+      title: 'Shift Continues',
+      description: 'Your shift was not ended.',
+    });
+  };
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -67,11 +115,9 @@ export function NotificationActionHandler() {
       console.log('[NotificationAction] Handling action:', { action, timeClockId, employeeId });
       
       if (action === 'stop_shift') {
-        const result = await stopShift(timeClockId, employeeId);
-        if (result.success) {
-          // Force a page refresh to update the UI
-          window.location.reload();
-        }
+        // Show confirmation dialog instead of immediately stopping
+        setPendingStopShift({ timeClockId, employeeId });
+        setShowConfirmDialog(true);
       } else if (action === 'stay_on_shift') {
         await stayOnShift(timeClockId, employeeId);
         toast({
@@ -90,7 +136,7 @@ export function NotificationActionHandler() {
       listenerRef.current?.remove();
       window.removeEventListener('pushNotificationActionPerformed', handleNativeAction as EventListener);
     };
-  }, [user, stopShift, stayOnShift, toast]);
+  }, [user, stayOnShift, toast]);
 
   // Also handle when app is opened from a notification
   useEffect(() => {
@@ -115,5 +161,29 @@ export function NotificationActionHandler() {
     return () => clearTimeout(timeout);
   }, [user]);
 
-  return null;
+  return (
+    <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>End Your Shift?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to clock out? This will end your current shift and record your clock-out time.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleCancelStopShift} disabled={isProcessing}>
+            Keep Working
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmStopShift}
+            disabled={isProcessing}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            End Shift
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
