@@ -756,7 +756,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "driver" | "shovel_crew" | "client"
+      app_role:
+        | "admin"
+        | "manager"
+        | "driver"
+        | "shovel_crew"
+        | "client"
+        | "work_log_viewer"
       employee_category: "plow" | "shovel" | "both"
       notification_sound: "default" | "chime" | "bell" | "alert" | "none"
       notification_type:
@@ -892,7 +898,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "driver", "shovel_crew", "client"],
+      app_role: [
+        "admin",
+        "manager",
+        "driver",
+        "shovel_crew",
+        "client",
+        "work_log_viewer",
+      ],
       employee_category: ["plow", "shovel", "both"],
       notification_sound: ["default", "chime", "bell", "alert", "none"],
       notification_type: [
