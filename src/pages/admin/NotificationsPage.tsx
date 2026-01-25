@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Bell, Send, History, Settings2 } from 'lucide-react';
@@ -8,7 +8,16 @@ import { SendNotificationForm } from '@/components/admin/SendNotificationForm';
 import { NotificationMandatorySettings } from '@/components/admin/NotificationMandatorySettings';
 
 export default function NotificationsPage() {
-  const [activeTab, setActiveTab] = useState('history');
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || 'history');
+
+  // Sync tab from URL on mount or when URL changes
+  useEffect(() => {
+    if (tabFromUrl && ['history', 'send', 'settings'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   return (
     <div className="container py-6 px-4 max-w-6xl">

@@ -6,6 +6,16 @@ import { useToast } from '@/hooks/use-toast';
 
 const ONESIGNAL_APP_ID = 'aca519b5-1d17-4332-bc19-a54978fff31c';
 
+// Type declaration for OneSignal global
+declare global {
+  interface Window {
+    plugins?: {
+      OneSignal?: any;
+    };
+    OneSignalDeferred?: any[];
+  }
+}
+
 interface NotificationPreferences {
   shift_status_enabled: boolean;
   geofence_alerts_enabled: boolean;
@@ -25,6 +35,22 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
   mandatory_geofence_alerts: false,
   mandatory_admin_announcements: false,
 };
+
+/**
+ * Get OneSignal instance from the global window object
+ * Cordova plugins register themselves globally, not as ES modules
+ */
+function getOneSignal(): any | null {
+  // Try the standard Cordova plugin location
+  if (window.plugins?.OneSignal) {
+    return window.plugins.OneSignal;
+  }
+  // Try direct window reference (some versions)
+  if ((window as any).OneSignal) {
+    return (window as any).OneSignal;
+  }
+  return null;
+}
 
 export function usePushNotifications() {
   const { user } = useAuth();
@@ -112,26 +138,27 @@ export function usePushNotifications() {
     }
 
     try {
-      // Use OneSignal SDK for subscription id (player_id). This is what our edge functions target.
-      // Dynamic import for native only - this will fail on web builds where the plugin is externalized
-      let OneSignal: any;
-      try {
-        const OneSignalMod = await import('onesignal-cordova-plugin');
-        OneSignal = OneSignalMod.default;
-      } catch (importError) {
-        console.error('[Push] Failed to import OneSignal plugin:', importError);
+      // Get OneSignal from global window object (Cordova plugins register globally)
+      const OneSignal = getOneSignal();
+      
+      if (!OneSignal) {
+        console.error('[Push] OneSignal not found on window. Available:', {
+          plugins: !!window.plugins,
+          OneSignal: !!(window as any).OneSignal,
+          keys: Object.keys(window.plugins || {})
+        });
         toast({
           variant: 'destructive',
           title: 'Push Not Available',
-          description: 'Push notifications require the native app. Please rebuild with npx cap sync.',
+          description: 'OneSignal plugin not loaded. Please rebuild: npm run build && npx cap sync ios',
         });
         setIsLoading(false);
         return;
       }
 
-      console.log('[Push] Initializing OneSignal...');
+      console.log('[Push] Found OneSignal plugin, initializing...');
       
-      // Ensure initialized (native side also initializes, but JS init is safe and ensures the JS bridge is ready)
+      // Ensure initialized
       try {
         OneSignal.initialize(ONESIGNAL_APP_ID);
         console.log('[Push] OneSignal initialized with app ID:', ONESIGNAL_APP_ID);
@@ -261,7 +288,6 @@ export function usePushNotifications() {
   }, [user, toast]);
 
   // Initialize on mount - ONLY check status, do NOT request permissions
-  // On iOS 18.2+, requesting permissions during early lifecycle breaks WKWebView input focus
   useEffect(() => {
     if (initRef.current) return;
     
@@ -293,15 +319,17 @@ export function usePushNotifications() {
         console.error('[Push] Error checking existing registration:', err);
       }
       
-      // On native platforms, only CHECK permission status - do NOT auto-register
-      // Registration should only happen via explicit user action (registerDevice)
+      // On native platforms, check permission status using global OneSignal
       if (Capacitor.isNativePlatform()) {
         try {
-          const OneSignalMod = await import('onesignal-cordova-plugin');
-          const OneSignal = OneSignalMod.default;
-          const hasPermission = await OneSignal.Notifications.getPermissionAsync();
-          setPermissionStatus(hasPermission ? 'granted' : 'prompt');
-          console.log('[Push] Permission status checked (not requested):', hasPermission);
+          const OneSignal = getOneSignal();
+          if (OneSignal) {
+            const hasPermission = await OneSignal.Notifications.getPermissionAsync();
+            setPermissionStatus(hasPermission ? 'granted' : 'prompt');
+            console.log('[Push] Permission status checked:', hasPermission);
+          } else {
+            console.log('[Push] OneSignal not available for permission check');
+          }
         } catch (e) {
           console.log('[Push] Could not check permission:', e);
         }
