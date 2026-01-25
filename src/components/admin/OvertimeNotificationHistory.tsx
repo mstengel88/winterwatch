@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { History, Loader2, RefreshCw, Clock, Users, Send } from 'lucide-react';
+import { History, Loader2, RefreshCw, Clock, Users, Send, RotateCcw } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 
 interface NotificationRecord {
@@ -19,38 +20,57 @@ interface NotificationRecord {
   } | null;
 }
 
+interface Employee {
+  id: string;
+  user_id: string | null;
+  first_name: string;
+  last_name: string;
+}
+
 export function OvertimeNotificationHistory() {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingTest, setIsSendingTest] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('self');
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('overtime_notifications_sent')
-        .select(`
-          id,
-          employee_id,
-          time_clock_id,
-          threshold_hours,
-          sent_at,
-          employee:employees(first_name, last_name)
-        `)
-        .order('sent_at', { ascending: false })
-        .limit(50);
+      const [notificationsRes, employeesRes] = await Promise.all([
+        supabase
+          .from('overtime_notifications_sent')
+          .select(`
+            id,
+            employee_id,
+            time_clock_id,
+            threshold_hours,
+            sent_at,
+            employee:employees(first_name, last_name)
+          `)
+          .order('sent_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('employees')
+          .select('id, user_id, first_name, last_name')
+          .eq('is_active', true)
+          .order('last_name'),
+      ]);
 
-      if (error) throw error;
+      if (notificationsRes.error) throw notificationsRes.error;
+      if (employeesRes.error) throw employeesRes.error;
       
       // Transform data to handle the joined employee data
-      const transformedData = (data || []).map(record => ({
+      const transformedData = (notificationsRes.data || []).map(record => ({
         ...record,
         employee: Array.isArray(record.employee) ? record.employee[0] : record.employee
       }));
       
       setNotifications(transformedData);
+      setEmployees(employeesRes.data || []);
     } catch (error) {
-      console.error('Error fetching notification history:', error);
+      console.error('Error fetching data:', error);
       toast.error('Failed to load notification history');
     } finally {
       setIsLoading(false);
@@ -58,22 +78,35 @@ export function OvertimeNotificationHistory() {
   }, []);
 
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    fetchData();
+  }, [fetchData]);
 
   const handleSendTestNotification = async () => {
     setIsSendingTest(true);
     try {
-      // Get current user's info
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('You must be logged in to send a test notification');
-        return;
+      let targetUserId: string;
+
+      if (selectedEmployeeId === 'self') {
+        // Send to current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast.error('You must be logged in to send a test notification');
+          return;
+        }
+        targetUserId = user.id;
+      } else {
+        // Find the employee's user_id
+        const employee = employees.find(e => e.id === selectedEmployeeId);
+        if (!employee?.user_id) {
+          toast.error('This employee does not have a linked user account');
+          return;
+        }
+        targetUserId = employee.user_id;
       }
 
       const { data, error } = await supabase.functions.invoke('send-notification', {
         body: {
-          user_ids: [user.id],
+          user_ids: [targetUserId],
           title: '🧪 Test Notification',
           body: 'This is a test notification to verify your push notification system is working correctly.',
           notification_type: 'admin_announcement',
@@ -82,18 +115,66 @@ export function OvertimeNotificationHistory() {
 
       if (error) throw error;
 
-      if (data?.success) {
-        toast.success('Test notification sent! Check your device.');
+      const employeeName = selectedEmployeeId === 'self' 
+        ? 'yourself' 
+        : employees.find(e => e.id === selectedEmployeeId)?.first_name || 'employee';
+
+      if (data?.success && data?.sent_count > 0) {
+        toast.success(`Test notification sent to ${employeeName}!`);
+      } else if (data?.sent_count === 0) {
+        toast.warning(`No active device found for ${employeeName}. They need to enable push notifications.`);
       } else if (data?.error) {
         toast.error(`Failed to send: ${data.error}`);
-      } else {
-        toast.info('Notification sent, but no active devices found. Make sure push is enabled.');
       }
     } catch (error) {
       console.error('Error sending test notification:', error);
       toast.error('Failed to send test notification');
     } finally {
       setIsSendingTest(false);
+    }
+  };
+
+  const handleResendLastNotification = async () => {
+    if (notifications.length === 0) {
+      toast.error('No previous overtime notifications to resend');
+      return;
+    }
+
+    const lastNotification = notifications[0];
+    const employee = employees.find(e => e.id === lastNotification.employee_id);
+
+    if (!employee?.user_id) {
+      toast.error('Cannot resend: Employee does not have a linked user account');
+      return;
+    }
+
+    setIsResending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          user_ids: [employee.user_id],
+          title: `⏰ Overtime Alert (${lastNotification.threshold_hours}h)`,
+          body: `You have been clocked in for over ${lastNotification.threshold_hours} hours. This is a resent notification.`,
+          notification_type: 'shift_status',
+        },
+      });
+
+      if (error) throw error;
+
+      const employeeName = `${employee.first_name} ${employee.last_name}`;
+
+      if (data?.success && data?.sent_count > 0) {
+        toast.success(`Overtime notification resent to ${employeeName}!`);
+      } else if (data?.sent_count === 0) {
+        toast.warning(`No active device found for ${employeeName}. They need to enable push notifications.`);
+      } else if (data?.error) {
+        toast.error(`Failed to resend: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error resending notification:', error);
+      toast.error('Failed to resend notification');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -107,7 +188,7 @@ export function OvertimeNotificationHistory() {
   return (
     <Card className="bg-card/50 border-border/50">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-500/10 rounded-lg">
               <History className="h-5 w-5 text-orange-500" />
@@ -119,17 +200,52 @@ export function OvertimeNotificationHistory() {
               </CardDescription>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchNotifications}
+              onClick={fetchData}
               disabled={isLoading}
               className="gap-2"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+            
+            {/* Resend Last Notification Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResendLastNotification}
+              disabled={isResending || notifications.length === 0}
+              className="gap-2"
+              title={notifications.length > 0 
+                ? `Resend to ${getEmployeeName(notifications[0])}` 
+                : 'No notifications to resend'}
+            >
+              {isResending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+              Resend Last
+            </Button>
+
+            {/* Employee Selector for Test */}
+            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Send test to..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="self">Myself</SelectItem>
+                {employees.filter(e => e.user_id).map(emp => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.first_name} {emp.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Button
               variant="default"
               size="sm"
@@ -169,16 +285,24 @@ export function OvertimeNotificationHistory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {notifications.map((notification) => (
-                  <tr key={notification.id} className="hover:bg-muted/20 transition-colors">
+                {notifications.map((notification, index) => (
+                  <tr 
+                    key={notification.id} 
+                    className={`hover:bg-muted/20 transition-colors ${index === 0 ? 'bg-primary/5' : ''}`}
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center">
                           <Users className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <span className="font-medium">
-                          {getEmployeeName(notification)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">
+                            {getEmployeeName(notification)}
+                          </span>
+                          {index === 0 && (
+                            <Badge variant="secondary" className="text-xs">Latest</Badge>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
