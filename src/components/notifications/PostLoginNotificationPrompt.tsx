@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Bell, X } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,13 +12,16 @@ import {
 } from '@/components/ui/dialog';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const PROMPT_DISMISSED_KEY = 'push_notification_prompt_dismissed';
 
 export function PostLoginNotificationPrompt() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const { isRegistered, isLoading, permissionStatus, registerDevice, isNativePlatform } = usePushNotifications();
   const [showPrompt, setShowPrompt] = useState(false);
+  const [isEnabling, setIsEnabling] = useState(false);
 
   useEffect(() => {
     // Only show on native platforms
@@ -40,20 +43,40 @@ export function PostLoginNotificationPrompt() {
     const dismissed = localStorage.getItem(PROMPT_DISMISSED_KEY);
     if (dismissed === user.id) return;
     
-    // Small delay to let the UI settle after login
+    // Longer delay on iOS to let WebView fully stabilize after login
+    const delay = Capacitor.getPlatform() === 'ios' ? 3000 : 1500;
+    
     const timer = setTimeout(() => {
+      console.log('[PostLoginPrompt] Showing notification prompt');
       setShowPrompt(true);
-    }, 1500);
+    }, delay);
     
     return () => clearTimeout(timer);
   }, [isNativePlatform, isLoading, isRegistered, permissionStatus, user]);
 
   const handleEnable = async () => {
-    setShowPrompt(false);
-    await registerDevice();
+    console.log('[PostLoginPrompt] User tapped Enable Notifications');
+    setIsEnabling(true);
+    
+    try {
+      await registerDevice();
+      console.log('[PostLoginPrompt] Registration completed');
+      setShowPrompt(false);
+    } catch (err) {
+      console.error('[PostLoginPrompt] Registration failed:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Setup Failed',
+        description: 'Could not enable notifications. Please try again in Settings.',
+      });
+      setShowPrompt(false);
+    } finally {
+      setIsEnabling(false);
+    }
   };
 
   const handleDismiss = () => {
+    console.log('[PostLoginPrompt] User dismissed prompt');
     setShowPrompt(false);
     if (user) {
       localStorage.setItem(PROMPT_DISMISSED_KEY, user.id);
@@ -76,10 +99,10 @@ export function PostLoginNotificationPrompt() {
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          <Button onClick={handleEnable} className="w-full">
-            Enable Notifications
+          <Button onClick={handleEnable} disabled={isEnabling} className="w-full">
+            {isEnabling ? 'Enabling...' : 'Enable Notifications'}
           </Button>
-          <Button variant="ghost" onClick={handleDismiss} className="w-full">
+          <Button variant="ghost" onClick={handleDismiss} disabled={isEnabling} className="w-full">
             Not Now
           </Button>
         </DialogFooter>
