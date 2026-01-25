@@ -15,7 +15,7 @@ import { LocationBootstrap } from "@/components/LocationBootstrap";
 import { IosInputFocusFix } from "@/components/ios/IosInputFocusFix";
 import { Capacitor } from "@capacitor/core";
 import AuthCallback from "./pages/AuthCallback";
-
+import { PostLoginNotificationPrompt } from "@/components/notifications/PostLoginNotificationPrompt";
 
 // Lazy load pages
 import DriverDashboard from "./pages/DriverDashboard";
@@ -69,6 +69,7 @@ const AppRoutes = () => (
           <Sonner />
           <OfflineIndicator />
           <InstallPrompt />
+          <PostLoginNotificationPrompt />
 
           <Suspense fallback={<PageLoader />}>
             <Routes>
