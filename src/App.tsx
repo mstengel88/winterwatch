@@ -50,20 +50,9 @@ const AppRoutes = () => (
       <TooltipProvider>
         <AuthProvider>
           
-          {/*
-            Native iOS "safe mode": we've observed WebKit/WebProcess instability on
-            iOS 18.x where early native-bridge calls can lead to WebView process termination
-            and a completely non-interactive UI.
-
-            To isolate the root cause, we temporarily disable startup helpers on iOS.
-            (Location + focus helpers remain enabled on web/Android.)
-          */}
-          {!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") ? (
-            <>
-              <LocationBootstrap />
-              <IosInputFocusFix />
-            </>
-          ) : null}
+          {/* Location and input helpers - enabled on all platforms */}
+          <LocationBootstrap />
+          <IosInputFocusFix />
 
           <Toaster />
           <Sonner />

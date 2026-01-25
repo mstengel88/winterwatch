@@ -1,14 +1,10 @@
 import { useEffect } from "react";
 
 /**
- * LocationBootstrap - Deferred location permission handling
+ * LocationBootstrap - Location initialization for immediate proximity display
  * 
- * IMPORTANT: On iOS 18.2+, requesting permissions (location, push, etc.) during 
- * early app lifecycle can break WKWebView text input interactions.
- * 
- * This component now only CHECKS existing permission status without prompting.
- * Actual permission requests should happen from explicit user actions (e.g., 
- * when starting a work log that requires location).
+ * This component fetches the user's location on app startup so that the 
+ * dashboard can immediately show the closest accounts with accurate distances.
  */
 export function LocationBootstrap() {
   useEffect(() => {
@@ -19,51 +15,72 @@ export function LocationBootstrap() {
         const { Capacitor } = await import("@capacitor/core");
 
         if (!Capacitor.isNativePlatform()) {
-          console.log("Web platform detected - skipping native location check");
-          return;
-        }
-
-        // iOS: We've seen WKWebView/WebProcess crashes immediately after calling
-        // Geolocation.checkPermissions() during early startup on iOS 18.x.
-        // Since we already defer permission prompts to explicit user action,
-        // we also skip the *status check* on iOS to avoid taking down the WebView.
-        if (Capacitor.getPlatform() === "ios") {
-          console.log("iOS detected - skipping Geolocation.checkPermissions on startup");
+          console.log("[LocationBootstrap] Web platform - using browser geolocation");
+          // On web, try to get position using browser API
+          if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => console.log("[LocationBootstrap] Web position:", pos.coords),
+              (err) => console.log("[LocationBootstrap] Web geolocation error:", err.message),
+              { enableHighAccuracy: true, timeout: 10000 }
+            );
+          }
           return;
         }
 
         const { Geolocation } = await import("@capacitor/geolocation");
 
-        // Only CHECK current permission status - do NOT request
-        // Requesting permissions on launch breaks WKWebView input focus on iOS 18.2+
+        // Check current permission status
         const status = await Geolocation.checkPermissions();
-        console.log("Location permission status:", status);
+        console.log("[LocationBootstrap] Permission status:", status);
 
-        // Only start watching if already granted (from a previous session)
         if (status.location === "granted") {
-          console.log("Location already granted - starting position watch");
+          // Already have permission - get position immediately
+          console.log("[LocationBootstrap] Permission granted - fetching position");
+          
+          const position = await Geolocation.getCurrentPosition({ 
+            enableHighAccuracy: true,
+            timeout: 10000 
+          });
+          console.log("[LocationBootstrap] Got position:", position.coords);
 
-          await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
-
+          // Start watching for updates
           watchId = await Geolocation.watchPosition(
             { enableHighAccuracy: true },
             (position, err) => {
-              if (position) console.log("Live location:", position.coords);
-              if (err) console.error("Location error:", err);
+              if (position) {
+                console.log("[LocationBootstrap] Position update:", position.coords);
+              }
+              if (err) {
+                console.error("[LocationBootstrap] Watch error:", err);
+              }
             }
           );
+        } else if (status.location === "prompt" || status.location === "prompt-with-rationale") {
+          // Request permission - this is safe after the app has loaded
+          console.log("[LocationBootstrap] Requesting location permission");
+          const newStatus = await Geolocation.requestPermissions();
+          
+          if (newStatus.location === "granted") {
+            const position = await Geolocation.getCurrentPosition({ 
+              enableHighAccuracy: true,
+              timeout: 10000 
+            });
+            console.log("[LocationBootstrap] Got position after permission:", position.coords);
+          }
         } else {
-          console.log("Location not yet granted - will request when needed");
+          console.log("[LocationBootstrap] Location permission denied");
         }
       } catch (error) {
-        console.error("Location check error:", error);
+        console.error("[LocationBootstrap] Error:", error);
       }
     }
 
-    run();
+    // Delay slightly to ensure app is fully loaded
+    const timer = setTimeout(run, 1000);
 
     return () => {
-      // best-effort cleanup
+      clearTimeout(timer);
+      // Cleanup watch
       (async () => {
         try {
           if (!watchId) return;
@@ -72,7 +89,7 @@ export function LocationBootstrap() {
           const { Geolocation } = await import("@capacitor/geolocation");
           await Geolocation.clearWatch({ id: watchId });
         } catch {
-          // ignore
+          // ignore cleanup errors
         }
       })();
     };
