@@ -9,10 +9,12 @@ type Snapshot = {
   timestamp: string;
   isNativePlatform: boolean;
   platform: string;
+  capacitorPluginsKeys: string[];
   capacitorBridgeStatus: 'checking' | 'available' | 'unavailable';
   subscriptionId: string | null;
   pushToken: string | null;
   permissionGranted: boolean | null;
+  lastError: string | null;
   // Legacy Cordova diagnostics (for reference)
   hasCordova: boolean;
   hasWindowPlugins: boolean;
@@ -31,12 +33,15 @@ async function takeSnapshot(): Promise<Snapshot> {
   const hasWindowPlugins = !!windowPlugins;
   const windowPluginsKeys = Object.keys(windowPlugins || {});
 
+  const capacitorPluginsKeys = Object.keys((w.Capacitor?.Plugins as Record<string, unknown>) || {});
+
   const notes: string[] = [];
   
   let capacitorBridgeStatus: 'checking' | 'available' | 'unavailable' = 'checking';
   let subscriptionId: string | null = null;
   let pushToken: string | null = null;
   let permissionGranted: boolean | null = null;
+  let lastError: string | null = null;
 
   if (!isNativePlatform) {
     notes.push('Not running as a native Capacitor app.');
@@ -69,7 +74,8 @@ async function takeSnapshot(): Promise<Snapshot> {
       }
     } catch (err) {
       capacitorBridgeStatus = 'unavailable';
-      notes.push(`Capacitor plugin error: ${err}`);
+      lastError = String(err);
+      notes.push(`Capacitor plugin error: ${lastError}`);
       notes.push('The OneSignalBridgePlugin.swift may not be compiled into the app. Rebuild in Xcode.');
     }
   }
@@ -78,10 +84,12 @@ async function takeSnapshot(): Promise<Snapshot> {
     timestamp: new Date().toISOString(),
     isNativePlatform,
     platform,
+    capacitorPluginsKeys,
     capacitorBridgeStatus,
     subscriptionId,
     pushToken,
     permissionGranted,
+    lastError,
     hasCordova,
     hasWindowPlugins,
     windowPluginsKeys,
@@ -158,9 +166,11 @@ export function PushDiagnostics() {
     isNativePlatform: snapshot.isNativePlatform,
     platform: snapshot.platform,
     capacitorBridgeStatus: snapshot.capacitorBridgeStatus,
+    capacitorPluginsKeys: snapshot.capacitorPluginsKeys,
     permissionGranted: snapshot.permissionGranted,
     subscriptionId: snapshot.subscriptionId,
     pushToken: snapshot.pushToken ? '(present)' : null,
+    lastError: snapshot.lastError,
     // Legacy
     hasCordova: snapshot.hasCordova,
     hasWindowPlugins: snapshot.hasWindowPlugins,
