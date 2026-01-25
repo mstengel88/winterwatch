@@ -73,7 +73,7 @@ export function OvertimeNotificationHistory() {
 
       const { data, error } = await supabase.functions.invoke('send-notification', {
         body: {
-          user_id: user.id,
+          user_ids: [user.id],
           title: '🧪 Test Notification',
           body: 'This is a test notification to verify your push notification system is working correctly.',
           notification_type: 'admin_announcement',
