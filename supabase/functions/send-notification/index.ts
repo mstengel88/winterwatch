@@ -195,7 +195,6 @@ Deno.serve(async (req) => {
         notification_type,
       },
       ios_sound: iosSound,
-      android_channel_id: notification_type,
     };
 
     console.log("OneSignal payload:", JSON.stringify(oneSignalPayload));
