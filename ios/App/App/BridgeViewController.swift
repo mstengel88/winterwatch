@@ -38,8 +38,8 @@ class BridgeViewController: CAPBridgeViewController {
         }
     }
     
-    // Register custom plugins with the Capacitor bridge
-    override func capacitorDidLoad() {
-        bridge?.registerPluginInstance(OneSignalBridgePlugin())
-    }
+    // NOTE:
+    // Do not manually register OneSignalBridge here.
+    // With Capacitor 5/6/7/8, local Swift plugins that conform to CAPBridgedPlugin
+    // are auto-registered as long as their .swift file is included in the app target.
 }
