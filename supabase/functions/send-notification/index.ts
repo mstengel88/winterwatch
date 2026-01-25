@@ -168,8 +168,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const playerIds = deviceTokens.map(t => t.player_id);
-    console.log(`Sending to ${playerIds.length} devices`);
+    // Deduplicate player IDs (same player_id might be registered for multiple users)
+    const uniquePlayerIds = [...new Set(deviceTokens.map(t => t.player_id))];
+    console.log(`Sending to ${uniquePlayerIds.length} unique devices (${deviceTokens.length} total tokens)`);
 
     // Map notification sounds
     const soundMap: Record<string, string> = {
@@ -187,7 +188,7 @@ Deno.serve(async (req) => {
     // Send via OneSignal
     const oneSignalPayload = {
       app_id: oneSignalAppId,
-      include_player_ids: playerIds,
+      include_player_ids: uniquePlayerIds,
       headings: { en: title },
       contents: { en: body },
       data: {
@@ -211,13 +212,49 @@ Deno.serve(async (req) => {
     const oneSignalResult = await oneSignalResponse.json();
     console.log("OneSignal response:", JSON.stringify(oneSignalResult));
 
-    if (!oneSignalResponse.ok) {
+    // Handle invalid player IDs - deactivate them in our database
+    if (oneSignalResult.errors?.invalid_player_ids) {
+      const invalidIds = oneSignalResult.errors.invalid_player_ids as string[];
+      console.log(`Found ${invalidIds.length} invalid player IDs, deactivating:`, invalidIds);
+      
+      // Mark invalid tokens as inactive so they won't be used again
+      const { error: deactivateError } = await supabase
+        .from("push_device_tokens")
+        .update({ is_active: false })
+        .in("player_id", invalidIds);
+      
+      if (deactivateError) {
+        console.error("Error deactivating invalid tokens:", deactivateError);
+      } else {
+        console.log(`Deactivated ${invalidIds.length} invalid tokens`);
+      }
+      
+      // Check if ALL tokens were invalid
+      const validCount = uniquePlayerIds.length - invalidIds.length;
+      if (validCount <= 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            sent_count: 0,
+            message: "All device tokens were invalid and have been cleaned up. Users need to re-enable push notifications in Settings.",
+            invalid_tokens_removed: invalidIds.length,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    if (!oneSignalResponse.ok && !oneSignalResult.id) {
       console.error("OneSignal error:", oneSignalResult);
       return new Response(
         JSON.stringify({ error: "Failed to send notification", details: oneSignalResult }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Calculate actual sent count
+    const invalidCount = oneSignalResult.errors?.invalid_player_ids?.length || 0;
+    const actualSentCount = uniquePlayerIds.length - invalidCount;
 
     // Log notifications for each user
     const notificationLogs = eligibleUserIds.map(userId => ({
@@ -226,16 +263,21 @@ Deno.serve(async (req) => {
       title,
       body,
       data,
-      onesignal_id: oneSignalResult.id,
+      onesignal_id: oneSignalResult.id || null,
+      delivery_status: actualSentCount > 0 ? 'sent' : 'failed',
     }));
 
     await supabase.from("notifications_log").insert(notificationLogs);
 
     return new Response(
       JSON.stringify({
-        success: true,
-        sent_count: playerIds.length,
-        onesignal_id: oneSignalResult.id,
+        success: actualSentCount > 0,
+        sent_count: actualSentCount,
+        onesignal_id: oneSignalResult.id || null,
+        invalid_tokens_removed: invalidCount,
+        message: invalidCount > 0 
+          ? `Sent to ${actualSentCount} device(s). ${invalidCount} invalid token(s) were removed.`
+          : undefined,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
