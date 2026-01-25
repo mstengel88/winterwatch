@@ -7,6 +7,7 @@ import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useWeather } from '@/hooks/useWeather';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
+import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -92,6 +93,7 @@ export default function ShovelDashboard() {
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
 
   // Auto-populate weather fields when weather data is fetched
   useEffect(() => {
@@ -278,13 +280,18 @@ export default function ShovelDashboard() {
     }
   };
 
-  const handleClockOut = async () => {
+  const handleClockOutClick = () => {
+    setShowClockOutConfirm(true);
+  };
+
+  const handleClockOutConfirm = async () => {
     const success = await clockOut();
     if (success) {
       toast({ title: 'Shift ended successfully!' });
     } else {
       toast({ variant: 'destructive', title: 'Failed to end shift' });
     }
+    return success;
   };
 
   const handleCheckIn = async () => {
@@ -454,7 +461,7 @@ export default function ShovelDashboard() {
               </div>
               {activeShift ? (
                 <Button 
-                  onClick={handleClockOut}
+                  onClick={handleClockOutClick}
                   variant="outline"
                   className="border-red-500/50 text-red-400 hover:bg-red-500/20"
                 >
@@ -470,6 +477,12 @@ export default function ShovelDashboard() {
                   Start Shift
                 </Button>
               )}
+              
+              <ClockOutConfirmDialog
+                open={showClockOutConfirm}
+                onOpenChange={setShowClockOutConfirm}
+                onConfirm={handleClockOutConfirm}
+              />
             </div>
           </CardContent>
         </Card>
