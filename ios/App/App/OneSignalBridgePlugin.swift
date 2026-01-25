@@ -4,10 +4,12 @@ import OneSignalFramework
 
 /// A minimal Capacitor plugin that exposes OneSignal's native iOS SDK to JavaScript.
 /// This bypasses the Cordova plugin (onesignal-cordova-plugin) which has plugin injection issues.
-@objc(OneSignalBridgePlugin)
+@objc(OneSignalBridge)
 public class OneSignalBridgePlugin: CAPPlugin, CAPBridgedPlugin {
     
-    public let identifier = "OneSignalBridgePlugin"
+    // Use the same identifier/jsName as the JavaScript side expects:
+    // registerPlugin('OneSignalBridge')
+    public let identifier = "OneSignalBridge"
     public let jsName = "OneSignalBridge"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "getSubscriptionId", returnType: CAPPluginReturnPromise),
