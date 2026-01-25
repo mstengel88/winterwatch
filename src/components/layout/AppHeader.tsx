@@ -89,7 +89,7 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 pt-[env(safe-area-inset-top)]">
-      <div className="container flex h-14 items-center justify-between px-4">
+      <div className="container flex h-16 items-center justify-between px-4 max-w-2xl mx-auto">
         {/* Left: Mobile Menu + Logo */}
         <div className="flex items-center gap-3">
           {/* Mobile Hamburger Menu */}
