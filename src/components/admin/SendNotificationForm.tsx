@@ -134,10 +134,34 @@ export function SendNotificationForm() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Notification Sent',
-        description: `Successfully sent to ${data.sent_count} device(s)`,
-      });
+      // Check if the response indicates failure
+      if (data.success === false) {
+        toast({
+          variant: 'destructive',
+          title: 'Delivery Failed',
+          description: data.error || 'All device tokens are invalid. Users need to re-enable push notifications in Settings.',
+        });
+        return;
+      }
+
+      // Check for partial success (some invalid tokens)
+      if (data.invalid_tokens_removed && data.invalid_tokens_removed > 0) {
+        toast({
+          title: 'Notification Sent',
+          description: data.message || `Sent to ${data.sent_count} device(s). ${data.invalid_tokens_removed} stale token(s) were cleaned up.`,
+        });
+      } else if (data.sent_count === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'No Devices',
+          description: 'No active devices to send to. Users need to enable push notifications in Settings.',
+        });
+      } else {
+        toast({
+          title: 'Notification Sent',
+          description: `Successfully sent to ${data.sent_count} device(s)`,
+        });
+      }
 
       // Reset form
       setTitle('');
@@ -148,7 +172,7 @@ export function SendNotificationForm() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to send notification',
+        description: 'Failed to send notification. Check the console for details.',
       });
     } finally {
       setIsSending(false);
