@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
@@ -42,7 +43,8 @@ interface AccountWithDistance extends Account {
 }
 
 export default function DriverDashboard() {
-  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const { profile, isAdminOrManager } = useAuth();
   const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
   const {
   location: geoLocation,
@@ -453,7 +455,13 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
         {/* Page Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
+            <div 
+              className={`flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 ${
+                isAdminOrManager() ? 'cursor-pointer hover:bg-primary/30 transition-colors' : ''
+              }`}
+              onClick={isAdminOrManager() ? () => navigate('/admin/notifications?tab=send') : undefined}
+              title={isAdminOrManager() ? 'Send Notification' : undefined}
+            >
               <Snowflake className="h-6 w-6 text-primary" />
             </div>
             <div>
