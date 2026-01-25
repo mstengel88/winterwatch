@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface OvertimeSettings {
   id: string;
-  employee_id: string;
+  employee_id: string | null;
   threshold_hours: number;
   is_enabled: boolean;
   notify_employee: boolean;
@@ -94,10 +94,16 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${activeClockEntries.length} active clock entries`);
 
-    // Get employee IDs from settings
+    // Separate global setting from individual settings
+    const globalSetting = (overtimeSettings as OvertimeSettings[]).find(s => s.employee_id === null);
+    const individualSettings = (overtimeSettings as OvertimeSettings[]).filter(s => s.employee_id !== null);
+
+    // Build a map of employee_id -> settings (individual overrides global)
     const settingsMap = new Map<string, OvertimeSettings>();
-    for (const setting of overtimeSettings as OvertimeSettings[]) {
-      settingsMap.set(setting.employee_id, setting);
+    for (const setting of individualSettings) {
+      if (setting.employee_id) {
+        settingsMap.set(setting.employee_id, setting);
+      }
     }
 
     // Get employee details
@@ -152,7 +158,12 @@ Deno.serve(async (req) => {
     let notifiedCount = 0;
 
     for (const entry of activeClockEntries as ActiveClockEntry[]) {
-      const setting = settingsMap.get(entry.employee_id);
+      // Get individual setting if exists, otherwise use global setting
+      let setting = settingsMap.get(entry.employee_id);
+      const isUsingGlobal = !setting && globalSetting;
+      if (!setting) {
+        setting = globalSetting;
+      }
       if (!setting) continue;
 
       const clockInTime = new Date(entry.clock_in_time);
@@ -175,8 +186,9 @@ Deno.serve(async (req) => {
 
       const employeeName = `${employee.first_name} ${employee.last_name}`;
       const hoursFormatted = Math.floor(hoursWorked);
+      const settingType = isUsingGlobal ? 'global' : 'individual';
 
-      console.log(`Employee ${employeeName} has been clocked in for ${hoursFormatted} hours (threshold: ${setting.threshold_hours})`);
+      console.log(`Employee ${employeeName} has been clocked in for ${hoursFormatted} hours (threshold: ${setting.threshold_hours}, setting: ${settingType})`);
 
       // Collect user IDs to notify
       const userIdsToNotify: string[] = [];
