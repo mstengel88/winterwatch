@@ -153,16 +153,25 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Better touch targets for mobile */
+  /* Better touch targets for mobile - HIG compliant 44pt minimum */
   button, a, [role="button"] {
     min-height: 44px;
-    min-width: 44px;
   }
 
   /* Prevent text selection on interactive elements */
   button, [role="button"] {
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* iOS-optimized form controls */
+  input, textarea, select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  /* Improve card readability on mobile */
+  .card {
+    border-radius: 1rem;
   }
 }
 
@@ -188,6 +197,40 @@
   /* Extra bottom padding for home indicator */
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* iOS-specific layout improvements */
+@layer utilities {
+  /* Consistent page container with safe area awareness */
+  .ios-page {
+    min-height: 100vh;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  /* Larger, more tappable form elements */
+  .ios-input {
+    @apply h-12 text-base rounded-xl;
+  }
+
+  /* iOS-style cards with better shadows */
+  .ios-card {
+    @apply rounded-2xl shadow-lg border-0 bg-card;
+  }
+
+  /* Improved button sizing for iOS */
+  .ios-button {
+    @apply h-12 px-6 text-base font-medium rounded-xl;
+  }
+
+  /* Larger section headers */
+  .ios-section-header {
+    @apply text-lg font-semibold mb-4;
+  }
+
+  /* Better spacing for list items */
+  .ios-list-item {
+    @apply py-4 px-4 min-h-[56px];
   }
 }
 
