@@ -126,20 +126,19 @@ export async function initDeepLinkAuth() {
   const { Capacitor } = await import("@capacitor/core");
   if (!Capacitor.isNativePlatform()) return;
 
+  // IMPORTANT (iOS 18.x stability):
+  // We've observed WKWebView/WebProcess crashes happening immediately after
+  // calling certain native-bridge APIs during very early startup.
+  // In particular, App.getLaunchUrl() appears right before the crash in logs.
+  //
+  // Strategy:
+  // 1) Always register the warm-start listener (covers the common OAuth return path).
+  // 2) Avoid calling getLaunchUrl on iOS at startup.
+  // 3) Defer any native calls slightly to allow the WebView to stabilize.
+
   const { App } = await import("@capacitor/app");
 
-  // Cold start
-  try {
-    const launch = await App.getLaunchUrl();
-    if (launch?.url) {
-      console.log("🚀 Launch URL:", launch.url);
-      await handleAuthCallbackUrl(launch.url);
-    }
-  } catch (e) {
-    console.error("❌ getLaunchUrl failed:", e);
-  }
-
-  // Warm start
+  // Warm start (and typical OAuth return)
   App.addListener("appUrlOpen", async ({ url }) => {
     try {
       if (!url) return;
@@ -148,4 +147,20 @@ export async function initDeepLinkAuth() {
       console.error("❌ appUrlOpen handler failed:", e);
     }
   });
+
+  // Cold start:
+  // Only attempt to read launch URL on non-iOS platforms (Android), and defer.
+  if (Capacitor.getPlatform() !== "ios") {
+    setTimeout(async () => {
+      try {
+        const launch = await App.getLaunchUrl();
+        if (launch?.url) {
+          console.log("🚀 Launch URL:", launch.url);
+          await handleAuthCallbackUrl(launch.url);
+        }
+      } catch (e) {
+        console.error("❌ getLaunchUrl failed:", e);
+      }
+    }, 750);
+  }
 }
