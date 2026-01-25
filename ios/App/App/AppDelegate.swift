@@ -12,10 +12,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        // Capacitor 7/8: ensure our local Swift plugin is registered even when
-        // CAPBridgeViewController lifecycle hooks are skipped.
-        CAPBridge.registerPlugin(OneSignalBridgePlugin.self)
-
         // Initialize OneSignal (do NOT request permission here - defer to user action in Settings)
         // Requesting permissions at startup can interfere with WKWebView focus on iOS 18.x
         OneSignal.initialize(
