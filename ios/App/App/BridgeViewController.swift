@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import WebKit
+import OneSignalFramework
 
 /// Custom bridge controller to mitigate iOS 18+ WKWebView gesture deferral issues
 /// that can make the UI feel completely non-interactive (taps not delivered).
