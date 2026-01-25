@@ -20,8 +20,24 @@ export function useBiometricAuth(): BiometricAuthResult {
   const [isEnabled, setIsEnabled] = useState(false);
 
   useEffect(() => {
-    checkBiometricAvailability();
+    // iOS 18.x stability: avoid ALL native bridge calls during early startup.
+    // Only check biometric availability after a user interaction or significant delay.
+    // For now, we only enable biometric checks on non-iOS or after delay.
+    const platform = Capacitor.getPlatform();
+    
+    // Always check localStorage (not a native call)
     checkIfEnabled();
+    
+    // Skip native biometric check on iOS during initial mount to prevent WKWebView crash
+    if (platform === 'ios') {
+      // On iOS, defer the native check significantly to allow WebView to stabilize
+      const timer = setTimeout(() => {
+        checkBiometricAvailability();
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else {
+      checkBiometricAvailability();
+    }
   }, []);
 
   const checkBiometricAvailability = async () => {
