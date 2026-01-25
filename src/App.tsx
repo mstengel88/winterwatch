@@ -180,16 +180,21 @@ function App() {
     (async () => {
       const { Capacitor } = await import("@capacitor/core");
       if (Capacitor.isNativePlatform()) {
-        // Defer deep-link init very slightly to let the first paint happen.
-        // (Helps iOS 18.x WKWebView stability.)
-        setTimeout(async () => {
-          try {
-            const { initDeepLinkAuth } = await import("./deepLinkAuth");
-            await initDeepLinkAuth();
-          } catch (e) {
-            console.error("[App] initDeepLinkAuth failed:", e);
-          }
-        }, 500);
+        // iOS 18.x stability: we've observed WebProcess crashes right after
+        // calling Capacitor App APIs (getLaunchUrl/addListener) on startup.
+        // For now, do NOT initialize deep-link auth handling at startup on iOS.
+        // (Email/password auth still works; OAuth deep links can be re-enabled later
+        // only when the user initiates an OAuth flow.)
+        if (Capacitor.getPlatform() !== "ios") {
+          setTimeout(async () => {
+            try {
+              const { initDeepLinkAuth } = await import("./deepLinkAuth");
+              await initDeepLinkAuth();
+            } catch (e) {
+              console.error("[App] initDeepLinkAuth failed:", e);
+            }
+          }, 500);
+        }
 
         if ("serviceWorker" in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
