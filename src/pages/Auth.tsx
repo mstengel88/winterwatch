@@ -8,13 +8,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Eye, EyeOff, Users, Building2, Fingerprint } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Users, Building2 } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { getOAuthRedirectTo } from '@/Auth/redirect';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
-import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 
 const authSchema = z.object({
   email: z.string().trim().email({ message: 'Please enter a valid email address' }),
@@ -30,7 +29,7 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
-  const [enableBiometricAfterLogin, setEnableBiometricAfterLogin] = useState(false);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
 
@@ -38,19 +37,10 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const biometric = useBiometricAuth();
+  
 
   const from = location.state?.from?.pathname || '/dashboard';
 
-  // Pre-fill email if biometric is enabled
-  useEffect(() => {
-    if (biometric.isEnabled && biometric.isAvailable) {
-      const savedEmail = biometric.getSavedEmail();
-      if (savedEmail) {
-        setEmail(savedEmail);
-      }
-    }
-  }, [biometric.isEnabled, biometric.isAvailable]);
 
   // Redirect when authenticated
   useEffect(() => {
@@ -121,15 +111,6 @@ export default function Auth() {
               description: error.message,
             });
           }
-        } else {
-          // Successfully logged in - enable biometric if requested
-          if (enableBiometricAfterLogin && biometric.isAvailable) {
-            biometric.enableBiometric(email);
-            toast({
-              title: 'Biometric Enabled',
-              description: `${biometric.biometryType === 'faceId' ? 'Face ID' : 'Touch ID'} has been enabled for quick sign-in.`,
-            });
-          }
         }
       } else {
         const { error } = await signUp(email, password, fullName);
@@ -155,47 +136,6 @@ export default function Auth() {
           setIsLogin(true);
         }
       }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleBiometricLogin = async () => {
-    const savedEmail = biometric.getSavedEmail();
-    if (!savedEmail) {
-      toast({
-        variant: 'destructive',
-        title: 'Biometric not configured',
-        description: 'Please sign in with your password first to enable biometric login.',
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const authenticated = await biometric.authenticate();
-      
-      if (authenticated) {
-        // For security, we still need a valid session
-        // Check if there's an existing session we can use
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          // Already have a session, just proceed
-          navigate(from, { replace: true });
-        } else {
-          // No session - user needs to enter password
-          // But we've confirmed their identity, so pre-fill email
-          setEmail(savedEmail);
-          toast({
-            title: 'Verification successful',
-            description: 'Please enter your password to complete sign in.',
-          });
-        }
-      }
-    } catch (error) {
-      console.log('[Auth] Biometric error:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -410,22 +350,6 @@ export default function Auth() {
                   </Link>
                 </div>
 
-                {biometric.isAvailable && !biometric.isEnabled && (
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="enableBiometric"
-                      checked={enableBiometricAfterLogin}
-                      onCheckedChange={(checked) => setEnableBiometricAfterLogin(checked === true)}
-                    />
-                    <Label
-                      htmlFor="enableBiometric"
-                      className="text-sm font-normal text-muted-foreground cursor-pointer flex items-center gap-1"
-                    >
-                      <Fingerprint className="h-4 w-4" />
-                      Enable {biometric.biometryType === 'faceId' ? 'Face ID' : 'Touch ID'}
-                    </Label>
-                  </div>
-                )}
               </div>
             )}
 
@@ -436,19 +360,6 @@ export default function Auth() {
               {isLogin ? 'Sign In' : 'Create account'}
             </Button>
 
-            {/* Biometric Login Button */}
-            {isLogin && biometric.isAvailable && biometric.isEnabled && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full gap-2" 
-                onClick={handleBiometricLogin}
-                disabled={isSubmitting}
-              >
-                <Fingerprint className="h-4 w-4" />
-                Sign in with {biometric.biometryType === 'faceId' ? 'Face ID' : 'Touch ID'}
-              </Button>
-            )}
           </form>
 
           {/* Divider */}
