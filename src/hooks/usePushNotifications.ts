@@ -37,16 +37,56 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
 };
 
 /**
+ * Wait for Cordova deviceready event
+ * CRITICAL: Plugins only become available AFTER this event fires
+ */
+async function waitForDeviceReady(timeoutMs = 10000): Promise<boolean> {
+  // If not in Cordova environment, resolve immediately
+  if (typeof (window as any).cordova === 'undefined') {
+    // Check if plugins already exist (may be pre-loaded)
+    if (window.plugins?.OneSignal) {
+      console.log('[Push] deviceready: Plugins already available');
+      return true;
+    }
+    console.log('[Push] deviceready: No Cordova detected, checking for plugins...');
+    // Wait a bit and check again - Capacitor may load plugins differently
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return !!window.plugins?.OneSignal;
+  }
+  
+  return new Promise((resolve) => {
+    // Check if already fired
+    if ((document as any).deviceReadyFired || (window as any).cordova?.platformId) {
+      console.log('[Push] deviceready: Already fired or platform initialized');
+      resolve(true);
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      console.log('[Push] deviceready: Timeout after', timeoutMs, 'ms');
+      resolve(false);
+    }, timeoutMs);
+    
+    document.addEventListener('deviceready', () => {
+      clearTimeout(timer);
+      (document as any).deviceReadyFired = true;
+      console.log('[Push] deviceready: Event fired!');
+      resolve(true);
+    }, { once: true });
+  });
+}
+
+/**
  * Get OneSignal instance from the global window object
  * Cordova plugins register themselves globally, not as ES modules
  */
 function getOneSignalSync(): any | null {
-  // Try the standard Cordova plugin location
+  // Try the standard Cordova plugin location (most common for v5)
   if (window.plugins?.OneSignal) {
     return window.plugins.OneSignal;
   }
-  // Try direct window reference (some versions)
-  if ((window as any).OneSignal) {
+  // Try direct window reference (check it has expected methods)
+  if ((window as any).OneSignal && typeof (window as any).OneSignal.initialize === 'function') {
     return (window as any).OneSignal;
   }
   // Try cordova.plugins path
@@ -58,16 +98,34 @@ function getOneSignalSync(): any | null {
 
 /**
  * Wait for OneSignal to be available on the window object
- * Cordova plugins may take time to initialize after app launch
+ * Cordova plugins may take time to initialize after deviceready
  */
-async function waitForOneSignal(maxAttempts = 10, delayMs = 300): Promise<any | null> {
+async function waitForOneSignal(maxAttempts = 20, delayMs = 500): Promise<any | null> {
+  // First wait for deviceready
+  const deviceReady = await waitForDeviceReady();
+  console.log('[Push] Device ready result:', deviceReady);
+  
+  // Give plugins extra time to register after deviceready
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const oneSignal = getOneSignalSync();
     if (oneSignal) {
       console.log(`[Push] OneSignal found on attempt ${attempt}`);
       return oneSignal;
     }
-    console.log(`[Push] OneSignal not found, attempt ${attempt}/${maxAttempts}. window.plugins:`, Object.keys(window.plugins || {}));
+    
+    // Log detailed debug info
+    const debugInfo = {
+      hasWindowPlugins: !!window.plugins,
+      windowPluginsKeys: Object.keys(window.plugins || {}),
+      hasCordova: !!(window as any).cordova,
+      cordovaPlatform: (window as any).cordova?.platformId,
+      cordovaPluginsKeys: Object.keys((window as any).cordova?.plugins || {}),
+      hasDirectOneSignal: !!(window as any).OneSignal,
+    };
+    console.log(`[Push] Attempt ${attempt}/${maxAttempts}:`, JSON.stringify(debugInfo));
+    
     if (attempt < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
