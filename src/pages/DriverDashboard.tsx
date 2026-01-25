@@ -5,6 +5,7 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useWeather } from '@/hooks/useWeather';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,12 @@ export default function DriverDashboard() {
     return () => clearInterval(interval);
   }, [refreshOnce]);
 
+  // Fetch weather based on geolocation
+  const { weather: weatherData, isLoading: weatherLoading } = useWeather(
+    geoLocation?.latitude ?? null,
+    geoLocation?.longitude ?? null
+  );
+
   const { toast } = useToast();
   const {
     photos,
@@ -83,14 +90,23 @@ export default function DriverDashboard() {
   const [selectedEmployees, setSelectedEmployees] = useState('');
   const [snowDepth, setSnowDepth] = useState('');
   const [saltUsed, setSaltUsed] = useState('');
-  const [temperature, setTemperature] = useState('31');
-  const [weather, setWeather] = useState('Overcast');
-  const [windSpeed, setWindSpeed] = useState('7');
+  const [temperature, setTemperature] = useState('');
+  const [weather, setWeather] = useState('');
+  const [windSpeed, setWindSpeed] = useState('');
   const [notes, setNotes] = useState('');
   const [allEquipment, setAllEquipment] = useState<any[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  // Auto-populate weather fields when weather data is fetched
+  useEffect(() => {
+    if (weatherData) {
+      setTemperature(String(weatherData.temperature));
+      setWeather(weatherData.conditions);
+      setWindSpeed(String(weatherData.windSpeed));
+    }
+  }, [weatherData]);
 
   // Employee selection for UI display only - doesn't affect work log tracking
   const selectedEmployeeNameForUi = useMemo(() => {
@@ -467,7 +483,9 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             <div>
               <h1 className="text-xl font-semibold flex items-center gap-2">
                 WinterWatch-Pro
-                <span className="text-sm font-normal text-muted-foreground">{temperature}°F</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {weatherLoading ? '...' : temperature ? `${temperature}°F` : '--°F'}
+                </span>
               </h1>
               <p className="text-sm text-muted-foreground">
                 Welcome back, {employee.first_name} {employee.last_name}! Track your plowing and salting services.
