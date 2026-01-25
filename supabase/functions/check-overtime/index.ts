@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface OvertimeSettings {
   id: string;
-  employee_id: string;
+  employee_id: string | null;
   threshold_hours: number;
   is_enabled: boolean;
   notify_employee: boolean;
@@ -94,10 +94,20 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${activeClockEntries.length} active clock entries`);
 
-    // Get employee IDs from settings
-    const settingsMap = new Map<string, OvertimeSettings>();
-    for (const setting of overtimeSettings as OvertimeSettings[]) {
-      settingsMap.set(setting.employee_id, setting);
+    // Separate global settings from individual settings (now supports multiple global)
+    const globalSettings = (overtimeSettings as OvertimeSettings[]).filter(s => s.employee_id === null);
+    const individualSettings = (overtimeSettings as OvertimeSettings[]).filter(s => s.employee_id !== null);
+
+    console.log(`Found ${globalSettings.length} global settings and ${individualSettings.length} individual settings`);
+
+    // Build a map of employee_id -> array of settings (for individual overrides)
+    const individualSettingsMap = new Map<string, OvertimeSettings[]>();
+    for (const setting of individualSettings) {
+      if (setting.employee_id) {
+        const existing = individualSettingsMap.get(setting.employee_id) || [];
+        existing.push(setting);
+        individualSettingsMap.set(setting.employee_id, existing);
+      }
     }
 
     // Get employee details
@@ -152,86 +162,91 @@ Deno.serve(async (req) => {
     let notifiedCount = 0;
 
     for (const entry of activeClockEntries as ActiveClockEntry[]) {
-      const setting = settingsMap.get(entry.employee_id);
-      if (!setting) continue;
-
       const clockInTime = new Date(entry.clock_in_time);
       const hoursWorked = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
 
-      // Check if threshold is exceeded
-      if (hoursWorked < setting.threshold_hours) {
-        continue;
-      }
+      // Get applicable settings: individual settings for this employee, or global settings
+      const employeeIndividualSettings = individualSettingsMap.get(entry.employee_id);
+      const applicableSettings = employeeIndividualSettings && employeeIndividualSettings.length > 0
+        ? employeeIndividualSettings
+        : globalSettings;
 
-      // Check if already notified for this clock entry and threshold
-      const notificationKey = `${entry.id}_${setting.threshold_hours}`;
-      if (sentSet.has(notificationKey)) {
-        console.log(`Already notified for clock entry ${entry.id}`);
-        continue;
-      }
+      if (applicableSettings.length === 0) continue;
 
       const employee = employeeMap.get(entry.employee_id);
       if (!employee) continue;
 
       const employeeName = `${employee.first_name} ${employee.last_name}`;
       const hoursFormatted = Math.floor(hoursWorked);
+      const settingType = employeeIndividualSettings && employeeIndividualSettings.length > 0 ? 'individual' : 'global';
 
-      console.log(`Employee ${employeeName} has been clocked in for ${hoursFormatted} hours (threshold: ${setting.threshold_hours})`);
+      // Check each applicable setting
+      for (const setting of applicableSettings) {
+        // Skip if threshold not exceeded
+        if (hoursWorked < setting.threshold_hours) {
+          continue;
+        }
 
-      // Collect user IDs to notify
-      const userIdsToNotify: string[] = [];
+        // Check if already notified for this clock entry and threshold
+        const notificationKey = `${entry.id}_${setting.threshold_hours}`;
+        if (sentSet.has(notificationKey)) {
+          console.log(`Already notified for clock entry ${entry.id} at ${setting.threshold_hours}hrs`);
+          continue;
+        }
 
-      if (setting.notify_employee && employee.user_id) {
-        userIdsToNotify.push(employee.user_id);
-      }
+        console.log(`Employee ${employeeName} has been clocked in for ${hoursFormatted} hours (threshold: ${setting.threshold_hours}, setting: ${settingType})`);
 
-      if (setting.notify_admins) {
-        for (const adminId of adminUserIds) {
-          if (!userIdsToNotify.includes(adminId)) {
-            userIdsToNotify.push(adminId);
+        // Collect user IDs to notify
+        const userIdsToNotify: string[] = [];
+
+        if (setting.notify_employee && employee.user_id) {
+          userIdsToNotify.push(employee.user_id);
+        }
+
+        if (setting.notify_admins) {
+          for (const adminId of adminUserIds) {
+            if (!userIdsToNotify.includes(adminId)) {
+              userIdsToNotify.push(adminId);
+            }
           }
         }
-      }
 
-      if (userIdsToNotify.length === 0) {
-        console.log('No users to notify');
-        continue;
-      }
+        if (userIdsToNotify.length === 0) {
+          console.log('No users to notify');
+          continue;
+        }
 
-      // Get device tokens for these users
-      const { data: deviceTokens, error: tokensError } = await supabase
-        .from('push_device_tokens')
-        .select('user_id, player_id')
-        .in('user_id', userIdsToNotify)
-        .eq('is_active', true);
+        // Get device tokens for these users
+        const { data: deviceTokens, error: tokensError } = await supabase
+          .from('push_device_tokens')
+          .select('user_id, player_id')
+          .in('user_id', userIdsToNotify)
+          .eq('is_active', true);
 
-      if (tokensError) {
-        console.error('Error fetching device tokens:', tokensError);
-        continue;
-      }
+        if (tokensError) {
+          console.error('Error fetching device tokens:', tokensError);
+          continue;
+        }
 
-      if (!deviceTokens || deviceTokens.length === 0) {
-        console.log('No device tokens found');
-        continue;
-      }
+        if (!deviceTokens || deviceTokens.length === 0) {
+          console.log('No device tokens found');
+          continue;
+        }
 
-      const playerIds = (deviceTokens as DeviceToken[]).map((t) => t.player_id);
+        const playerIds = (deviceTokens as DeviceToken[]).map((t) => t.player_id);
 
-      // Determine notification content based on recipient
-      const title = 'Overtime Alert';
-      const body = employee.user_id && userIdsToNotify.includes(employee.user_id)
-        ? `You have been clocked in for ${hoursFormatted} hours`
-        : `${employeeName} has been clocked in for ${hoursFormatted} hours`;
+        // Determine if this notification is going to the employee themselves
+        const isEmployeeRecipient = employee.user_id && userIdsToNotify.includes(employee.user_id);
 
-      // Send notification via OneSignal
-      try {
-        const onesignalResponse = await fetch('https://onesignal.com/api/v1/notifications', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${onesignalApiKey}`,
-          },
-          body: JSON.stringify({
+        // Notification content with action prompt for employee
+        const title = 'Overtime Alert';
+        const body = isEmployeeRecipient
+          ? `You have been clocked in for ${hoursFormatted} hours. Would you like to stay on shift or clock out?`
+          : `${employeeName} has been clocked in for ${hoursFormatted} hours`;
+
+        // Send notification via OneSignal with action buttons
+        try {
+          const notificationPayload: Record<string, unknown> = {
             app_id: onesignalAppId,
             include_player_ids: playerIds,
             headings: { en: title },
@@ -243,52 +258,70 @@ Deno.serve(async (req) => {
               time_clock_id: entry.id,
               hours_worked: hoursFormatted,
             },
-          }),
-        });
+          };
 
-        if (!onesignalResponse.ok) {
-          const errorText = await onesignalResponse.text();
-          console.error('OneSignal error:', errorText);
-          continue;
-        }
+          // Add action buttons for iOS (only for employee notifications)
+          if (isEmployeeRecipient) {
+            notificationPayload.ios_category = 'overtime_action';
+            notificationPayload.buttons = [
+              { id: 'stay_on_shift', text: 'Stay on Shift' },
+              { id: 'stop_shift', text: 'Stop Shift' },
+            ];
+          }
 
-        const onesignalData = await onesignalResponse.json();
-        console.log('OneSignal notification sent:', onesignalData.id);
-
-        // Record that we sent this notification
-        const { error: insertError } = await supabase
-          .from('overtime_notifications_sent')
-          .insert({
-            time_clock_id: entry.id,
-            employee_id: entry.employee_id,
-            threshold_hours: setting.threshold_hours,
-          });
-
-        if (insertError) {
-          console.error('Error recording sent notification:', insertError);
-        }
-
-        // Log notifications
-        for (const userId of userIdsToNotify) {
-          await supabase.from('notifications_log').insert({
-            user_id: userId,
-            notification_type: 'shift_status',
-            title,
-            body,
-            onesignal_id: onesignalData.id,
-            data: {
-              type: 'overtime_alert',
-              employee_id: entry.employee_id,
-              time_clock_id: entry.id,
+          const onesignalResponse = await fetch('https://onesignal.com/api/v1/notifications', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Basic ${onesignalApiKey}`,
             },
+            body: JSON.stringify(notificationPayload),
           });
-        }
 
-        notifiedCount++;
-      } catch (sendError) {
-        console.error('Error sending notification:', sendError);
-      }
-    }
+          if (!onesignalResponse.ok) {
+            const errorText = await onesignalResponse.text();
+            console.error('OneSignal error:', errorText);
+            continue;
+          }
+
+          const onesignalData = await onesignalResponse.json();
+          console.log('OneSignal notification sent:', onesignalData.id);
+
+          // Record that we sent this notification
+          const { error: insertError } = await supabase
+            .from('overtime_notifications_sent')
+            .insert({
+              time_clock_id: entry.id,
+              employee_id: entry.employee_id,
+              threshold_hours: setting.threshold_hours,
+            });
+
+          if (insertError) {
+            console.error('Error recording sent notification:', insertError);
+          }
+
+          // Log notifications
+          for (const userId of userIdsToNotify) {
+            await supabase.from('notifications_log').insert({
+              user_id: userId,
+              notification_type: 'shift_status',
+              title,
+              body,
+              onesignal_id: onesignalData.id,
+              data: {
+                type: 'overtime_alert',
+                employee_id: entry.employee_id,
+                time_clock_id: entry.id,
+              },
+            });
+          }
+
+          notifiedCount++;
+        } catch (sendError) {
+          console.error('Error sending notification:', sendError);
+        }
+      } // End of settings loop
+    } // End of entries loop
 
     console.log(`Checked ${activeClockEntries.length} entries, notified ${notifiedCount}`);
 

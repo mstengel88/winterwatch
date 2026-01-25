@@ -96,7 +96,7 @@ const AppRoutes = () => (
               <Route
                 path="/work-logs"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
+                  <ProtectedRoute allowedRoles={["admin", "manager", "work_log_viewer"]}>
                     <WorkLogsPage />
                   </ProtectedRoute>
                 }

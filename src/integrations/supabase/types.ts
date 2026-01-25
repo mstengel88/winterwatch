@@ -309,7 +309,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          employee_id: string
+          employee_id: string | null
           id: string
           is_enabled: boolean
           notify_admins: boolean
@@ -320,7 +320,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
-          employee_id: string
+          employee_id?: string | null
           id?: string
           is_enabled?: boolean
           notify_admins?: boolean
@@ -331,7 +331,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
-          employee_id?: string
+          employee_id?: string | null
           id?: string
           is_enabled?: boolean
           notify_admins?: boolean

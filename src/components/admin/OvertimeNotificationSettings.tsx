@@ -9,11 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Clock, Bell, Loader2, Plus, Pencil, Trash2, Users } from 'lucide-react';
+import { Clock, Bell, Loader2, Plus, Pencil, Trash2, Users, Play } from 'lucide-react';
 
 interface OvertimeSetting {
   id: string;
-  employee_id: string;
+  employee_id: string | null;
   threshold_hours: number;
   is_enabled: boolean;
   notify_employee: boolean;
@@ -27,6 +27,8 @@ interface Employee {
   is_active: boolean;
 }
 
+const GLOBAL_SETTING_ID = '__GLOBAL__';
+
 export function OvertimeNotificationSettings() {
   const [settings, setSettings] = useState<OvertimeSetting[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -34,14 +36,19 @@ export function OvertimeNotificationSettings() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSetting, setEditingSetting] = useState<OvertimeSetting | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   const [formData, setFormData] = useState({
-    employee_id: '',
+    employee_id: '', // Empty string for individual, GLOBAL_SETTING_ID for global
     threshold_hours: '8',
     is_enabled: true,
     notify_employee: true,
     notify_admins: true,
   });
+
+  // Separate global settings from individual settings
+  const globalSettings = settings.filter(s => s.employee_id === null);
+  const individualSettings = settings.filter(s => s.employee_id !== null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -72,7 +79,7 @@ export function OvertimeNotificationSettings() {
     if (setting) {
       setEditingSetting(setting);
       setFormData({
-        employee_id: setting.employee_id,
+        employee_id: setting.employee_id === null ? GLOBAL_SETTING_ID : setting.employee_id,
         threshold_hours: setting.threshold_hours.toString(),
         is_enabled: setting.is_enabled,
         notify_employee: setting.notify_employee,
@@ -92,8 +99,9 @@ export function OvertimeNotificationSettings() {
   };
 
   const handleSave = async () => {
+    // For individual settings, require an employee selection
     if (!formData.employee_id) {
-      toast.error('Please select an employee');
+      toast.error('Please select an employee or "All Employees (Global)"');
       return;
     }
 
@@ -105,8 +113,9 @@ export function OvertimeNotificationSettings() {
 
     setIsSaving(true);
     try {
+      const isGlobal = formData.employee_id === GLOBAL_SETTING_ID;
       const data = {
-        employee_id: formData.employee_id,
+        employee_id: isGlobal ? null : formData.employee_id,
         threshold_hours: thresholdHours,
         is_enabled: formData.is_enabled,
         notify_employee: formData.notify_employee,
@@ -126,7 +135,9 @@ export function OvertimeNotificationSettings() {
           .insert(data);
         if (error) {
           if (error.code === '23505') {
-            toast.error('This employee already has an overtime setting');
+            toast.error(isGlobal 
+              ? 'A global setting already exists' 
+              : 'This employee already has an overtime setting');
             return;
           }
           throw error;
@@ -179,15 +190,36 @@ export function OvertimeNotificationSettings() {
     }
   };
 
-  const getEmployeeName = (employeeId: string) => {
+  const getEmployeeName = (employeeId: string | null) => {
+    if (employeeId === null) return 'All Employees (Global Default)';
     const emp = employees.find(e => e.id === employeeId);
     return emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown';
   };
 
-  // Get employees without settings for the dropdown
+  // Get employees without settings for the dropdown (exclude those with individual settings)
   const availableEmployees = employees.filter(
-    emp => !settings.some(s => s.employee_id === emp.id) || editingSetting?.employee_id === emp.id
+    emp => !individualSettings.some(s => s.employee_id === emp.id) || editingSetting?.employee_id === emp.id
   );
+
+  // Global setting is always available (can have multiple)
+  const canAddGlobal = true;
+
+  const handleTestOvertimeCheck = async () => {
+    setIsTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-overtime');
+      
+      if (error) throw error;
+      
+      const result = data as { checked: number; notified: number };
+      toast.success(`Overtime check complete: ${result.checked} entries checked, ${result.notified} notifications sent`);
+    } catch (error) {
+      console.error('Error testing overtime check:', error);
+      toast.error('Failed to run overtime check');
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -213,10 +245,25 @@ export function OvertimeNotificationSettings() {
                 </CardDescription>
               </div>
             </div>
-            <Button onClick={() => openDialog()} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Setting
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleTestOvertimeCheck} 
+                disabled={isTesting}
+                className="gap-2"
+              >
+                {isTesting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                Test Check
+              </Button>
+              <Button onClick={() => openDialog()} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Setting
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -239,7 +286,74 @@ export function OvertimeNotificationSettings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {settings.map((setting) => (
+                  {/* Show global settings first */}
+                  {globalSettings.map((globalSetting) => (
+                    <tr key={globalSetting.id} className="hover:bg-muted/20 transition-colors bg-primary/5">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                            <Users className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <span className="font-medium text-primary">
+                              All Employees (Global)
+                            </span>
+                            <p className="text-xs text-muted-foreground">
+                              Applies to employees without individual settings
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className="gap-1">
+                          <Clock className="h-3 w-3" />
+                          {globalSetting.threshold_hours} hours
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          {globalSetting.notify_employee && (
+                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                              Employee
+                            </Badge>
+                          )}
+                          {globalSetting.notify_admins && (
+                            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                              Admins
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Switch
+                          checked={globalSetting.is_enabled}
+                          onCheckedChange={() => handleToggleEnabled(globalSetting)}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openDialog(globalSetting)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(globalSetting.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Individual employee settings */}
+                  {individualSettings.map((setting) => (
                     <tr key={setting.id} className="hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -314,21 +428,31 @@ export function OvertimeNotificationSettings() {
               {editingSetting ? 'Edit Overtime Setting' : 'Add Overtime Setting'}
             </DialogTitle>
             <DialogDescription>
-              Configure when to send overtime notifications for this employee
+              Configure when to send overtime notifications
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label>Employee</Label>
+              <Label>Apply To</Label>
               <Select
                 value={formData.employee_id}
                 onValueChange={(value) => setFormData({ ...formData, employee_id: value })}
                 disabled={!!editingSetting}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an employee" />
+                  <SelectValue placeholder="Select employee or global" />
                 </SelectTrigger>
                 <SelectContent>
+                  {canAddGlobal && (
+                    <SelectItem value={GLOBAL_SETTING_ID} className="font-medium">
+                      <span className="text-primary">🌐 All Employees (Global Default)</span>
+                    </SelectItem>
+                  )}
+                  {availableEmployees.length > 0 && canAddGlobal && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground border-t mt-1 pt-2">
+                      Individual Employees
+                    </div>
+                  )}
                   {availableEmployees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
                       {emp.first_name} {emp.last_name}
@@ -336,6 +460,9 @@ export function OvertimeNotificationSettings() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Global applies to all employees without individual settings
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="threshold_hours">Threshold (hours)</Label>
