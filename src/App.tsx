@@ -16,6 +16,7 @@ import { IosInputFocusFix } from "@/components/ios/IosInputFocusFix";
 import { Capacitor } from "@capacitor/core";
 import AuthCallback from "./pages/AuthCallback";
 import { PostLoginNotificationPrompt } from "@/components/notifications/PostLoginNotificationPrompt";
+import { NotificationActionHandler } from "@/components/notifications/NotificationActionHandler";
 
 // Lazy load pages
 import DriverDashboard from "./pages/DriverDashboard";
@@ -59,6 +60,7 @@ const AppRoutes = () => (
           <OfflineIndicator />
           <InstallPrompt />
           <PostLoginNotificationPrompt />
+          <NotificationActionHandler />
 
           <Suspense fallback={<PageLoader />}>
             <Routes>

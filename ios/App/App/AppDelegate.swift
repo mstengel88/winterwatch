@@ -108,10 +108,73 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         completionHandler([.banner, .badge, .sound])
     }
     
-    // Handle notification tap
+    // Handle notification tap or action button press
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
-        NotificationCenter.default.post(name: Notification.Name("pushNotificationActionPerformed"), object: userInfo)
+        let actionIdentifier = response.actionIdentifier
+        
+        // Check if this is a custom action (button press)
+        if actionIdentifier == "stay_on_shift" || actionIdentifier == "stop_shift" {
+            // Extract the notification data
+            var actionData: [String: Any] = [
+                "actionId": actionIdentifier,
+                "type": "overtime_alert"
+            ]
+            
+            // Try to get data from different possible locations
+            if let custom = userInfo["custom"] as? [String: Any],
+               let a = custom["a"] as? [String: Any] {
+                // OneSignal format
+                if let employeeId = a["employee_id"] as? String {
+                    actionData["employee_id"] = employeeId
+                }
+                if let timeClockId = a["time_clock_id"] as? String {
+                    actionData["time_clock_id"] = timeClockId
+                }
+            } else {
+                // Direct format
+                if let employeeId = userInfo["employee_id"] as? String {
+                    actionData["employee_id"] = employeeId
+                }
+                if let timeClockId = userInfo["time_clock_id"] as? String {
+                    actionData["time_clock_id"] = timeClockId
+                }
+            }
+            
+            print("[AppDelegate] Notification action: \(actionIdentifier), data: \(actionData)")
+            
+            // Post notification with action data
+            NotificationCenter.default.post(
+                name: Notification.Name("pushNotificationActionPerformed"),
+                object: actionData
+            )
+            
+            // Also inject JavaScript to handle in WebView
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if let window = UIApplication.shared.windows.first,
+                   let rootVC = window.rootViewController as? BridgeViewController,
+                   let webView = rootVC.bridge?.webView {
+                    let jsonData = try? JSONSerialization.data(withJSONObject: actionData)
+                    let jsonString = String(data: jsonData ?? Data(), encoding: .utf8) ?? "{}"
+                    let script = """
+                        window.dispatchEvent(new CustomEvent('pushNotificationActionPerformed', {
+                            detail: \(jsonString)
+                        }));
+                    """
+                    webView.evaluateJavaScript(script) { _, error in
+                        if let error = error {
+                            print("[AppDelegate] JS injection error: \(error)")
+                        } else {
+                            print("[AppDelegate] JS event dispatched successfully")
+                        }
+                    }
+                }
+            }
+        } else {
+            // Regular notification tap
+            NotificationCenter.default.post(name: Notification.Name("pushNotificationActionPerformed"), object: userInfo)
+        }
+        
         completionHandler()
     }
     
