@@ -7,6 +7,7 @@ import { Bell, Clock, MapPin, Megaphone, Volume2, Lock } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { PushDiagnostics } from '@/components/notifications/PushDiagnostics';
 
 const SOUND_OPTIONS = [
   { value: 'default', label: 'Default' },
@@ -272,6 +273,9 @@ export function NotificationSettings() {
             </div>
           </>
         )}
+
+        {/* Admin-only: show what plugin globals exist on-device */}
+        <PushDiagnostics />
       </CardContent>
     </Card>
   );
