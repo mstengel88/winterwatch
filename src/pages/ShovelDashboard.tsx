@@ -4,6 +4,7 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useWeather } from '@/hooks/useWeather';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,13 @@ export default function ShovelDashboard() {
     updateActiveWorkLog,
   } = useShovelWorkLogs();
   const { location: geoLocation, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
+  
+  // Fetch weather based on geolocation
+  const { weather: weatherData, isLoading: weatherLoading } = useWeather(
+    geoLocation?.latitude ?? null,
+    geoLocation?.longitude ?? null
+  );
+
   const {
     photos,
     previews,
@@ -77,13 +85,22 @@ export default function ShovelDashboard() {
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>([]);
   const [snowDepth, setSnowDepth] = useState('');
   const [saltUsed, setSaltUsed] = useState('');
-  const [temperature, setTemperature] = useState('31');
-  const [weather, setWeather] = useState('Cloudy');
-  const [wind, setWind] = useState('11');
+  const [temperature, setTemperature] = useState('');
+  const [weather, setWeather] = useState('');
+  const [wind, setWind] = useState('');
   const [notes, setNotes] = useState('');
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
+
+  // Auto-populate weather fields when weather data is fetched
+  useEffect(() => {
+    if (weatherData) {
+      setTemperature(String(weatherData.temperature));
+      setWeather(weatherData.conditions);
+      setWind(String(weatherData.windSpeed));
+    }
+  }, [weatherData]);
 
   // Key for storing team members per shift in localStorage
   const shiftTeamStorageKey = activeShift ? `shovel-team-${activeShift.id}` : null;
@@ -405,7 +422,7 @@ export default function ShovelDashboard() {
             </div>
             <h1 className="text-2xl font-bold">Shovel Crew</h1>
             <Badge variant="outline" className="bg-[hsl(var(--card))]/50 border-border/50 text-muted-foreground">
-              {temperature}°F
+              {weatherLoading ? '...' : temperature ? `${temperature}°F` : '--°F'}
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1">
