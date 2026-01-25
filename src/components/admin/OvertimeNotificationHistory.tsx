@@ -170,8 +170,20 @@ export function OvertimeNotificationHistory() {
         body: {
           user_ids: [employee.user_id],
           title: `⏰ Overtime Alert (${lastNotification.threshold_hours}h)`,
-          body: `You have been clocked in for over ${lastNotification.threshold_hours} hours. This is a resent notification.`,
+          body: `You have been clocked in for ${lastNotification.threshold_hours} hours. Would you like to stay on shift or clock out?`,
           notification_type: 'shift_status',
+          // Include action buttons for iOS
+          ios_category: 'overtime_action',
+          buttons: [
+            { id: 'stay_on_shift', text: 'Stay on Shift' },
+            { id: 'stop_shift', text: 'Stop Shift' },
+          ],
+          data: {
+            type: 'overtime_alert',
+            employee_id: employee.id,
+            time_clock_id: lastNotification.time_clock_id,
+            hours_worked: lastNotification.threshold_hours,
+          },
         },
       });
 
@@ -219,8 +231,19 @@ export function OvertimeNotificationHistory() {
         body: {
           user_ids: [employee.user_id],
           title: `⏰ Overtime Alert (${thresholdHours}h)`,
-          body: `You have been clocked in for over ${thresholdHours} hours. Please check in with your manager.`,
+          body: `You have been clocked in for ${thresholdHours} hours. Would you like to stay on shift or clock out?`,
           notification_type: 'shift_status',
+          // Include action buttons for iOS
+          ios_category: 'overtime_action',
+          buttons: [
+            { id: 'stay_on_shift', text: 'Stay on Shift' },
+            { id: 'stop_shift', text: 'Stop Shift' },
+          ],
+          data: {
+            type: 'overtime_alert',
+            employee_id: employee.id,
+            hours_worked: thresholdHours,
+          },
         },
       });
 
