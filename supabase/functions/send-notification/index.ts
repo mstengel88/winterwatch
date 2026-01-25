@@ -234,12 +234,12 @@ Deno.serve(async (req) => {
       if (validCount <= 0) {
         return new Response(
           JSON.stringify({ 
-            success: false, 
+            success: true, 
             sent_count: 0,
-            error: "All device tokens are invalid. Users need to re-enable push notifications.",
-            invalid_count: invalidIds.length,
+            message: "All device tokens were invalid and have been cleaned up. Users need to re-enable push notifications in Settings.",
+            invalid_tokens_removed: invalidIds.length,
           }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
