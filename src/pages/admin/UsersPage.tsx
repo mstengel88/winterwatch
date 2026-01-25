@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { UserCog, Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User } from 'lucide-react';
+import { UserCog, Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User, FileText } from 'lucide-react';
 import { AppRole, Profile } from '@/types/auth';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -14,7 +14,7 @@ interface UserWithRoles extends Profile {
   roles: AppRole[];
 }
 
-const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client'];
+const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client', 'work_log_viewer'];
 
 const getRoleIcon = (role: string) => {
   switch (role) {
@@ -22,6 +22,7 @@ const getRoleIcon = (role: string) => {
     case 'manager': return <Users className="h-3 w-3" />;
     case 'driver': return <Truck className="h-3 w-3" />;
     case 'shovel_crew': return <Shovel className="h-3 w-3" />;
+    case 'work_log_viewer': return <FileText className="h-3 w-3" />;
     default: return <User className="h-3 w-3" />;
   }
 };
@@ -32,6 +33,7 @@ const getRoleColor = (role: string) => {
     case 'manager': return 'bg-warning text-warning-foreground';
     case 'driver': return 'bg-plow text-plow-foreground';
     case 'shovel_crew': return 'bg-shovel text-shovel-foreground';
+    case 'work_log_viewer': return 'bg-primary text-primary-foreground';
     default: return 'bg-secondary text-secondary-foreground';
   }
 };
