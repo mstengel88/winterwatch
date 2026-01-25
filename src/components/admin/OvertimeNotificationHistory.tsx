@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { History, Loader2, RefreshCw, Clock, Users, Send, RotateCcw } from 'lucide-react';
+import { History, Loader2, RefreshCw, Clock, Users, Send, RotateCcw, ChevronDown, Zap } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 
 interface NotificationRecord {
@@ -27,18 +28,26 @@ interface Employee {
   last_name: string;
 }
 
+interface OvertimeSetting {
+  id: string;
+  threshold_hours: number;
+  is_enabled: boolean;
+}
+
 export function OvertimeNotificationHistory() {
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [overtimeSettings, setOvertimeSettings] = useState<OvertimeSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [isSendingOvertimeTest, setIsSendingOvertimeTest] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('self');
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [notificationsRes, employeesRes] = await Promise.all([
+      const [notificationsRes, employeesRes, settingsRes] = await Promise.all([
         supabase
           .from('overtime_notifications_sent')
           .select(`
@@ -56,10 +65,16 @@ export function OvertimeNotificationHistory() {
           .select('id, user_id, first_name, last_name')
           .eq('is_active', true)
           .order('last_name'),
+        supabase
+          .from('overtime_notification_settings')
+          .select('id, threshold_hours, is_enabled')
+          .eq('is_enabled', true)
+          .order('threshold_hours'),
       ]);
 
       if (notificationsRes.error) throw notificationsRes.error;
       if (employeesRes.error) throw employeesRes.error;
+      if (settingsRes.error) throw settingsRes.error;
       
       // Transform data to handle the joined employee data
       const transformedData = (notificationsRes.data || []).map(record => ({
@@ -69,6 +84,7 @@ export function OvertimeNotificationHistory() {
       
       setNotifications(transformedData);
       setEmployees(employeesRes.data || []);
+      setOvertimeSettings(settingsRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load notification history');
@@ -185,6 +201,51 @@ export function OvertimeNotificationHistory() {
     return 'Unknown Employee';
   };
 
+  const handleSendOvertimeTest = async (thresholdHours: number) => {
+    if (selectedEmployeeId === 'self') {
+      toast.error('Please select an employee (not yourself) for overtime test notifications');
+      return;
+    }
+
+    const employee = employees.find(e => e.id === selectedEmployeeId);
+    if (!employee?.user_id) {
+      toast.error('This employee does not have a linked user account');
+      return;
+    }
+
+    setIsSendingOvertimeTest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          user_ids: [employee.user_id],
+          title: `⏰ Overtime Alert (${thresholdHours}h)`,
+          body: `You have been clocked in for over ${thresholdHours} hours. Please check in with your manager.`,
+          notification_type: 'shift_status',
+        },
+      });
+
+      if (error) throw error;
+
+      const employeeName = `${employee.first_name} ${employee.last_name}`;
+
+      if (data?.success && data?.sent_count > 0) {
+        toast.success(`${thresholdHours}h overtime alert sent to ${employeeName}!`);
+      } else if (data?.sent_count === 0) {
+        toast.warning(`No active device found for ${employeeName}. They need to enable push notifications.`);
+      } else if (data?.error) {
+        toast.error(`Failed to send: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error sending overtime test:', error);
+      toast.error('Failed to send overtime test notification');
+    } finally {
+      setIsSendingOvertimeTest(false);
+    }
+  };
+
+  // Get unique threshold values from settings
+  const uniqueThresholds = [...new Set(overtimeSettings.map(s => s.threshold_hours))].sort((a, b) => a - b);
+
   return (
     <Card className="bg-card/50 border-border/50">
       <CardHeader>
@@ -260,6 +321,54 @@ export function OvertimeNotificationHistory() {
               )}
               Test Push
             </Button>
+
+            {/* Overtime Test Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={isSendingOvertimeTest || selectedEmployeeId === 'self'}
+                  className="gap-2"
+                >
+                  {isSendingOvertimeTest ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                  Test Overtime
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card z-50">
+                <DropdownMenuLabel>Send Overtime Alert</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {uniqueThresholds.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No thresholds configured
+                  </DropdownMenuItem>
+                ) : (
+                  uniqueThresholds.map(threshold => (
+                    <DropdownMenuItem
+                      key={threshold}
+                      onClick={() => handleSendOvertimeTest(threshold)}
+                      className="gap-2"
+                    >
+                      <Clock className="h-4 w-4" />
+                      {threshold} Hour Alert
+                    </DropdownMenuItem>
+                  ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => handleSendOvertimeTest(8)}
+                  className="gap-2 text-muted-foreground"
+                >
+                  <Clock className="h-4 w-4" />
+                  Custom: 8h
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </CardHeader>
