@@ -36,4 +36,9 @@ class BridgeViewController: CAPBridgeViewController {
             webView.configuration.preferences.isTextInteractionEnabled = true
         }
     }
+    
+    // Register custom plugins with the Capacitor bridge
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(OneSignalBridgePlugin())
+    }
 }
