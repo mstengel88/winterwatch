@@ -177,19 +177,27 @@ const AppRoutes = () => (
 
 function App() {
   useEffect(() => {
-  (async () => {
-    const { Capacitor } = await import("@capacitor/core");
-    if (Capacitor.isNativePlatform()) {
-      const { initDeepLinkAuth } = await import("./deepLinkAuth");
-      await initDeepLinkAuth();
+    (async () => {
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.isNativePlatform()) {
+        // Defer deep-link init very slightly to let the first paint happen.
+        // (Helps iOS 18.x WKWebView stability.)
+        setTimeout(async () => {
+          try {
+            const { initDeepLinkAuth } = await import("./deepLinkAuth");
+            await initDeepLinkAuth();
+          } catch (e) {
+            console.error("[App] initDeepLinkAuth failed:", e);
+          }
+        }, 500);
 
-      if ("serviceWorker" in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
       }
-    }
-  })();
-}, []);
+    })();
+  }, []);
 
 
 
