@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Clock, Bell, Loader2, Plus, Pencil, Trash2, Users } from 'lucide-react';
+import { Clock, Bell, Loader2, Plus, Pencil, Trash2, Users, Play } from 'lucide-react';
 
 interface OvertimeSetting {
   id: string;
@@ -36,6 +36,7 @@ export function OvertimeNotificationSettings() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSetting, setEditingSetting] = useState<OvertimeSetting | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   const [formData, setFormData] = useState({
     employee_id: '', // Empty string for individual, GLOBAL_SETTING_ID for global
@@ -203,6 +204,23 @@ export function OvertimeNotificationSettings() {
   // Global setting is always available (can have multiple)
   const canAddGlobal = true;
 
+  const handleTestOvertimeCheck = async () => {
+    setIsTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-overtime');
+      
+      if (error) throw error;
+      
+      const result = data as { checked: number; notified: number };
+      toast.success(`Overtime check complete: ${result.checked} entries checked, ${result.notified} notifications sent`);
+    } catch (error) {
+      console.error('Error testing overtime check:', error);
+      toast.error('Failed to run overtime check');
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -227,10 +245,25 @@ export function OvertimeNotificationSettings() {
                 </CardDescription>
               </div>
             </div>
-            <Button onClick={() => openDialog()} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Setting
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleTestOvertimeCheck} 
+                disabled={isTesting}
+                className="gap-2"
+              >
+                {isTesting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                Test Check
+              </Button>
+              <Button onClick={() => openDialog()} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Setting
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
