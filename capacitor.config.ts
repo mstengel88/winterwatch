@@ -14,16 +14,28 @@ const config: CapacitorConfig = {
     iosScheme: "https",
     androidScheme: "https",
   },
-  // iOS 18+ WKWebView input/gesture stability
+  // iOS 18+ WKWebView input/gesture stability and performance
   ios: {
     allowsLinkPreview: false,
     scrollEnabled: true,
+    // Performance optimizations
+    backgroundColor: "#0f172a", // Match app background for faster perceived load
+    limitsNavigationsToAppBoundDomains: false,
   },
   plugins: {
     Keyboard: {
       // Keeps layout stable and improves focus/keyboard behavior in WKWebView
       resize: "body",
       resizeOnFullScreen: true,
+    },
+    SplashScreen: {
+      // Optimize splash screen for faster perceived startup
+      launchShowDuration: 0, // Auto-hide immediately when app is ready
+      launchAutoHide: true,
+      backgroundColor: "#0f172a",
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: true,
     },
   },
 };
