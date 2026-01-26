@@ -40,18 +40,18 @@ export default function NotificationsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            History
+        <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+          <TabsTrigger value="history" className="flex items-center gap-1.5 px-2 py-2 text-xs sm:text-sm sm:gap-2 sm:px-3">
+            <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">History</span>
           </TabsTrigger>
-          <TabsTrigger value="send" className="flex items-center gap-2">
-            <Send className="h-4 w-4" />
-            Send Notification
+          <TabsTrigger value="send" className="flex items-center gap-1.5 px-2 py-2 text-xs sm:text-sm sm:gap-2 sm:px-3">
+            <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">Send</span>
           </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Mandatory Settings
+          <TabsTrigger value="settings" className="flex items-center gap-1.5 px-2 py-2 text-xs sm:text-sm sm:gap-2 sm:px-3">
+            <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">Mandatory</span>
           </TabsTrigger>
         </TabsList>
 

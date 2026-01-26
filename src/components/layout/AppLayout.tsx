@@ -1,17 +1,27 @@
 import { ReactNode } from 'react';
 import { AppHeader } from './AppHeader';
 import { LocationBootstrap } from "@/components/LocationBootstrap";
+import { useNativePlatform } from '@/hooks/useNativePlatform';
+import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const { isNative } = useNativePlatform();
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className={cn(
+      "min-h-screen bg-background",
+      isNative && "ios-page"
+    )}>
       <LocationBootstrap />
       <AppHeader />
-      <main className="container px-4 py-6 mx-auto max-w-6xl">
+      <main className={cn(
+        "container px-4 py-6 mx-auto max-w-6xl",
+        isNative && "pb-safe"
+      )}>
         {children}
       </main>
     </div>
