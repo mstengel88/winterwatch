@@ -802,6 +802,37 @@ export default function ReportsPage() {
     }
   };
 
+  // Move billable logs back to current (clear check_out_time)
+  const handleBulkMoveToCurrent = async () => {
+    const ids = Array.from(selectedWorkLogs);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      // Separate plow and shovel logs
+      const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
+      const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
+      
+      if (plowIds.length > 0) {
+        const { error } = await supabase.from('work_logs').update({ check_out_time: null, status: 'in_progress' }).in('id', plowIds);
+        if (error) throw error;
+      }
+      if (shovelIds.length > 0) {
+        const { error } = await supabase.from('shovel_work_logs').update({ check_out_time: null, status: 'in_progress' }).in('id', shovelIds);
+        if (error) throw error;
+      }
+      
+      toast.success(`${ids.length} work log(s) moved back to current`);
+      setSelectedWorkLogs(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving logs to current:', error);
+      toast.error('Failed to move logs to current');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Open dialog handlers
   const openAddShift = () => {
     setEditingShift(null);
@@ -1228,15 +1259,26 @@ export default function ReportsPage() {
                       </Button>
                     )}
                     {activeTab === 'billable' && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => handleBulkMarkBilled(true)}
-                        disabled={isSaving}
-                      >
-                        <Archive className="h-4 w-4 mr-1" />
-                        Mark Billed ({selectedWorkLogs.size})
-                      </Button>
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={handleBulkMoveToCurrent}
+                          disabled={isSaving}
+                        >
+                          <Clock className="h-4 w-4 mr-1" />
+                          Move to Current ({selectedWorkLogs.size})
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleBulkMarkBilled(true)}
+                          disabled={isSaving}
+                        >
+                          <Archive className="h-4 w-4 mr-1" />
+                          Mark Billed ({selectedWorkLogs.size})
+                        </Button>
+                      </>
                     )}
                     {activeTab === 'completed' && (
                       <Button 
