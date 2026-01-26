@@ -62,6 +62,7 @@ interface WorkLogEntry {
   photo_urls: string[] | null;
   notes: string | null;
   billed: boolean;
+  billing_status: 'current' | 'billable' | 'completed';
 }
 
 interface Account {
@@ -235,6 +236,7 @@ export default function ReportsPage() {
         photo_urls: log.photo_urls,
         notes: log.notes,
         billed: log.billed || false,
+        billing_status: (log.billing_status || 'current') as 'current' | 'billable' | 'completed',
       }));
 
       // For shovel logs, fetch team member names if available
@@ -270,6 +272,7 @@ export default function ReportsPage() {
             photo_urls: log.photo_urls,
             notes: log.notes,
             billed: log.billed || false,
+            billing_status: (log.billing_status || 'current') as 'current' | 'billable' | 'completed',
           };
         })
       );
@@ -299,21 +302,10 @@ export default function ReportsPage() {
 
   const filteredWorkLogs = useMemo(() => {
     return workLogs.filter(log => {
-      // Filter by status based on active tab
-      // Current = in_progress (not completed, not billed)
-      // Billable = completed but not billed
-      // Completed = billed (archived)
-      if (activeTab === 'current') {
-        // Show logs that are in progress (have check_in but no check_out) and not billed
-        if (log.billed) return false;
-        if (log.check_out_time) return false; // Has checkout = not in progress
-      }
-      if (activeTab === 'billable') {
-        // Show completed logs (have checkout) that are not yet billed
-        if (log.billed) return false;
-        if (!log.check_out_time) return false; // No checkout = still in progress
-      }
-      if (activeTab === 'completed' && !log.billed) return false;
+      // Filter by billing_status based on active tab
+      if (activeTab === 'current' && log.billing_status !== 'current') return false;
+      if (activeTab === 'billable' && log.billing_status !== 'billable') return false;
+      if (activeTab === 'completed' && log.billing_status !== 'completed') return false;
       
       if (logType !== 'all' && log.type !== logType) return false;
       if (selectedServiceType !== 'all' && log.service_type !== selectedServiceType) return false;
@@ -342,11 +334,9 @@ export default function ReportsPage() {
     });
   }, [workLogs, logType, selectedPlowAccount, selectedShovelLocation, selectedEmployee, selectedServiceType, selectedEquipment, minSnow, minSalt, accounts, employees, equipment, activeTab]);
 
-  // Counts for tabs
-  // Current = in progress (no checkout, not billed)
-  const currentCount = useMemo(() => workLogs.filter(l => !l.billed && !l.check_out_time).length, [workLogs]);
-  // Billable = completed (has checkout) but not billed
-  const billableCount = useMemo(() => workLogs.filter(l => !l.billed && l.check_out_time).length, [workLogs]);
+  // Counts for tabs based on billing_status
+  const currentCount = useMemo(() => workLogs.filter(l => l.billing_status === 'current').length, [workLogs]);
+  const billableCount = useMemo(() => workLogs.filter(l => l.billing_status === 'billable').length, [workLogs]);
   // Completed = billed/archived
   const completedCount = useMemo(() => workLogs.filter(l => l.billed).length, [workLogs]);
 
@@ -753,23 +743,26 @@ export default function ReportsPage() {
     setBulkDeleteDialogOpen(true);
   };
 
-  // Bulk mark as billed/unbilled
+  // Bulk mark as billed/unbilled (also updates billing_status)
   const handleBulkMarkBilled = async (billed: boolean) => {
     const ids = Array.from(selectedWorkLogs);
     if (ids.length === 0) return;
     
     setIsSaving(true);
     try {
-      // Separate plow and shovel logs
       const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
       const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
       
+      const updateData = billed 
+        ? { billed: true, billing_status: 'completed' }
+        : { billed: false, billing_status: 'billable' };
+      
       if (plowIds.length > 0) {
-        const { error } = await supabase.from('work_logs').update({ billed }).in('id', plowIds);
+        const { error } = await supabase.from('work_logs').update(updateData).in('id', plowIds);
         if (error) throw error;
       }
       if (shovelIds.length > 0) {
-        const { error } = await supabase.from('shovel_work_logs').update({ billed }).in('id', shovelIds);
+        const { error } = await supabase.from('shovel_work_logs').update(updateData).in('id', shovelIds);
         if (error) throw error;
       }
       
@@ -784,15 +777,20 @@ export default function ReportsPage() {
     }
   };
 
-  // Mark single work log as billed/unbilled
+  // Mark single work log as billed/unbilled (also updates billing_status)
   const handleToggleBilled = async (log: WorkLogEntry) => {
     setIsSaving(true);
     try {
       const table = log.type === 'plow' ? 'work_logs' : 'shovel_work_logs';
-      const { error } = await supabase.from(table).update({ billed: !log.billed }).eq('id', log.id);
+      const newBilled = !log.billed;
+      const updateData = newBilled 
+        ? { billed: true, billing_status: 'completed' }
+        : { billed: false, billing_status: 'billable' };
+      
+      const { error } = await supabase.from(table).update(updateData).eq('id', log.id);
       if (error) throw error;
       
-      toast.success(`Work log marked as ${!log.billed ? 'billed' : 'unbilled'}`);
+      toast.success(`Work log marked as ${newBilled ? 'billed' : 'unbilled'}`);
       await fetchData();
     } catch (error) {
       console.error('Error toggling billed status:', error);
@@ -802,27 +800,26 @@ export default function ReportsPage() {
     }
   };
 
-  // Move billable logs back to current (clear check_out_time)
+  // Move logs back to current (only updates billing_status, no data changes)
   const handleBulkMoveToCurrent = async () => {
     const ids = Array.from(selectedWorkLogs);
     if (ids.length === 0) return;
     
     setIsSaving(true);
     try {
-      // Separate plow and shovel logs
       const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
       const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
       
       if (plowIds.length > 0) {
-        const { error } = await supabase.from('work_logs').update({ check_out_time: null, status: 'in_progress' }).in('id', plowIds);
+        const { error } = await supabase.from('work_logs').update({ billing_status: 'current' }).in('id', plowIds);
         if (error) throw error;
       }
       if (shovelIds.length > 0) {
-        const { error } = await supabase.from('shovel_work_logs').update({ check_out_time: null, status: 'in_progress' }).in('id', shovelIds);
+        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'current' }).in('id', shovelIds);
         if (error) throw error;
       }
       
-      toast.success(`${ids.length} work log(s) moved back to current`);
+      toast.success(`${ids.length} work log(s) moved to current`);
       setSelectedWorkLogs(new Set());
       await fetchData();
     } catch (error) {
@@ -833,24 +830,22 @@ export default function ReportsPage() {
     }
   };
 
-  // Move current logs to billable (set check_out_time to now)
+  // Move logs to billable (only updates billing_status, no data changes)
   const handleBulkMoveToBillable = async () => {
     const ids = Array.from(selectedWorkLogs);
     if (ids.length === 0) return;
     
     setIsSaving(true);
     try {
-      const now = new Date().toISOString();
-      // Separate plow and shovel logs
       const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
       const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
       
       if (plowIds.length > 0) {
-        const { error } = await supabase.from('work_logs').update({ check_out_time: now, status: 'completed' }).in('id', plowIds);
+        const { error } = await supabase.from('work_logs').update({ billing_status: 'billable' }).in('id', plowIds);
         if (error) throw error;
       }
       if (shovelIds.length > 0) {
-        const { error } = await supabase.from('shovel_work_logs').update({ check_out_time: now, status: 'completed' }).in('id', shovelIds);
+        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'billable' }).in('id', shovelIds);
         if (error) throw error;
       }
       
