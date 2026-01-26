@@ -8,10 +8,10 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="min-h-screen bg-background ios-page">
+    <div className="min-h-screen bg-background">
       <LocationBootstrap />
       <AppHeader />
-      <main className="container px-4 py-5 pb-safe max-w-2xl mx-auto">
+      <main className="container px-4 py-6 mx-auto max-w-6xl">
         {children}
       </main>
     </div>
