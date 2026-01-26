@@ -6,14 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { UserCog, Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User } from 'lucide-react';
+import { UserCog, Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User, FileText } from 'lucide-react';
 import { AppRole, Profile } from '@/types/auth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UserWithRoles extends Profile {
   roles: AppRole[];
 }
 
-const ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client'];
+const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client', 'work_log_viewer'];
 
 const getRoleIcon = (role: string) => {
   switch (role) {
@@ -21,6 +22,7 @@ const getRoleIcon = (role: string) => {
     case 'manager': return <Users className="h-3 w-3" />;
     case 'driver': return <Truck className="h-3 w-3" />;
     case 'shovel_crew': return <Shovel className="h-3 w-3" />;
+    case 'work_log_viewer': return <FileText className="h-3 w-3" />;
     default: return <User className="h-3 w-3" />;
   }
 };
@@ -31,11 +33,18 @@ const getRoleColor = (role: string) => {
     case 'manager': return 'bg-warning text-warning-foreground';
     case 'driver': return 'bg-plow text-plow-foreground';
     case 'shovel_crew': return 'bg-shovel text-shovel-foreground';
+    case 'work_log_viewer': return 'bg-primary text-primary-foreground';
     default: return 'bg-secondary text-secondary-foreground';
   }
 };
 
 export default function UsersPage() {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
+  
+  // Managers can only assign non-admin roles
+  const availableRoles = isAdmin ? ALL_ROLES : ALL_ROLES.filter(r => r !== 'admin');
+  
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingRole, setAddingRole] = useState<{ userId: string; role: AppRole } | null>(null);
@@ -115,6 +124,12 @@ export default function UsersPage() {
   };
 
   const removeRole = async (userId: string, role: AppRole) => {
+    // Managers cannot remove admin role
+    if (!isAdmin && role === 'admin') {
+      toast.error('Only admins can remove the admin role');
+      return;
+    }
+    
     const roleId = `${userId}-${role}`;
     setRemovingRole(roleId);
     try {
@@ -185,21 +200,28 @@ export default function UsersPage() {
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {user.roles.length > 0 ? (
-                          user.roles.map((role) => (
-                            <Badge
-                              key={role}
-                              className={`${getRoleColor(role)} cursor-pointer`}
-                              onClick={() => removeRole(user.id, role)}
-                            >
-                              {getRoleIcon(role)}
-                              <span className="ml-1 capitalize">{role.replace('_', ' ')}</span>
-                              {removingRole === `${user.id}-${role}` ? (
-                                <Loader2 className="ml-1 h-3 w-3 animate-spin" />
-                              ) : (
-                                <Trash2 className="ml-1 h-3 w-3" />
-                              )}
-                            </Badge>
-                          ))
+                          user.roles.map((role) => {
+                            // Managers can't remove admin role
+                            const canRemove = isAdmin || role !== 'admin';
+                            return (
+                              <Badge
+                                key={role}
+                                className={`${getRoleColor(role)} ${canRemove ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}
+                                onClick={() => canRemove && removeRole(user.id, role)}
+                                title={!canRemove ? 'Only admins can remove admin role' : undefined}
+                              >
+                                {getRoleIcon(role)}
+                                <span className="ml-1 capitalize">{role.replace('_', ' ')}</span>
+                                {canRemove && (
+                                  removingRole === `${user.id}-${role}` ? (
+                                    <Loader2 className="ml-1 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="ml-1 h-3 w-3" />
+                                  )
+                                )}
+                              </Badge>
+                            );
+                          })
                         ) : (
                           <span className="text-sm text-muted-foreground">No roles</span>
                         )}
@@ -217,7 +239,7 @@ export default function UsersPage() {
                             <SelectValue placeholder="Select role" />
                           </SelectTrigger>
                           <SelectContent>
-                            {ROLES.filter((r) => !user.roles.includes(r)).map((role) => (
+                            {availableRoles.filter((r) => !user.roles.includes(r)).map((role) => (
                               <SelectItem key={role} value={role}>
                                 <span className="capitalize">{role.replace('_', ' ')}</span>
                               </SelectItem>

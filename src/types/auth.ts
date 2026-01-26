@@ -1,6 +1,6 @@
 import { User, Session } from '@supabase/supabase-js';
 
-export type AppRole = 'admin' | 'manager' | 'driver' | 'shovel_crew' | 'client';
+export type AppRole = 'admin' | 'manager' | 'driver' | 'shovel_crew' | 'client' | 'work_log_viewer';
 
 export interface UserRole {
   id: string;

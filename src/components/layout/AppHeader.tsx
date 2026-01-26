@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/sheet';
 import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNativePlatform } from '@/hooks/useNativePlatform';
 import logo from '@/assets/logo.png';
 
 interface NavItem {
@@ -32,7 +33,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
-  { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager'] },
+  { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
   { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
 ];
@@ -42,6 +43,7 @@ export function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isNative } = useNativePlatform();
 
   const handleSignOut = async () => {
     await signOut();
@@ -88,8 +90,11 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-      <div className="container flex h-14 items-center justify-between px-4">
+    <header className={cn(
+      "sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60",
+      isNative && "pt-[env(safe-area-inset-top)]"
+    )}>
+      <div className="container flex h-14 items-center justify-between px-4 max-w-6xl mx-auto">
         {/* Left: Mobile Menu + Logo */}
         <div className="flex items-center gap-3">
           {/* Mobile Hamburger Menu */}
@@ -228,6 +233,10 @@ export function AppHeader() {
                   <DropdownMenuItem onClick={() => navigate('/admin/equipment')}>
                     <Wrench className="mr-2 h-4 w-4" />
                     Equipment
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/notifications')}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Notifications
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/time-clock')}>
                     <Clock className="mr-2 h-4 w-4" />

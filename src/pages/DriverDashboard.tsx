@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useWeather } from '@/hooks/useWeather';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
+import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
 import { 
   Snowflake, 
   Truck, 
@@ -42,9 +45,32 @@ interface AccountWithDistance extends Account {
 }
 
 export default function DriverDashboard() {
-  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const { profile, isAdminOrManager } = useAuth();
   const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
-  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading, error: geoError } = useGeolocation();
+  const {
+  location: geoLocation,
+  isLoading: geoLoading,
+  error: geoError,
+  refreshOnce,
+} = useGeolocation();
+
+  useEffect(() => {
+    refreshOnce(); // initial prompt + fetch
+
+    const interval = setInterval(() => {
+      refreshOnce(); // keep it updated
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [refreshOnce]);
+
+  // Fetch weather based on geolocation
+  const { weather: weatherData, isLoading: weatherLoading } = useWeather(
+    geoLocation?.latitude ?? null,
+    geoLocation?.longitude ?? null
+  );
+
   const { toast } = useToast();
   const {
     photos,
@@ -58,18 +84,6 @@ export default function DriverDashboard() {
     canAddMore,
   } = usePhotoUpload({ folder: 'work-logs' });
 
-  // Get location on mount and set up periodic refresh
-  useEffect(() => {
-    getCurrentLocation();
-    
-    // Refresh location every 30 seconds for real-time updates
-    const interval = setInterval(() => {
-      getCurrentLocation();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [getCurrentLocation]);
-
   // Form state
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [serviceType, setServiceType] = useState<'plow' | 'salt' | 'both'>('plow');
@@ -77,14 +91,24 @@ export default function DriverDashboard() {
   const [selectedEmployees, setSelectedEmployees] = useState('');
   const [snowDepth, setSnowDepth] = useState('');
   const [saltUsed, setSaltUsed] = useState('');
-  const [temperature, setTemperature] = useState('31');
-  const [weather, setWeather] = useState('Overcast');
-  const [windSpeed, setWindSpeed] = useState('7');
+  const [temperature, setTemperature] = useState('');
+  const [weather, setWeather] = useState('');
+  const [windSpeed, setWindSpeed] = useState('');
   const [notes, setNotes] = useState('');
   const [allEquipment, setAllEquipment] = useState<any[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  // Auto-populate weather fields when weather data is fetched
+  useEffect(() => {
+    if (weatherData) {
+      setTemperature(String(weatherData.temperature));
+      setWeather(weatherData.conditions);
+      setWindSpeed(String(weatherData.windSpeed));
+    }
+  }, [weatherData]);
 
   // Employee selection for UI display only - doesn't affect work log tracking
   const selectedEmployeeNameForUi = useMemo(() => {
@@ -105,6 +129,25 @@ export default function DriverDashboard() {
     checkIn,
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
+// 🔍 DEBUG: check what accounts DriverDashboard is actually receiving
+  useEffect(() => {
+    const withCoords = accounts.filter(
+      (a) => a.latitude != null && a.longitude != null
+    );
+
+    console.log("📍 DriverDashboard accounts TOTAL:", accounts.length);
+    console.log("📍 DriverDashboard accounts WITH coords:", withCoords.length);
+    console.log(
+      "📍 Sample coords:",
+      withCoords.slice(0, 3).map((a) => ({
+        name: a.name,
+        latitude: a.latitude,
+        longitude: a.longitude,
+      }))
+    );
+  }, [accounts]);
+
+
 
   // Filter equipment based on selected service type and sort by number descending
   // Plow → show 'plow' and 'both', Salt/Both → show 'both' only
@@ -208,44 +251,46 @@ export default function DriverDashboard() {
   }, [activeWorkLog]);
 
   // Calculate sorted accounts by distance
-  const sortedAccounts = useMemo((): AccountWithDistance[] => {
-    if (!geoLocation || accounts.length === 0) {
-      return accounts.map(acc => ({ ...acc, distance: undefined }));
-    }
-    
-    return accounts
-      .map((acc) => {
-        let distance: number | undefined = undefined;
-        if (acc.latitude && acc.longitude) {
-          distance = calculateDistance(
-            geoLocation.latitude,
-            geoLocation.longitude,
-            acc.latitude,
-            acc.longitude
-          );
-        }
-        return { ...acc, distance };
-      })
-      .sort((a, b) => {
-        // Accounts with distance first, sorted by distance
-        if (a.distance !== undefined && b.distance !== undefined) {
-          return a.distance - b.distance;
-        }
-        if (a.distance !== undefined) return -1;
-        if (b.distance !== undefined) return 1;
-        return a.name.localeCompare(b.name);
-      });
-  }, [geoLocation, accounts]);
+const sortedAccounts = useMemo((): AccountWithDistance[] => {
+  if (!geoLocation || accounts.length === 0) {
+    return accounts.map((acc) => ({ ...acc, distance: undefined }));
+  }
+
+  return accounts
+    .map((acc) => {
+      let distance: number | undefined = undefined;
+
+      const lat = Number(acc.latitude);
+      const lng = Number(acc.longitude);
+
+if (Number.isFinite(lat) && Number.isFinite(lng)) {
+  distance = calculateDistance(
+    geoLocation.latitude,
+    geoLocation.longitude,
+    lat,
+    lng
+  );
+}
+
+
+      return { ...acc, distance };
+    })
+    .sort((a, b) => {
+      if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
+      if (a.distance !== undefined) return -1;
+      if (b.distance !== undefined) return 1;
+      return a.name.localeCompare(b.name);
+    });
+}, [geoLocation, accounts]);
+
 
   // Get nearest account
   const nearestAccount = useMemo(() => {
-    if (sortedAccounts.length === 0) return null;
-    const first = sortedAccounts[0];
-    if (first.distance !== undefined) {
-      return { account: first, distance: first.distance };
-    }
-    return null;
-  }, [sortedAccounts]);
+  const firstWithDistance = sortedAccounts.find((a) => a.distance !== undefined);
+  if (!firstWithDistance || firstWithDistance.distance === undefined) return null;
+  return { account: firstWithDistance, distance: firstWithDistance.distance };
+}, [sortedAccounts]);
+
 
   // Auto-select nearest account when location updates and no account selected
   useEffect(() => {
@@ -256,9 +301,13 @@ export default function DriverDashboard() {
 
   // Handle manual location refresh
   const handleRefreshLocation = useCallback(async () => {
-    await getCurrentLocation();
-    toast({ title: 'Location updated' });
-  }, [getCurrentLocation, toast]);
+  const loc = await refreshOnce();
+  if (loc) {
+    toast({ title: "Location updated" });
+  }
+}, [refreshOnce, toast]);
+
+
 
   // Today's stats
   const todayStats = useMemo(() => {
@@ -284,19 +333,24 @@ export default function DriverDashboard() {
     if (success) {
       toast({ title: 'Shift started!' });
       // Refresh location after clocking in
-      getCurrentLocation();
+      refreshOnce();
     } else {
       toast({ variant: 'destructive', title: 'Failed to start shift' });
     }
   };
 
-  const handleClockOut = async () => {
+  const handleClockOutClick = () => {
+    setShowClockOutConfirm(true);
+  };
+
+  const handleClockOutConfirm = async () => {
     const success = await clockOut();
     if (success) {
       toast({ title: 'Shift ended!' });
     } else {
       toast({ variant: 'destructive', title: 'Failed to end shift' });
     }
+    return success;
   };
 
   const handleCheckIn = async () => {
@@ -424,13 +478,21 @@ export default function DriverDashboard() {
         {/* Page Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
+            <div 
+              className={`flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 ${
+                isAdminOrManager() ? 'cursor-pointer hover:bg-primary/30 transition-colors' : ''
+              }`}
+              onClick={isAdminOrManager() ? () => navigate('/admin/notifications?tab=send') : undefined}
+              title={isAdminOrManager() ? 'Send Notification' : undefined}
+            >
               <Snowflake className="h-6 w-6 text-primary" />
             </div>
             <div>
               <h1 className="text-xl font-semibold flex items-center gap-2">
                 WinterWatch-Pro
-                <span className="text-sm font-normal text-muted-foreground">{temperature}°F</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {weatherLoading ? '...' : temperature ? `${temperature}°F` : '--°F'}
+                </span>
               </h1>
               <p className="text-sm text-muted-foreground">
                 Welcome back, {employee.first_name} {employee.last_name}! Track your plowing and salting services.
@@ -472,7 +534,7 @@ export default function DriverDashboard() {
               </div>
               {activeShift ? (
                 <Button 
-                  onClick={handleClockOut}
+                  onClick={handleClockOutClick}
                   variant="outline"
                   className="border-red-500/50 text-red-400 hover:bg-red-500/20"
                 >
@@ -488,6 +550,12 @@ export default function DriverDashboard() {
                   Start Shift
                 </Button>
               )}
+              
+              <ClockOutConfirmDialog
+                open={showClockOutConfirm}
+                onOpenChange={setShowClockOutConfirm}
+                onConfirm={handleClockOutConfirm}
+              />
             </div>
           </CardContent>
         </Card>

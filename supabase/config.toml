@@ -1,1 +1,13 @@
 project_id = "caegybyfdkmgjrygnavg"
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.check-overtime]
+verify_jwt = false
+
+[functions.get-weather]
+verify_jwt = false
+
+[functions.overtime-action]
+verify_jwt = false

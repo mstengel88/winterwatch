@@ -10,10 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Users, Plus, Loader2, Truck, Shovel, Search, Upload, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Users, Plus, Loader2, Truck, Shovel, Search, Upload, MoreHorizontal, Pencil, Trash2, Clock } from 'lucide-react';
 import { Employee, EmployeeCategory } from '@/types/database';
 import { Profile } from '@/types/auth';
 import { employeeSchema, getValidationError } from '@/lib/validations';
+import { OvertimeNotificationSettings } from '@/components/admin/OvertimeNotificationSettings';
 
 const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both'];
 
@@ -185,14 +186,18 @@ export default function EmployeesPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-muted/30 border border-border/50">
-          <TabsTrigger value="employees" className="data-[state=active]:bg-secondary gap-2">
-            <Users className="h-4 w-4" />
-            Employees
+        <TabsList className="bg-muted/30 border border-border/50 h-auto flex-wrap">
+          <TabsTrigger value="employees" className="data-[state=active]:bg-secondary gap-1.5 px-2 py-2 text-xs sm:text-sm sm:gap-2 sm:px-3">
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">Employees</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="data-[state=active]:bg-secondary gap-2">
-            <Users className="h-4 w-4" />
-            Users & Roles
+          <TabsTrigger value="users" className="data-[state=active]:bg-secondary gap-1.5 px-2 py-2 text-xs sm:text-sm sm:gap-2 sm:px-3">
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">Users</span>
+          </TabsTrigger>
+          <TabsTrigger value="overtime" className="data-[state=active]:bg-secondary gap-1.5 px-2 py-2 text-xs sm:text-sm sm:gap-2 sm:px-3">
+            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">Overtime</span>
           </TabsTrigger>
         </TabsList>
 
@@ -357,6 +362,10 @@ export default function EmployeesPage() {
               <p>User & Role management coming soon</p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="overtime" className="mt-6">
+          <OvertimeNotificationSettings />
         </TabsContent>
       </Tabs>
 

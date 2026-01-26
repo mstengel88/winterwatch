@@ -57,12 +57,14 @@ export default function WorkLogsPage() {
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address), equipment:equipment(name)')
           .gte('created_at', startDate)
           .lte('created_at', endDate)
+          .eq('billing_status', 'current')
           .order('created_at', { ascending: false }),
         supabase
           .from('shovel_work_logs')
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address)')
           .gte('created_at', startDate)
           .lte('created_at', endDate)
+          .eq('billing_status', 'current')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -256,7 +258,7 @@ export default function WorkLogsPage() {
   };
 
   return (
-    <AppLayout>
+    <AppLayout variant="wide">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
