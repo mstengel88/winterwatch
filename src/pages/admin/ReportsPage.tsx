@@ -1280,7 +1280,7 @@ export default function ReportsPage() {
                           {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
                         </TableCell>
                         <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
-                        <TableCell className="max-w-[100px] truncate" title={log.account_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.account_name}
                         </TableCell>
                         <TableCell>
@@ -1307,13 +1307,13 @@ export default function ReportsPage() {
                           {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
                            log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.weather_conditions || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.equipment_name || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                         </TableCell>
                         <TableCell>
@@ -1409,7 +1409,7 @@ export default function ReportsPage() {
                           {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
                         </TableCell>
                         <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
-                        <TableCell className="max-w-[100px] truncate" title={log.account_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.account_name}
                         </TableCell>
                         <TableCell>
@@ -1436,13 +1436,13 @@ export default function ReportsPage() {
                           {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
                            log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.weather_conditions || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.equipment_name || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                         </TableCell>
                         <TableCell>
