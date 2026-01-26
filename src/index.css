@@ -123,6 +123,10 @@
 
   html {
     color-scheme: dark;
+    /* Optimize rendering performance */
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
@@ -131,6 +135,9 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     overscroll-behavior-y: contain;
+    /* GPU acceleration for smoother animations */
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 
   /* Safe area support for notched devices */

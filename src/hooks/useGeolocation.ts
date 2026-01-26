@@ -1,6 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Geolocation } from "@capacitor/geolocation";
 import { Capacitor } from "@capacitor/core";
+
+// Cache location for 30 seconds to reduce GPS calls (saves battery on iOS)
+const LOCATION_CACHE_MS = 30000;
 
 export function useGeolocation() {
   const [location, setLocation] = useState<{
@@ -11,8 +14,19 @@ export function useGeolocation() {
 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Cache to prevent excessive GPS calls
+  const lastFetchRef = useRef<number>(0);
+  const cachedLocationRef = useRef<typeof location>(null);
 
-  const refreshOnce = useCallback(async () => {
+  const refreshOnce = useCallback(async (forceRefresh = false) => {
+    // Return cached location if still fresh (unless force refresh)
+    const now = Date.now();
+    if (!forceRefresh && cachedLocationRef.current && (now - lastFetchRef.current) < LOCATION_CACHE_MS) {
+      console.log("📍 Using cached location");
+      return cachedLocationRef.current;
+    }
+    
     try {
       setIsLoading(true);
 
@@ -23,6 +37,8 @@ export function useGeolocation() {
 
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
+        timeout: 10000, // 10 second timeout for faster feedback
+        maximumAge: forceRefresh ? 0 : LOCATION_CACHE_MS, // Allow cached position
       });
 
       const loc = {
@@ -33,13 +49,17 @@ export function useGeolocation() {
 
       console.log("📍 refreshOnce location:", loc);
 
+      // Update cache
+      lastFetchRef.current = now;
+      cachedLocationRef.current = loc;
+      
       setLocation(loc);
       setError(null);
       return loc;
     } catch (err: any) {
       console.error("❌ Geolocation error:", err);
       setError("Failed to get location");
-      return null;
+      return cachedLocationRef.current; // Return cached on error
     } finally {
       setIsLoading(false);
     }
