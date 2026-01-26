@@ -833,7 +833,38 @@ export default function ReportsPage() {
     }
   };
 
-  // Open dialog handlers
+  // Move current logs to billable (set check_out_time to now)
+  const handleBulkMoveToBillable = async () => {
+    const ids = Array.from(selectedWorkLogs);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const now = new Date().toISOString();
+      // Separate plow and shovel logs
+      const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
+      const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
+      
+      if (plowIds.length > 0) {
+        const { error } = await supabase.from('work_logs').update({ check_out_time: now, status: 'completed' }).in('id', plowIds);
+        if (error) throw error;
+      }
+      if (shovelIds.length > 0) {
+        const { error } = await supabase.from('shovel_work_logs').update({ check_out_time: now, status: 'completed' }).in('id', shovelIds);
+        if (error) throw error;
+      }
+      
+      toast.success(`${ids.length} work log(s) moved to billable`);
+      setSelectedWorkLogs(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving logs to billable:', error);
+      toast.error('Failed to move logs to billable');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const openAddShift = () => {
     setEditingShift(null);
     setShiftDialogOpen(true);
@@ -1251,11 +1282,11 @@ export default function ReportsPage() {
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        onClick={() => handleBulkMarkBilled(true)}
+                        onClick={handleBulkMoveToBillable}
                         disabled={isSaving}
                       >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Mark Complete ({selectedWorkLogs.size})
+                        <FileText className="h-4 w-4 mr-1" />
+                        Move to Billable ({selectedWorkLogs.size})
                       </Button>
                     )}
                     {activeTab === 'billable' && (
