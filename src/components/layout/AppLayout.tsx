@@ -6,9 +6,11 @@ import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
   children: ReactNode;
+  /** Use 'wide' for data-heavy pages like Reports and Work Logs */
+  variant?: 'default' | 'wide';
 }
 
-export function AppLayout({ children }: AppLayoutProps) {
+export function AppLayout({ children, variant = 'default' }: AppLayoutProps) {
   const { isNative } = useNativePlatform();
 
   return (
@@ -19,7 +21,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       <LocationBootstrap />
       <AppHeader />
       <main className={cn(
-        "container px-4 py-6 mx-auto max-w-6xl",
+        "container px-4 py-6 mx-auto",
+        variant === 'wide' ? "max-w-[1400px]" : "max-w-6xl",
         isNative && "pb-safe"
       )}>
         {children}
