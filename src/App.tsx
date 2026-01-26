@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, memo } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
+import { OfflineSyncIndicator } from "@/components/pwa/OfflineSyncIndicator";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
@@ -18,8 +19,9 @@ import AuthCallback from "./pages/AuthCallback";
 import { PostLoginNotificationPrompt } from "@/components/notifications/PostLoginNotificationPrompt";
 import { NotificationActionHandler } from "@/components/notifications/NotificationActionHandler";
 
-// Lazy load pages
-import DriverDashboard from "./pages/DriverDashboard";
+// Lazy load ALL pages for faster initial bundle
+// DriverDashboard is the most common landing page - preload after initial render
+const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
 const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
 const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
@@ -36,14 +38,47 @@ const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
 const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
 const NotificationsPage = lazy(() => import("./pages/admin/NotificationsPage"));
 const NotificationTypesPage = lazy(() => import("./pages/admin/NotificationTypesPage"));
+const DocsPage = lazy(() => import("./pages/DocsPage"));
 
-const queryClient = new QueryClient();
+// Preload common routes after initial render for smoother navigation
+const preloadCommonRoutes = () => {
+  // Use requestIdleCallback for non-blocking preload
+  const idleCallback = 'requestIdleCallback' in window 
+    ? window.requestIdleCallback 
+    : (cb: () => void) => setTimeout(cb, 200);
+  
+  idleCallback(() => {
+    // Preload DriverDashboard (most common destination after login)
+    import("./pages/DriverDashboard");
+    // Preload ShovelDashboard (second most common)
+    import("./pages/ShovelDashboard");
+  });
+};
 
-const PageLoader = () => (
+// Optimized QueryClient with iOS-specific settings
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Reduce refetching on iOS to save battery and network
+      staleTime: 1000 * 60 * 2, // 2 minutes
+      gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      // Don't refetch on window focus on mobile (saves battery)
+      refetchOnWindowFocus: !Capacitor.isNativePlatform(),
+      // Prevent refetching when reconnecting on mobile
+      refetchOnReconnect: !Capacitor.isNativePlatform(),
+    },
+  },
+});
+
+// Memoized PageLoader to prevent unnecessary re-renders
+const PageLoader = memo(() => (
   <div className="flex min-h-screen items-center justify-center">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
   </div>
-);
+));
+PageLoader.displayName = 'PageLoader';
 
 const AppRoutes = () => (
   <QueryClientProvider client={queryClient}>
@@ -58,6 +93,7 @@ const AppRoutes = () => (
           <Toaster />
           <Sonner />
           <OfflineIndicator />
+          <OfflineSyncIndicator className="fixed bottom-20 left-4 z-40" />
           <InstallPrompt />
           <PostLoginNotificationPrompt />
           <NotificationActionHandler />
@@ -158,6 +194,8 @@ const AppRoutes = () => (
                 <Route path="notification-types" element={<NotificationTypesPage />} />
               </Route>
 
+              <Route path="/docs" element={<DocsPage />} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
@@ -169,6 +207,9 @@ const AppRoutes = () => (
 
 function App() {
   useEffect(() => {
+    // Preload common routes after initial render for faster navigation
+    preloadCommonRoutes();
+    
     (async () => {
       const { Capacitor } = await import("@capacitor/core");
       if (Capacitor.isNativePlatform()) {
@@ -186,6 +227,7 @@ function App() {
           }
         }, delay);
 
+        // Unregister service workers on native (they cause issues)
         if ("serviceWorker" in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
           await Promise.all(regs.map((r) => r.unregister()));
@@ -193,8 +235,6 @@ function App() {
       }
     })();
   }, []);
-
-
 
   return <AppRoutes />;
 }
