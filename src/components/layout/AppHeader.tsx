@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/sheet';
 import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNativePlatform } from '@/hooks/useNativePlatform';
 import logo from '@/assets/logo.png';
 
 interface NavItem {
@@ -42,6 +43,7 @@ export function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isNative } = useNativePlatform();
 
   const handleSignOut = async () => {
     await signOut();
@@ -88,7 +90,10 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <header className={cn(
+      "sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60",
+      isNative && "pt-[env(safe-area-inset-top)]"
+    )}>
       <div className="container flex h-14 items-center justify-between px-4 max-w-6xl mx-auto">
         {/* Left: Mobile Menu + Logo */}
         <div className="flex items-center gap-3">

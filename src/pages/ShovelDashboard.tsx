@@ -647,7 +647,7 @@ export default function ShovelDashboard() {
 
             {/* Team Members - editable before and after check-in */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <Label className="text-sm flex items-center gap-2">
                   <Footprints className="h-4 w-4" />
                   Team Members <span className="text-red-400">*</span>
@@ -656,7 +656,7 @@ export default function ShovelDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/20"
+                    className="h-8 text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/20 self-start sm:self-auto"
                     onClick={async () => {
                       const dbServiceType = serviceType === 'salt' ? 'ice_melt' : serviceType;
                       const success = await updateActiveWorkLog({ 
