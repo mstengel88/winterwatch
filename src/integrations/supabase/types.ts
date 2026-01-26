@@ -495,6 +495,7 @@ export type Database = {
           account_id: string
           areas_cleared: string[] | null
           billed: boolean
+          billing_status: string
           check_in_latitude: number | null
           check_in_longitude: number | null
           check_in_time: string | null
@@ -518,6 +519,7 @@ export type Database = {
           account_id: string
           areas_cleared?: string[] | null
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -541,6 +543,7 @@ export type Database = {
           account_id?: string
           areas_cleared?: string[] | null
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -655,6 +658,7 @@ export type Database = {
         Row: {
           account_id: string
           billed: boolean
+          billing_status: string
           check_in_latitude: number | null
           check_in_longitude: number | null
           check_in_time: string | null
@@ -677,6 +681,7 @@ export type Database = {
         Insert: {
           account_id: string
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -699,6 +704,7 @@ export type Database = {
         Update: {
           account_id?: string
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
