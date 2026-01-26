@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
+import { OfflineSyncIndicator } from "@/components/pwa/OfflineSyncIndicator";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
@@ -37,6 +38,7 @@ const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
 const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
 const NotificationsPage = lazy(() => import("./pages/admin/NotificationsPage"));
 const NotificationTypesPage = lazy(() => import("./pages/admin/NotificationTypesPage"));
+const DocsPage = lazy(() => import("./pages/DocsPage"));
 
 // Preload common routes after initial render for smoother navigation
 const preloadCommonRoutes = () => {
@@ -91,6 +93,7 @@ const AppRoutes = () => (
           <Toaster />
           <Sonner />
           <OfflineIndicator />
+          <OfflineSyncIndicator className="fixed bottom-20 left-4 z-40" />
           <InstallPrompt />
           <PostLoginNotificationPrompt />
           <NotificationActionHandler />
@@ -190,6 +193,8 @@ const AppRoutes = () => (
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="notification-types" element={<NotificationTypesPage />} />
               </Route>
+
+              <Route path="/docs" element={<DocsPage />} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>

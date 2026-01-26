@@ -3,6 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEmployee } from './useEmployee';
 import { useGeolocation } from './useGeolocation';
 import { WorkLog, Account, ServiceType } from '@/types/database';
+import {
+  isOnline,
+  addPendingWorkLog,
+  generateTempId,
+  cacheAccounts,
+  getCachedAccounts,
+} from '@/lib/offlineStorage';
 
 interface UseWorkLogsReturn {
   accounts: Account[];
@@ -46,6 +53,15 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
 
   const fetchAccounts = useCallback(async () => {
     try {
+      // If offline, use cached data
+      if (!isOnline()) {
+        const cached = getCachedAccounts<Account>();
+        if (cached.length > 0) {
+          setAccounts(cached);
+          return;
+        }
+      }
+
       const { data, error: fetchError } = await supabase
         .from('accounts')
         .select('*')
@@ -56,10 +72,20 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
 
       if (fetchError) throw fetchError;
 
-      setAccounts((data || []) as Account[]);
+      const accountsData = (data || []) as Account[];
+      setAccounts(accountsData);
+      
+      // Cache for offline use
+      cacheAccounts(accountsData);
     } catch (err) {
       console.error('Error fetching accounts:', err);
-      setError('Failed to load accounts');
+      // Fallback to cached data on error
+      const cached = getCachedAccounts<Account>();
+      if (cached.length > 0) {
+        setAccounts(cached);
+      } else {
+        setError('Failed to load accounts');
+      }
     }
   }, []);
 
@@ -141,20 +167,52 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     }
 
     const location = await getCurrentLocation();
+    const checkInData = {
+      account_id: accountId,
+      employee_id: effectiveEmployeeId,
+      equipment_id: equipmentId || null,
+      service_type: serviceType,
+      status: 'in_progress' as const,
+      check_in_time: new Date().toISOString(),
+      check_in_latitude: location?.latitude ?? null,
+      check_in_longitude: location?.longitude ?? null,
+    };
+
+    // If offline, save locally
+    if (!isOnline()) {
+      const tempId = generateTempId();
+      addPendingWorkLog({
+        id: tempId,
+        tempId,
+        action: 'check_in',
+        data: checkInData,
+        timestamp: Date.now(),
+      });
+      
+      // Create optimistic local work log
+      const optimisticLog: WorkLog = {
+        ...checkInData,
+        id: tempId,
+        check_out_time: null,
+        check_out_latitude: null,
+        check_out_longitude: null,
+        snow_depth_inches: null,
+        salt_used_lbs: null,
+        weather_conditions: null,
+        notes: null,
+        photo_urls: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        account: accounts.find(a => a.id === accountId),
+      };
+      setActiveWorkLog(optimisticLog);
+      return true;
+    }
 
     try {
       const { data, error: insertError } = await supabase
         .from('work_logs')
-        .insert({
-          account_id: accountId,
-          employee_id: effectiveEmployeeId,
-          equipment_id: equipmentId || null,
-          service_type: serviceType,
-          status: 'in_progress',
-          check_in_time: new Date().toISOString(),
-          check_in_latitude: location?.latitude ?? null,
-          check_in_longitude: location?.longitude ?? null,
-        })
+        .insert(checkInData)
         .select(`
           *,
           account:accounts(*),
@@ -182,30 +240,44 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
 
     const location = await getCurrentLocation();
 
+    const updatePayload: Record<string, unknown> = {
+      status: 'completed',
+      check_out_time: new Date().toISOString(),
+      check_out_latitude: location?.latitude ?? null,
+      check_out_longitude: location?.longitude ?? null,
+      snow_depth_inches: data.snowDepthInches ?? null,
+      salt_used_lbs: data.saltUsedLbs ?? null,
+      weather_conditions: data.weatherConditions ?? null,
+      notes: data.notes ?? null,
+      photo_urls: data.photoUrls ?? null,
+    };
+
+    // Update equipment/employee/service type if provided
+    if (data.equipmentId !== undefined) {
+      updatePayload.equipment_id = data.equipmentId || null;
+    }
+    if (data.employeeId !== undefined) {
+      updatePayload.employee_id = data.employeeId;
+    }
+    if (data.serviceType !== undefined) {
+      updatePayload.service_type = data.serviceType;
+    }
+
+    // If offline, save locally
+    if (!isOnline()) {
+      const tempId = generateTempId();
+      addPendingWorkLog({
+        id: activeWorkLog.id,
+        tempId,
+        action: 'check_out',
+        data: updatePayload,
+        timestamp: Date.now(),
+      });
+      setActiveWorkLog(null);
+      return true;
+    }
+
     try {
-      const updatePayload: Record<string, unknown> = {
-        status: 'completed',
-        check_out_time: new Date().toISOString(),
-        check_out_latitude: location?.latitude ?? null,
-        check_out_longitude: location?.longitude ?? null,
-        snow_depth_inches: data.snowDepthInches ?? null,
-        salt_used_lbs: data.saltUsedLbs ?? null,
-        weather_conditions: data.weatherConditions ?? null,
-        notes: data.notes ?? null,
-        photo_urls: data.photoUrls ?? null,
-      };
-
-      // Update equipment/employee/service type if provided
-      if (data.equipmentId !== undefined) {
-        updatePayload.equipment_id = data.equipmentId || null;
-      }
-      if (data.employeeId !== undefined) {
-        updatePayload.employee_id = data.employeeId;
-      }
-      if (data.serviceType !== undefined) {
-        updatePayload.service_type = data.serviceType;
-      }
-
       const { error: updateError } = await supabase
         .from('work_logs')
         .update(updatePayload)
