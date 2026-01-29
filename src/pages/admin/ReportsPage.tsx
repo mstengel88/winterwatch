@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type MouseEvent, type TouchEvent } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -102,11 +102,11 @@ export default function ReportsPage() {
   // iOS Safari can occasionally miss `click` on small icon buttons inside tables.
   // Using `touchend` + preventing the subsequent synthetic click improves reliability.
   const tapHandlers = (action: () => void) => ({
-    onClick: (e: React.MouseEvent) => {
+    onClick: (e: MouseEvent) => {
       e.stopPropagation();
       action();
     },
-    onTouchEnd: (e: React.TouchEvent) => {
+    onTouchEnd: (e: TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
       action();
