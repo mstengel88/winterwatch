@@ -193,6 +193,7 @@ const AppRoutes = () => (
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="notification-types" element={<NotificationTypesPage />} />
+                <Route path="audit-log" element={<AuditLogPage />} />
               </Route>
 
               <Route path="/docs" element={<DocsPage />} />

@@ -238,6 +238,10 @@ export function AppHeader() {
                     <Bell className="mr-2 h-4 w-4" />
                     Notifications
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/audit-log')}>
+                    <History className="mr-2 h-4 w-4" />
+                    Audit Log
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/time-clock')}>
                     <Clock className="mr-2 h-4 w-4" />
                     Time Clock
