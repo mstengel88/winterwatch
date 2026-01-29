@@ -27,6 +27,8 @@ import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
 import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
 import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
+import { useNativePlatform } from '@/hooks/useNativePlatform';
+import { cn } from '@/lib/utils';
 
 interface TimeClockEntry {
   id: string;
@@ -83,12 +85,17 @@ interface Equipment {
 }
 
 export default function ReportsPage() {
+  const { isNative } = useNativePlatform();
+
   const [isLoading, setIsLoading] = useState(true);
   const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+
+  // iOS/Native: ensure table action buttons are large enough to tap reliably.
+  const tableIconButtonClass = cn("h-7 w-7", isNative && "h-11 w-11");
 
   // Filter state
   const [fromDate, setFromDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
