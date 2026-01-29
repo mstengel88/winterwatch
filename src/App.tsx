@@ -38,6 +38,7 @@ const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
 const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
 const NotificationsPage = lazy(() => import("./pages/admin/NotificationsPage"));
 const NotificationTypesPage = lazy(() => import("./pages/admin/NotificationTypesPage"));
+const AuditLogPage = lazy(() => import("./pages/admin/AuditLogPage"));
 const DocsPage = lazy(() => import("./pages/DocsPage"));
 
 // Preload common routes after initial render for smoother navigation
