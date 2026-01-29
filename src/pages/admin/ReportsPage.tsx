@@ -1685,17 +1685,17 @@ export default function ReportsPage() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-7 w-7" 
+                              className={tableIconButtonClass} 
                               onClick={() => handleToggleBilled(log)}
                               title="Unarchive"
                               disabled={isSaving}
                             >
                               <Archive className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openEditWorkLog(log)}>
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openDeleteWorkLog(log)}>
                               <Trash2 className="h-3 w-3 text-red-400" />
                             </Button>
                           </div>
