@@ -27,6 +27,8 @@ import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
 import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
 import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
+import { useNativePlatform } from '@/hooks/useNativePlatform';
+import { cn } from '@/lib/utils';
 
 interface TimeClockEntry {
   id: string;
@@ -83,12 +85,17 @@ interface Equipment {
 }
 
 export default function ReportsPage() {
+  const { isNative } = useNativePlatform();
+
   const [isLoading, setIsLoading] = useState(true);
   const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+
+  // iOS/Native: ensure table action buttons are large enough to tap reliably.
+  const tableIconButtonClass = cn("h-7 w-7", isNative && "h-11 w-11");
 
   // Filter state
   const [fromDate, setFromDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -1191,10 +1198,10 @@ export default function ReportsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditShift(entry)}>
+                        <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openEditShift(entry)}>
                           <Pencil className="h-3 w-3 text-muted-foreground" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteShift(entry)}>
+                        <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openDeleteShift(entry)}>
                           <Trash2 className="h-3 w-3 text-red-400" />
                         </Button>
                       </div>
@@ -1427,10 +1434,10 @@ export default function ReportsPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openEditWorkLog(log)}>
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openDeleteWorkLog(log)}>
                               <Trash2 className="h-3 w-3 text-red-400" />
                             </Button>
                           </div>
@@ -1549,17 +1556,17 @@ export default function ReportsPage() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-7 w-7" 
+                              className={tableIconButtonClass} 
                               onClick={() => handleToggleBilled(log)}
                               title="Mark as billed"
                               disabled={isSaving}
                             >
                               <CheckCircle className="h-3 w-3 text-green-500" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openEditWorkLog(log)}>
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openDeleteWorkLog(log)}>
                               <Trash2 className="h-3 w-3 text-red-400" />
                             </Button>
                           </div>
@@ -1678,17 +1685,17 @@ export default function ReportsPage() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-7 w-7" 
+                              className={tableIconButtonClass} 
                               onClick={() => handleToggleBilled(log)}
                               title="Unarchive"
                               disabled={isSaving}
                             >
                               <Archive className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openEditWorkLog(log)}>
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} onClick={() => openDeleteWorkLog(log)}>
                               <Trash2 className="h-3 w-3 text-red-400" />
                             </Button>
                           </div>
