@@ -848,14 +848,20 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             {/* Submit Button */}
             {activeWorkLog ? (
               <Button 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                onClick={handleCheckOut}
+                type="button"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground min-h-[48px]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCheckOut();
+                }}
               >
                 Check Out & Complete
               </Button>
             ) : (
               <Button 
-                className="w-full bg-primary/50 hover:bg-primary/40 text-primary-foreground cursor-not-allowed"
+                type="button"
+                className="w-full bg-primary/50 hover:bg-primary/40 text-primary-foreground cursor-not-allowed min-h-[48px]"
                 disabled
               >
                 Check In First

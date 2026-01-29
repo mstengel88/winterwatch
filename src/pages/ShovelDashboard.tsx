@@ -780,9 +780,14 @@ export default function ShovelDashboard() {
 
             {/* Log Service Button */}
             <Button
-              onClick={handleLogService}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleLogService();
+              }}
               disabled={!activeShift || !isFormValid || isUploading}
-              className={`w-full py-6 text-lg font-semibold transition-colors ${
+              className={`w-full py-6 text-lg font-semibold transition-colors min-h-[48px] ${
                 !activeShift || !isFormValid || isUploading
                   ? 'bg-muted text-muted-foreground cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
