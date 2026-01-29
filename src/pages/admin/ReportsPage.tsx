@@ -28,6 +28,7 @@ import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDial
 import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
 import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
 interface TimeClockEntry {
@@ -86,6 +87,7 @@ interface Equipment {
 
 export default function ReportsPage() {
   const { isNative } = useNativePlatform();
+  const isMobile = useIsMobile();
 
   const [isLoading, setIsLoading] = useState(true);
   const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
@@ -94,8 +96,22 @@ export default function ReportsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
 
-  // iOS/Native: ensure table action buttons are large enough to tap reliably.
-  const tableIconButtonClass = cn("h-7 w-7", isNative && "h-11 w-11");
+  // iOS/Native + mobile web: ensure table action buttons are large enough to tap reliably.
+  const tableIconButtonClass = cn("h-7 w-7", (isNative || isMobile) && "h-11 w-11");
+
+  // iOS Safari can occasionally miss `click` on small icon buttons inside tables.
+  // Using `touchend` + preventing the subsequent synthetic click improves reliability.
+  const tapHandlers = (action: () => void) => ({
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      action();
+    },
+    onTouchEnd: (e: React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      action();
+    },
+  });
 
   // Filter state
   const [fromDate, setFromDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
