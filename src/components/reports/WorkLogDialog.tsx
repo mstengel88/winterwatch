@@ -164,7 +164,10 @@ export function WorkLogDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Work Log' : 'Add New Work Log'}</DialogTitle>
         </DialogHeader>
@@ -332,11 +335,20 @@ export function WorkLogDialog({
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="min-h-[44px]"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !accountId || !employeeId}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || !accountId || !employeeId}
+              className="min-h-[44px]"
+            >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isEdit ? 'Update' : 'Create'}
             </Button>
