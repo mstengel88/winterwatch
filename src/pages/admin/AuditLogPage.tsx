@@ -58,7 +58,8 @@ export default function AuditLogPage() {
   const { data: logs, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['audit-logs', tableFilter, actionFilter],
     queryFn: async () => {
-      let query = supabase
+      // Use type assertion since audit_logs is a new table not yet in generated types
+      let query = (supabase as any)
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })
