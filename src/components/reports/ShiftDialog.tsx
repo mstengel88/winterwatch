@@ -137,11 +137,20 @@ export function ShiftDialog({
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="min-h-[44px]"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !employeeId || !clockInDate || !clockInTime}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || !employeeId || !clockInDate || !clockInTime}
+              className="min-h-[44px]"
+            >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isEdit ? 'Update' : 'Create'}
             </Button>
