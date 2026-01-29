@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
+import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import logo from '@/assets/logo.png';
@@ -237,6 +237,10 @@ export function AppHeader() {
                   <DropdownMenuItem onClick={() => navigate('/admin/notifications')}>
                     <Bell className="mr-2 h-4 w-4" />
                     Notifications
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/audit-log')}>
+                    <History className="mr-2 h-4 w-4" />
+                    Audit Log
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/time-clock')}>
                     <Clock className="mr-2 h-4 w-4" />
