@@ -38,6 +38,7 @@ interface TimeClockEntry {
   clock_out_time: string | null;
   clock_in_latitude: number | null;
   clock_in_longitude: number | null;
+  billing_status: 'current' | 'billable' | 'completed';
   employee?: {
     first_name: string;
     last_name: string;
