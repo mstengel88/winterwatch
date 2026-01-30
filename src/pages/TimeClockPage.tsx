@@ -363,8 +363,7 @@ export default function TimeClockPage() {
                   No time entries found.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table className="min-w-[800px]">
+                <Table className="min-w-[800px]">
                     <TableHeader>
                       <TableRow className="border-border/50 hover:bg-transparent">
                         <TableHead>Employee</TableHead>
@@ -466,7 +465,6 @@ export default function TimeClockPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
               )}
             </CardContent>
           </Card>
