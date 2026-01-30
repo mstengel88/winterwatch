@@ -196,130 +196,167 @@ Deno.serve(async (req) => {
 
         console.log(`Employee ${employeeName} has been clocked in for ${hoursFormatted} hours (threshold: ${setting.threshold_hours}, setting: ${settingType})`);
 
-        // Collect user IDs to notify
-        const userIdsToNotify: string[] = [];
-
-        if (setting.notify_employee && employee.user_id) {
-          userIdsToNotify.push(employee.user_id);
-        }
+        // Collect user IDs to notify - separate employee from admins
+        const employeeUserId = setting.notify_employee && employee.user_id ? employee.user_id : null;
+        const adminUserIdsToNotify: string[] = [];
 
         if (setting.notify_admins) {
           for (const adminId of adminUserIds) {
-            if (!userIdsToNotify.includes(adminId)) {
-              userIdsToNotify.push(adminId);
+            // Don't add employee to admin list (they get their own notification)
+            if (adminId !== employeeUserId) {
+              adminUserIdsToNotify.push(adminId);
             }
           }
         }
 
-        if (userIdsToNotify.length === 0) {
+        const hasEmployeeToNotify = !!employeeUserId;
+        const hasAdminsToNotify = adminUserIdsToNotify.length > 0;
+
+        if (!hasEmployeeToNotify && !hasAdminsToNotify) {
           console.log('No users to notify');
           continue;
         }
 
-        // Get device tokens for these users
-        const { data: deviceTokens, error: tokensError } = await supabase
-          .from('push_device_tokens')
-          .select('user_id, player_id')
-          .in('user_id', userIdsToNotify)
-          .eq('is_active', true);
-
-        if (tokensError) {
-          console.error('Error fetching device tokens:', tokensError);
-          continue;
-        }
-
-        if (!deviceTokens || deviceTokens.length === 0) {
-          console.log('No device tokens found');
-          continue;
-        }
-
-        const playerIds = (deviceTokens as DeviceToken[]).map((t) => t.player_id);
-
-        // Determine if this notification is going to the employee themselves
-        const isEmployeeRecipient = employee.user_id && userIdsToNotify.includes(employee.user_id);
-
-        // Notification content with action prompt for employee
+        // Notification content - different for employee vs admins
         const title = 'Overtime Alert';
-        const body = isEmployeeRecipient
-          ? `You have been clocked in for ${hoursFormatted} hours. Would you like to stay on shift or clock out?`
-          : `${employeeName} has been clocked in for ${hoursFormatted} hours`;
+        const employeeBody = `You have been clocked in for ${hoursFormatted} hours. Would you like to stay on shift or clock out?`;
+        const adminBody = `${employeeName} has been clocked in for ${hoursFormatted} hours`;
 
-        // Send notification via OneSignal with action buttons
-        try {
-          const notificationPayload: Record<string, unknown> = {
-            app_id: onesignalAppId,
-            include_player_ids: playerIds,
-            headings: { en: title },
-            contents: { en: body },
-            ios_sound: 'default',
-            data: {
-              type: 'overtime_alert',
-              employee_id: entry.employee_id,
-              time_clock_id: entry.id,
-              hours_worked: hoursFormatted,
-            },
-          };
+        const baseNotificationData = {
+          type: 'overtime_alert',
+          employee_id: entry.employee_id,
+          time_clock_id: entry.id,
+          hours_worked: hoursFormatted,
+        };
 
-          // Add action buttons for iOS (only for employee notifications)
-          if (isEmployeeRecipient) {
-            notificationPayload.ios_category = 'overtime_action';
-            notificationPayload.buttons = [
-              { id: 'stay_on_shift', text: 'Stay on Shift' },
-              { id: 'stop_shift', text: 'Stop Shift' },
-            ];
+        // Send notification to EMPLOYEE (with action buttons)
+        if (hasEmployeeToNotify) {
+          try {
+            const { data: employeeTokens, error: empTokensError } = await supabase
+              .from('push_device_tokens')
+              .select('player_id')
+              .eq('user_id', employeeUserId)
+              .eq('is_active', true);
+
+            if (empTokensError) {
+              console.error('Error fetching employee tokens:', empTokensError);
+            } else if (employeeTokens && employeeTokens.length > 0) {
+              const employeePlayerIds = employeeTokens.map((t) => t.player_id);
+
+              const employeePayload = {
+                app_id: onesignalAppId,
+                include_player_ids: employeePlayerIds,
+                headings: { en: title },
+                contents: { en: employeeBody },
+                ios_sound: 'default',
+                data: baseNotificationData,
+                ios_category: 'overtime_action',
+                buttons: [
+                  { id: 'stay_on_shift', text: 'Stay on Shift' },
+                  { id: 'stop_shift', text: 'Stop Shift' },
+                ],
+              };
+
+              const empResponse = await fetch('https://onesignal.com/api/v1/notifications', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Basic ${onesignalApiKey}`,
+                },
+                body: JSON.stringify(employeePayload),
+              });
+
+              if (empResponse.ok) {
+                const empData = await empResponse.json();
+                console.log('Employee notification sent:', empData.id);
+
+                await supabase.from('notifications_log').insert({
+                  user_id: employeeUserId,
+                  notification_type: 'shift_status',
+                  title,
+                  body: employeeBody,
+                  onesignal_id: empData.id,
+                  data: baseNotificationData,
+                });
+              } else {
+                console.error('Employee notification failed:', await empResponse.text());
+              }
+            }
+          } catch (empError) {
+            console.error('Error sending employee notification:', empError);
           }
+        }
 
-          const onesignalResponse = await fetch('https://onesignal.com/api/v1/notifications', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Basic ${onesignalApiKey}`,
-            },
-            body: JSON.stringify(notificationPayload),
+        // Send notification to ADMINS (with employee name, no action buttons)
+        if (hasAdminsToNotify) {
+          try {
+            const { data: adminTokens, error: adminTokensError } = await supabase
+              .from('push_device_tokens')
+              .select('user_id, player_id')
+              .in('user_id', adminUserIdsToNotify)
+              .eq('is_active', true);
+
+            if (adminTokensError) {
+              console.error('Error fetching admin tokens:', adminTokensError);
+            } else if (adminTokens && adminTokens.length > 0) {
+              const adminPlayerIds = adminTokens.map((t) => t.player_id);
+
+              const adminPayload = {
+                app_id: onesignalAppId,
+                include_player_ids: adminPlayerIds,
+                headings: { en: title },
+                contents: { en: adminBody },
+                ios_sound: 'default',
+                data: baseNotificationData,
+              };
+
+              const adminResponse = await fetch('https://onesignal.com/api/v1/notifications', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Basic ${onesignalApiKey}`,
+                },
+                body: JSON.stringify(adminPayload),
+              });
+
+              if (adminResponse.ok) {
+                const adminData = await adminResponse.json();
+                console.log('Admin notification sent:', adminData.id);
+
+                // Log for each admin
+                for (const adminUserId of adminUserIdsToNotify) {
+                  await supabase.from('notifications_log').insert({
+                    user_id: adminUserId,
+                    notification_type: 'shift_status',
+                    title,
+                    body: adminBody,
+                    onesignal_id: adminData.id,
+                    data: baseNotificationData,
+                  });
+                }
+              } else {
+                console.error('Admin notification failed:', await adminResponse.text());
+              }
+            }
+          } catch (adminError) {
+            console.error('Error sending admin notification:', adminError);
+          }
+        }
+
+        // Record that we sent this notification
+        const { error: insertError } = await supabase
+          .from('overtime_notifications_sent')
+          .insert({
+            time_clock_id: entry.id,
+            employee_id: entry.employee_id,
+            threshold_hours: setting.threshold_hours,
           });
 
-          if (!onesignalResponse.ok) {
-            const errorText = await onesignalResponse.text();
-            console.error('OneSignal error:', errorText);
-            continue;
-          }
-
-          const onesignalData = await onesignalResponse.json();
-          console.log('OneSignal notification sent:', onesignalData.id);
-
-          // Record that we sent this notification
-          const { error: insertError } = await supabase
-            .from('overtime_notifications_sent')
-            .insert({
-              time_clock_id: entry.id,
-              employee_id: entry.employee_id,
-              threshold_hours: setting.threshold_hours,
-            });
-
-          if (insertError) {
-            console.error('Error recording sent notification:', insertError);
-          }
-
-          // Log notifications
-          for (const userId of userIdsToNotify) {
-            await supabase.from('notifications_log').insert({
-              user_id: userId,
-              notification_type: 'shift_status',
-              title,
-              body,
-              onesignal_id: onesignalData.id,
-              data: {
-                type: 'overtime_alert',
-                employee_id: entry.employee_id,
-                time_clock_id: entry.id,
-              },
-            });
-          }
-
-          notifiedCount++;
-        } catch (sendError) {
-          console.error('Error sending notification:', sendError);
+        if (insertError) {
+          console.error('Error recording sent notification:', insertError);
         }
+
+        notifiedCount++;
       } // End of settings loop
     } // End of entries loop
 
