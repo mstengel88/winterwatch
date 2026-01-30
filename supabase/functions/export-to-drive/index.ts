@@ -12,6 +12,7 @@ interface ExportRequest {
   fileContent: string; // Base64 encoded file content
   mimeType: string;
   folderName?: string; // Optional folder to create/use in Drive
+  providerToken: string; // Google OAuth provider token from client
 }
 
 serve(async (req) => {
@@ -52,40 +53,25 @@ serve(async (req) => {
     const userId = claimsData.claims.sub;
     console.log("User authenticated:", userId);
 
-    // Get the user's Google OAuth provider token
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError || !sessionData?.session) {
-      console.error("Failed to get session:", sessionError);
+    // Parse request body
+    const body: ExportRequest = await req.json();
+    const { fileName, fileContent, mimeType, folderName, providerToken } = body;
+
+    if (!fileName || !fileContent || !mimeType) {
       return new Response(
-        JSON.stringify({ error: "No active session" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Missing required fields: fileName, fileContent, mimeType" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const providerToken = sessionData.session.provider_token;
-    
     if (!providerToken) {
-      console.error("No Google provider token found. User needs to re-authenticate with Drive scope.");
+      console.error("No Google provider token provided in request body");
       return new Response(
         JSON.stringify({ 
           error: "Google Drive access not available. Please sign out and sign back in with Google to grant Drive permissions.",
           code: "NO_PROVIDER_TOKEN"
         }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Provider token obtained");
-
-    // Parse request body
-    const body: ExportRequest = await req.json();
-    const { fileName, fileContent, mimeType, folderName } = body;
-
-    if (!fileName || !fileContent || !mimeType) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields: fileName, fileContent, mimeType" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
