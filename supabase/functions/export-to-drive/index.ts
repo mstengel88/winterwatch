@@ -136,9 +136,6 @@ serve(async (req) => {
       }
     }
 
-    // Decode base64 content
-    const binaryContent = Uint8Array.from(atob(fileContent), (c) => c.charCodeAt(0));
-
     // Prepare file metadata
     const metadata: Record<string, unknown> = {
       name: fileName,
@@ -149,32 +146,51 @@ serve(async (req) => {
       metadata.parents = [folderId];
     }
 
-    // Create multipart upload body
+    // Create multipart upload body using FormData-style approach
     const boundary = "winterwatch_boundary_" + Date.now();
     const metadataStr = JSON.stringify(metadata);
 
-    // Build the multipart body manually
-    const encoder = new TextEncoder();
-    const metadataPart = encoder.encode(
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadataStr}\r\n`
-    );
-    const filePart1 = encoder.encode(
-      `--${boundary}\r\nContent-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n`
-    );
-    const filePart2 = encoder.encode(`\r\n--${boundary}--`);
+    // Decode base64 content to binary
+    const binaryString = atob(fileContent);
+    const binaryContent = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      binaryContent[i] = binaryString.charCodeAt(i);
+    }
 
-    // Combine all parts
-    const bodyParts = new Uint8Array(
-      metadataPart.length + filePart1.length + binaryContent.length + filePart2.length
-    );
+    // Build multipart body as string parts + binary
+    const CRLF = "\r\n";
+    const metadataPart = 
+      `--${boundary}${CRLF}` +
+      `Content-Type: application/json; charset=UTF-8${CRLF}${CRLF}` +
+      metadataStr + CRLF;
+    
+    const filePartHeader = 
+      `--${boundary}${CRLF}` +
+      `Content-Type: ${mimeType}${CRLF}${CRLF}`;
+    
+    const closingBoundary = `${CRLF}--${boundary}--`;
+
+    // Encode text parts
+    const encoder = new TextEncoder();
+    const metadataBytes = encoder.encode(metadataPart);
+    const fileHeaderBytes = encoder.encode(filePartHeader);
+    const closingBytes = encoder.encode(closingBoundary);
+
+    // Combine all parts into single Uint8Array
+    const totalLength = metadataBytes.length + fileHeaderBytes.length + binaryContent.length + closingBytes.length;
+    const bodyParts = new Uint8Array(totalLength);
     let offset = 0;
-    bodyParts.set(metadataPart, offset);
-    offset += metadataPart.length;
-    bodyParts.set(filePart1, offset);
-    offset += filePart1.length;
+    
+    bodyParts.set(metadataBytes, offset);
+    offset += metadataBytes.length;
+    
+    bodyParts.set(fileHeaderBytes, offset);
+    offset += fileHeaderBytes.length;
+    
     bodyParts.set(binaryContent, offset);
     offset += binaryContent.length;
-    bodyParts.set(filePart2, offset);
+    
+    bodyParts.set(closingBytes, offset);
 
     // Upload to Google Drive
     const uploadRes = await fetch(
