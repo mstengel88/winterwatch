@@ -135,6 +135,7 @@ export default function ReportsPage() {
   const [minSnow, setMinSnow] = useState('');
   const [minSalt, setMinSalt] = useState('');
   const [activeTab, setActiveTab] = useState('current');
+  const [activeShiftTab, setActiveShiftTab] = useState('current');
 
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
