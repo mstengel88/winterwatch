@@ -491,6 +491,88 @@ export default function ReportsPage() {
     toast.success('PDF exported successfully');
   };
 
+  const handleExportToDrive = async () => {
+    const rawLogs = filteredWorkLogs.map((log) => {
+      const employeeDisplay =
+        log.type === 'shovel' && log.team_member_names && log.team_member_names.length > 0
+          ? log.team_member_names.join(', ')
+          : log.employee_name;
+
+      return {
+        id: log.id,
+        type: log.type,
+        date: format(new Date(log.date), 'MM/dd/yy'),
+        checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
+        checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
+        duration: formatDuration(log.check_in_time, log.check_out_time),
+        account: log.account_name,
+        serviceType: log.service_type,
+        snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
+        saltLbs: log.salt_used_lbs
+          ? `${log.salt_used_lbs}lb`
+          : log.ice_melt_used_lbs
+            ? `${log.ice_melt_used_lbs}lb`
+            : '-',
+        equipment: log.equipment_name || '-',
+        employee: employeeDisplay,
+        conditions: log.weather_conditions || '-',
+        notes: log.notes || undefined,
+      };
+    });
+
+    const totalHours = filteredWorkLogs.reduce((sum, log) => {
+      if (log.check_in_time && log.check_out_time) {
+        return sum + differenceInMinutes(new Date(log.check_out_time), new Date(log.check_in_time)) / 60;
+      }
+      return sum;
+    }, 0);
+
+    const uniqueAccounts = new Set(filteredWorkLogs.map(log => log.account_name)).size;
+    const plowCount = filteredWorkLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
+    const saltCount = filteredWorkLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
+
+    // Generate PDF blob
+    const pdfBlob = generateWorkLogsPDF(rawLogs, {
+      totalJobs: stats.total,
+      totalHours,
+      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
+      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
+      plowCount,
+      saltCount,
+      propertyCount: uniqueAccounts,
+      dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
+    }, 'Work Logs Report', { returnBlob: true });
+
+    if (!pdfBlob) {
+      toast.error('Failed to generate PDF');
+      return;
+    }
+
+    const fileName = `work-logs-report-${format(new Date(fromDate), 'yyyy-MM-dd')}-to-${format(new Date(toDate), 'yyyy-MM-dd')}.pdf`;
+    
+    toast.loading('Uploading to Google Drive...', { id: 'drive-export' });
+    
+    const result = await exportPdfToDrive(pdfBlob, fileName, 'WinterWatch Reports');
+    
+    if (result.success) {
+      toast.success('Exported to Google Drive!', { id: 'drive-export' });
+      if (result.webViewLink) {
+        toast.info('Click to open in Drive', {
+          action: {
+            label: 'Open',
+            onClick: () => window.open(result.webViewLink, '_blank'),
+          },
+        });
+      }
+    } else {
+      toast.error(result.error || 'Failed to export to Google Drive', { id: 'drive-export' });
+      
+      if (result.code === 'NO_PROVIDER_TOKEN' || result.code === 'TOKEN_EXPIRED' || result.code === 'ACCESS_DENIED') {
+        toast.info('Please sign out and sign back in with Google to grant Drive permissions.');
+      }
+    }
+  };
+
   const handleExportTimeSheets = () => {
     // Generate CSV for time sheets
     const headers = ['Employee', 'Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Location'];
