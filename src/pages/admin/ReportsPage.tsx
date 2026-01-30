@@ -90,6 +90,7 @@ interface Equipment {
 export default function ReportsPage() {
   const { isNative } = useNativePlatform();
   const isMobile = useIsMobile();
+  const { isExporting, exportPdfToDrive } = useGoogleDriveExport();
 
   const [isLoading, setIsLoading] = useState(true);
   const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
