@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
-import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Pencil } from 'lucide-react';
+import { Clock, Search, Calendar, Users, Loader2 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInMinutes, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { TimeClockEntriesTable } from '@/components/timeclock/TimeClockEntriesTable';
