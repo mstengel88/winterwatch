@@ -364,7 +364,7 @@ export default function TimeClockPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="min-w-[800px]">
                     <TableHeader>
                       <TableRow className="border-border/50 hover:bg-transparent">
                         <TableHead>Employee</TableHead>
