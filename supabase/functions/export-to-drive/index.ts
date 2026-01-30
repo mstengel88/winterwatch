@@ -55,12 +55,23 @@ serve(async (req) => {
 
     // Parse request body
     const body: ExportRequest = await req.json();
-    const { fileName, fileContent, mimeType, folderName } = body;
+    const { fileName, fileContent, mimeType, folderName, providerToken } = body;
 
     if (!fileName || !fileContent || !mimeType) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: fileName, fileContent, mimeType" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!providerToken) {
+      console.error("No Google provider token provided in request body");
+      return new Response(
+        JSON.stringify({ 
+          error: "Google Drive access not available. Please sign out and sign back in with Google to grant Drive permissions.",
+          code: "NO_PROVIDER_TOKEN"
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

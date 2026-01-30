@@ -23,12 +23,25 @@ export function useGoogleDriveExport() {
     setIsExporting(true);
     
     try {
+      // Get the provider token from the current session
+      const { data: sessionData } = await supabase.auth.getSession();
+      const providerToken = sessionData?.session?.provider_token;
+      
+      if (!providerToken) {
+        return {
+          success: false,
+          error: 'Google Drive access not available. Please sign out and sign back in with Google to grant Drive permissions.',
+          code: 'NO_PROVIDER_TOKEN',
+        };
+      }
+
       const { data, error } = await supabase.functions.invoke('export-to-drive', {
         body: {
           fileName,
           fileContent,
           mimeType,
           folderName,
+          providerToken, // Pass the token to the edge function
         },
       });
 
