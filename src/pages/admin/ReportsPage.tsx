@@ -38,6 +38,7 @@ interface TimeClockEntry {
   clock_out_time: string | null;
   clock_in_latitude: number | null;
   clock_in_longitude: number | null;
+  billing_status: 'current' | 'billable' | 'completed';
   employee?: {
     first_name: string;
     last_name: string;
@@ -134,6 +135,7 @@ export default function ReportsPage() {
   const [minSnow, setMinSnow] = useState('');
   const [minSalt, setMinSalt] = useState('');
   const [activeTab, setActiveTab] = useState('current');
+  const [activeShiftTab, setActiveShiftTab] = useState('current');
 
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
@@ -327,10 +329,19 @@ export default function ReportsPage() {
   // Filtered data
   const filteredShifts = useMemo(() => {
     return timeClockEntries.filter(entry => {
+      // Filter by billing_status based on active shift tab
+      if (activeShiftTab === 'current' && entry.billing_status !== 'current') return false;
+      if (activeShiftTab === 'billable' && entry.billing_status !== 'billable') return false;
+      if (activeShiftTab === 'completed' && entry.billing_status !== 'completed') return false;
       if (selectedEmployee !== 'all' && entry.employee_id !== selectedEmployee) return false;
       return true;
     });
-  }, [timeClockEntries, selectedEmployee]);
+  }, [timeClockEntries, selectedEmployee, activeShiftTab]);
+
+  // Counts for shift tabs based on billing_status
+  const shiftCurrentCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'current').length, [timeClockEntries]);
+  const shiftBillableCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'billable').length, [timeClockEntries]);
+  const shiftCompletedCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'completed').length, [timeClockEntries]);
 
   const filteredWorkLogs = useMemo(() => {
     return workLogs.filter(log => {
@@ -892,6 +903,69 @@ export default function ReportsPage() {
     }
   };
 
+  // Move shifts to current
+  const handleBulkMoveShiftsToCurrent = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'current' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) moved to current`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving shifts to current:', error);
+      toast.error('Failed to move shifts to current');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move shifts to billable
+  const handleBulkMoveShiftsToBillable = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'billable' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) moved to billable`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving shifts to billable:', error);
+      toast.error('Failed to move shifts to billable');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move shifts to completed
+  const handleBulkMoveShiftsToCompleted = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'completed' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) marked as completed`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error marking shifts as completed:', error);
+      toast.error('Failed to mark shifts as completed');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const openAddShift = () => {
     setEditingShift(null);
     setShiftDialogOpen(true);
@@ -1155,10 +1229,36 @@ export default function ReportsPage() {
             </div>
             <div className="flex items-center gap-2">
               {selectedShifts.size > 0 && (
-                <Button size="sm" variant="destructive" onClick={openBulkDeleteShifts}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete ({selectedShifts.size})
-                </Button>
+                <>
+                  {activeShiftTab === 'billable' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToCurrent} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Current
+                    </Button>
+                  )}
+                  {activeShiftTab === 'current' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToBillable} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Billable
+                    </Button>
+                  )}
+                  {activeShiftTab === 'billable' && (
+                    <Button size="sm" variant="default" onClick={handleBulkMoveShiftsToCompleted} disabled={isSaving}>
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Mark Completed
+                    </Button>
+                  )}
+                  {activeShiftTab === 'completed' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToBillable} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Billable
+                    </Button>
+                  )}
+                  <Button size="sm" variant="destructive" onClick={openBulkDeleteShifts}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete ({selectedShifts.size})
+                  </Button>
+                </>
               )}
               <Button size="sm" variant="outline" onClick={openAddShift}>
                 <Plus className="h-4 w-4 mr-1" />
@@ -1166,6 +1266,21 @@ export default function ReportsPage() {
               </Button>
             </div>
           </div>
+
+          {/* Shift Tabs */}
+          <Tabs value={activeShiftTab} onValueChange={(v) => { setActiveShiftTab(v); setSelectedShifts(new Set()); }} className="mb-4">
+            <TabsList className="grid grid-cols-3 w-full max-w-md">
+              <TabsTrigger value="current" className="text-sm">
+                Current ({shiftCurrentCount})
+              </TabsTrigger>
+              <TabsTrigger value="billable" className="text-sm">
+                Billable ({shiftBillableCount})
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="text-sm">
+                Completed ({shiftCompletedCount})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div className="overflow-x-auto">
             <Table>
