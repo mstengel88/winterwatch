@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
-import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Play, Square, LogOut, Pencil } from 'lucide-react';
+import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Pencil } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInMinutes, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
+import { TimeClockEntriesTable } from '@/components/timeclock/TimeClockEntriesTable';
 
 interface TimeClockEntry {
   id: string;
@@ -363,108 +363,15 @@ export default function TimeClockPage() {
                   No time entries found.
                 </div>
               ) : (
-                <Table className="min-w-[800px]">
-                    <TableHeader>
-                      <TableRow className="border-border/50 hover:bg-transparent">
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Clock In</TableHead>
-                        <TableHead>Clock Out</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEntries.slice(0, 15).map((entry) => (
-                        <TableRow key={entry.id} className={`border-border/50 ${isEdited(entry) ? 'bg-destructive/10' : ''}`}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {entry.employee
-                                ? `${entry.employee.first_name} ${entry.employee.last_name}`
-                                : '-'}
-                              {isEdited(entry) && (
-                                <Badge variant="outline" className="text-destructive border-destructive/50 gap-1 text-xs">
-                                  <Pencil className="h-3 w-3" />
-                                  Edited
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(entry.clock_in_time), 'MM/dd/yy')}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Play className="h-3 w-3 text-green-500" />
-                              {formatTime(entry.clock_in_time)}
-                            </div>
-                            {entry.clock_in_latitude && (
-                              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                GPS recorded
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {entry.clock_out_time ? (
-                              <div className="flex items-center gap-1">
-                                <Square className="h-3 w-3 text-red-500" />
-                                {formatTime(entry.clock_out_time)}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1 text-sm">
-                              <Timer className="h-3 w-3 text-muted-foreground" />
-                              {entry.clock_out_time ? (
-                                getDuration(entry.clock_in_time, entry.clock_out_time)
-                              ) : (
-                                <ElapsedTime clockInTime={entry.clock_in_time} />
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {entry.clock_out_time ? (
-                              <Badge variant="outline">Completed</Badge>
-                            ) : (
-                              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                                <span className="h-1.5 w-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse" />
-                                Active
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {!entry.clock_out_time && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleClockOutClick(
-                                  entry.id, 
-                                  entry.employee 
-                                    ? `${entry.employee.first_name} ${entry.employee.last_name}` 
-                                    : 'Employee'
-                                )}
-                                disabled={clockingOut === entry.id}
-                                className="h-7 px-2"
-                              >
-                                {clockingOut === entry.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <>
-                                    <LogOut className="h-3 w-3 mr-1" />
-                                    Clock Out
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <TimeClockEntriesTable
+                  entries={filteredEntries}
+                  clockingOut={clockingOut}
+                  onClockOutClick={handleClockOutClick}
+                  isEdited={isEdited}
+                  formatTime={formatTime}
+                  getDuration={getDuration}
+                  renderElapsedTime={(clockInTime) => <ElapsedTime clockInTime={clockInTime} />}
+                />
               )}
             </CardContent>
           </Card>
