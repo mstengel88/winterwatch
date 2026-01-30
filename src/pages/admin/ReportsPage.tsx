@@ -1229,10 +1229,36 @@ export default function ReportsPage() {
             </div>
             <div className="flex items-center gap-2">
               {selectedShifts.size > 0 && (
-                <Button size="sm" variant="destructive" onClick={openBulkDeleteShifts}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete ({selectedShifts.size})
-                </Button>
+                <>
+                  {activeShiftTab === 'billable' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToCurrent} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Current
+                    </Button>
+                  )}
+                  {activeShiftTab === 'current' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToBillable} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Billable
+                    </Button>
+                  )}
+                  {activeShiftTab === 'billable' && (
+                    <Button size="sm" variant="default" onClick={handleBulkMoveShiftsToCompleted} disabled={isSaving}>
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Mark Completed
+                    </Button>
+                  )}
+                  {activeShiftTab === 'completed' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToBillable} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Billable
+                    </Button>
+                  )}
+                  <Button size="sm" variant="destructive" onClick={openBulkDeleteShifts}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete ({selectedShifts.size})
+                  </Button>
+                </>
               )}
               <Button size="sm" variant="outline" onClick={openAddShift}>
                 <Plus className="h-4 w-4 mr-1" />
@@ -1240,6 +1266,21 @@ export default function ReportsPage() {
               </Button>
             </div>
           </div>
+
+          {/* Shift Tabs */}
+          <Tabs value={activeShiftTab} onValueChange={(v) => { setActiveShiftTab(v); setSelectedShifts(new Set()); }} className="mb-4">
+            <TabsList className="grid grid-cols-3 w-full max-w-md">
+              <TabsTrigger value="current" className="text-sm">
+                Current ({shiftCurrentCount})
+              </TabsTrigger>
+              <TabsTrigger value="billable" className="text-sm">
+                Billable ({shiftBillableCount})
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="text-sm">
+                Completed ({shiftCompletedCount})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div className="overflow-x-auto">
             <Table>
