@@ -29,6 +29,7 @@ import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
 import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useGoogleDriveExport } from '@/hooks/useGoogleDriveExport';
 import { cn } from '@/lib/utils';
 
 interface TimeClockEntry {
