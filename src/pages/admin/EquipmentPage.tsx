@@ -265,8 +265,8 @@ export default function EquipmentPage() {
           </div>
 
           {/* Equipment Table */}
-          <div className="rounded-lg border border-border/50 overflow-hidden">
-            <table className="w-full">
+          <div className="rounded-lg border border-border/50 overflow-x-auto">
+            <table className="w-full min-w-[800px]">
               <thead className="bg-muted/30">
                 <tr className="text-left text-sm text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Name</th>
