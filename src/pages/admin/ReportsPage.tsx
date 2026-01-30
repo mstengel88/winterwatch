@@ -964,6 +964,7 @@ export default function ReportsPage() {
     } finally {
       setIsSaving(false);
     }
+  };
 
   const openAddShift = () => {
     setEditingShift(null);
