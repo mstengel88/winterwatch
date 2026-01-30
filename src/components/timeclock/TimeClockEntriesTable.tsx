@@ -35,8 +35,8 @@ export function TimeClockEntriesTable({
   renderElapsedTime,
 }: Props) {
   return (
-    <div className="overflow-x-auto rounded-md border border-border/50 [-webkit-overflow-scrolling:touch] touch-pan-x">
-      <table className="w-full min-w-[900px] caption-bottom text-sm">
+    <div className="max-w-full overflow-x-auto overflow-y-hidden rounded-md border border-border/50 [-webkit-overflow-scrolling:touch] touch-pan-x">
+      <table className="w-full min-w-[900px] whitespace-nowrap caption-bottom text-sm">
         <thead className="bg-muted/30">
           <tr className="text-left text-sm text-muted-foreground">
             <th className="h-12 px-4 font-medium">Employee</th>
