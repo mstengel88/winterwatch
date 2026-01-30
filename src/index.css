@@ -135,9 +135,12 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     overscroll-behavior-y: contain;
-    /* GPU acceleration for smoother animations */
-    transform: translateZ(0);
-    backface-visibility: hidden;
+    /*
+      IMPORTANT (iOS/native):
+      Avoid applying `transform` on `body`.
+      A transformed ancestor can break `position: fixed` descendants on iOS/WKWebView,
+      causing dialogs to render at the top of the document when the page is scrolled.
+    */
   }
 
   /* Safe area support for notched devices */
