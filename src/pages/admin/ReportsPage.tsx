@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Loader2, FileDown, Filter, Clock, Plus, Eye, Pencil, Trash2, 
-  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown, Archive, CheckCircle
+  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown, Archive, CheckCircle, Cloud
 } from 'lucide-react';
 import {
   DropdownMenu,
