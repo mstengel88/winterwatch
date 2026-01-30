@@ -903,6 +903,68 @@ export default function ReportsPage() {
     }
   };
 
+  // Move shifts to current
+  const handleBulkMoveShiftsToCurrent = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'current' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) moved to current`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving shifts to current:', error);
+      toast.error('Failed to move shifts to current');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move shifts to billable
+  const handleBulkMoveShiftsToBillable = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'billable' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) moved to billable`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving shifts to billable:', error);
+      toast.error('Failed to move shifts to billable');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move shifts to completed
+  const handleBulkMoveShiftsToCompleted = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'completed' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) marked as completed`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error marking shifts as completed:', error);
+      toast.error('Failed to mark shifts as completed');
+    } finally {
+      setIsSaving(false);
+    }
+
   const openAddShift = () => {
     setEditingShift(null);
     setShiftDialogOpen(true);
