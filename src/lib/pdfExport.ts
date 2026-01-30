@@ -33,11 +33,16 @@ interface ReportSummary {
   dateRange: string;
 }
 
+interface GeneratePdfOptions {
+  returnBlob?: boolean;
+}
+
 export function generateWorkLogsPDF(
   workLogs: WorkLogData[],
   summary: ReportSummary,
-  title: string = 'Work Logs Report'
-): void {
+  title: string = 'Work Logs Report',
+  options?: GeneratePdfOptions
+): Blob | void {
   // Landscape orientation for wider table
   const doc = new jsPDF({ orientation: 'landscape' });
   const pageWidth = doc.internal.pageSize.getWidth();
