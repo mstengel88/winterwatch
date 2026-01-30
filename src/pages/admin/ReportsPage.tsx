@@ -329,10 +329,19 @@ export default function ReportsPage() {
   // Filtered data
   const filteredShifts = useMemo(() => {
     return timeClockEntries.filter(entry => {
+      // Filter by billing_status based on active shift tab
+      if (activeShiftTab === 'current' && entry.billing_status !== 'current') return false;
+      if (activeShiftTab === 'billable' && entry.billing_status !== 'billable') return false;
+      if (activeShiftTab === 'completed' && entry.billing_status !== 'completed') return false;
       if (selectedEmployee !== 'all' && entry.employee_id !== selectedEmployee) return false;
       return true;
     });
-  }, [timeClockEntries, selectedEmployee]);
+  }, [timeClockEntries, selectedEmployee, activeShiftTab]);
+
+  // Counts for shift tabs based on billing_status
+  const shiftCurrentCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'current').length, [timeClockEntries]);
+  const shiftBillableCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'billable').length, [timeClockEntries]);
+  const shiftCompletedCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'completed').length, [timeClockEntries]);
 
   const filteredWorkLogs = useMemo(() => {
     return workLogs.filter(log => {
