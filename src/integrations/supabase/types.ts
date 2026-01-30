@@ -621,6 +621,7 @@ export type Database = {
       }
       time_clock: {
         Row: {
+          billing_status: string
           clock_in_latitude: number | null
           clock_in_longitude: number | null
           clock_in_time: string
@@ -634,6 +635,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_status?: string
           clock_in_latitude?: number | null
           clock_in_longitude?: number | null
           clock_in_time: string
@@ -647,6 +649,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_status?: string
           clock_in_latitude?: number | null
           clock_in_longitude?: number | null
           clock_in_time?: string
