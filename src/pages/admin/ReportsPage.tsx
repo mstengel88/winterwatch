@@ -1128,6 +1128,10 @@ export default function ReportsPage() {
                 <FileDown className="h-4 w-4 mr-2" />
                 Export Summary Report
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportToDrive} disabled={isExporting}>
+                <Cloud className="h-4 w-4 mr-2" />
+                {isExporting ? 'Uploading...' : 'Export to Google Drive'}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" variant="outline" onClick={fetchData}>
