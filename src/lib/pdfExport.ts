@@ -185,6 +185,11 @@ export function generateWorkLogsPDF(
     );
   }
 
+  // Return blob or save file
+  if (options?.returnBlob) {
+    return doc.output('blob');
+  }
+  
   // Save with date range in filename
   const fileName = `work-logs-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
   doc.save(fileName);
