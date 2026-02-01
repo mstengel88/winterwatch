@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, ArrowLeft, KeyRound } from 'lucide-react';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
+import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 
 const passwordSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
