@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,6 @@ const passwordSchema = z.object({
 });
 
 export default function ResetPassword() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -29,27 +28,66 @@ export default function ResetPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string }>({});
-  const [isValidToken, setIsValidToken] = useState(true);
+  const [isValidToken, setIsValidToken] = useState<boolean | null>(null); // null = checking
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    // Check if we have recovery session from the URL
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    let mounted = true;
+
+    const checkRecoverySession = async () => {
+      // Give Supabase a moment to process the hash fragment from the URL
+      // The hash contains the recovery token that Supabase automatically processes
       
-      // If we're on this page with a hash fragment, it means we came from email link
-      if (window.location.hash.includes('type=recovery')) {
-        // Supabase should handle the session automatically
+      // First, check if we have a recovery hash in the URL
+      const hasRecoveryHash = window.location.hash.includes('type=recovery');
+      
+      if (hasRecoveryHash) {
+        // Supabase should automatically process the hash and establish a session
+        // Wait a bit for onAuthStateChange to fire with the recovery event
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Now check for an active session
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (!mounted) return;
+
+      if (error) {
+        console.error('Error checking session:', error);
+        setIsValidToken(false);
+        setIsCheckingSession(false);
         return;
       }
-      
-      // If no session and no recovery token, redirect
-      if (!session && !searchParams.get('token')) {
+
+      // If we have a session, the user can reset their password
+      if (session) {
+        setIsValidToken(true);
+      } else {
+        // No session and no recovery hash means invalid/expired link
         setIsValidToken(false);
       }
+      
+      setIsCheckingSession(false);
     };
-    
-    checkSession();
-  }, [searchParams]);
+
+    // Listen for PASSWORD_RECOVERY event from Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      
+      if (event === 'PASSWORD_RECOVERY') {
+        // This event fires when Supabase processes the recovery token
+        setIsValidToken(true);
+        setIsCheckingSession(false);
+      }
+    });
+
+    checkRecoverySession();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const validateForm = () => {
     try {
@@ -109,6 +147,18 @@ export default function ResetPassword() {
     }
   };
 
+  // Show loading while checking session
+  if (isCheckingSession || isValidToken === null) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Verifying reset link...</p>
+        </div>
+      </main>
+    );
+  }
+
   if (!isValidToken) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
@@ -119,8 +169,13 @@ export default function ResetPassword() {
             <p className="text-muted-foreground mb-6">
               This password reset link is invalid or has expired. Please request a new one.
             </p>
+            <Link to="/forgot-password">
+              <Button className="w-full mb-3">
+                Request New Link
+              </Button>
+            </Link>
             <Link to="/auth">
-              <Button className="w-full">
+              <Button variant="outline" className="w-full">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Sign In
               </Button>
