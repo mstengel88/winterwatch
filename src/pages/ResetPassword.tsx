@@ -147,6 +147,18 @@ export default function ResetPassword() {
     }
   };
 
+  // Show loading while checking session
+  if (isCheckingSession || isValidToken === null) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Verifying reset link...</p>
+        </div>
+      </main>
+    );
+  }
+
   if (!isValidToken) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
@@ -157,8 +169,13 @@ export default function ResetPassword() {
             <p className="text-muted-foreground mb-6">
               This password reset link is invalid or has expired. Please request a new one.
             </p>
+            <Link to="/forgot-password">
+              <Button className="w-full mb-3">
+                Request New Link
+              </Button>
+            </Link>
             <Link to="/auth">
-              <Button className="w-full">
+              <Button variant="outline" className="w-full">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Sign In
               </Button>
