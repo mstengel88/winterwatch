@@ -233,6 +233,7 @@ export default function ResetPassword() {
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}
+              <PasswordStrengthIndicator password={password} />
             </div>
 
             <div className="space-y-2">
