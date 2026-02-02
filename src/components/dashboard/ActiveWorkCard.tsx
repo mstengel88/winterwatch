@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { WorkLog, Account } from '@/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MapPin, LogOut, Snowflake, Loader2, Clock } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 
 interface ActiveWorkCardProps {
   workLog: WorkLog;
@@ -26,12 +27,52 @@ interface CheckOutData {
 
 export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: ActiveWorkCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [snowDepth, setSnowDepth] = useState('');
-  const [saltUsed, setSaltUsed] = useState('');
-  const [weather, setWeather] = useState('');
-  const [notes, setNotes] = useState('');
+  
+  // Use persistence hook
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData } = useCheckoutFormPersistence({
+    workLogId: workLog.id,
+    variant: 'plow',
+  });
+  
+  // Initialize form state from persisted data
+  const [snowDepth, setSnowDepth] = useState(formData.snowDepth || '');
+  const [saltUsed, setSaltUsed] = useState(formData.saltUsed || '');
+  const [weather, setWeather] = useState(formData.weather || '');
+  const [notes, setNotes] = useState(formData.notes || '');
   
   const photoUpload = usePhotoUpload({ folder: 'work-logs' });
+
+  // Restore photo previews from persistence on mount
+  useEffect(() => {
+    if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
+      photoUpload.restorePreviews(formData.photoPreviews);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  // Persist form changes
+  useEffect(() => {
+    updateField('snowDepth', snowDepth);
+  }, [snowDepth, updateField]);
+
+  useEffect(() => {
+    updateField('saltUsed', saltUsed);
+  }, [saltUsed, updateField]);
+
+  useEffect(() => {
+    updateField('weather', weather);
+  }, [weather, updateField]);
+
+  useEffect(() => {
+    updateField('notes', notes);
+  }, [notes, updateField]);
+
+  // Persist photo previews when they change
+  useEffect(() => {
+    if (photoUpload.previews.length > 0) {
+      updatePhotoPreviews(photoUpload.previews);
+    }
+  }, [photoUpload.previews, updatePhotoPreviews]);
 
   const handleCheckOut = async () => {
     setIsSubmitting(true);
@@ -42,13 +83,19 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
       photoUrls = await photoUpload.uploadPhotos(workLog.id);
     }
     
-    await onCheckOut({
+    const success = await onCheckOut({
       snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
       saltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
       weatherConditions: weather || undefined,
       notes: notes || undefined,
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
     });
+    
+    // Clear persisted data on successful checkout
+    if (success) {
+      clearPersistedData();
+    }
+    
     setIsSubmitting(false);
   };
 
@@ -156,6 +203,7 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
           canAddMore={photoUpload.canAddMore}
           onAddPhotos={photoUpload.addPhotos}
           onRemovePhoto={photoUpload.removePhoto}
+          hasRestoredPreviews={photoUpload.hasRestoredPreviews}
         />
 
         <Button

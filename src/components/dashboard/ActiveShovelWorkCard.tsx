@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShovelWorkLog, Account } from '@/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { MapPin, LogOut, Shovel, Loader2, Clock } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 
 interface ActiveShovelWorkCardProps {
   workLog: ShovelWorkLog;
@@ -35,12 +36,52 @@ const CLEARABLE_AREAS = [
 
 export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [areasCleared, setAreasCleared] = useState<string[]>([]);
-  const [iceMeltUsed, setIceMeltUsed] = useState('');
-  const [weather, setWeather] = useState('');
-  const [notes, setNotes] = useState('');
+  
+  // Use persistence hook
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData } = useCheckoutFormPersistence({
+    workLogId: workLog.id,
+    variant: 'shovel',
+  });
+  
+  // Initialize form state from persisted data
+  const [areasCleared, setAreasCleared] = useState<string[]>(formData.areasCleared || []);
+  const [iceMeltUsed, setIceMeltUsed] = useState(formData.iceMeltUsed || '');
+  const [weather, setWeather] = useState(formData.weather || '');
+  const [notes, setNotes] = useState(formData.notes || '');
   
   const photoUpload = usePhotoUpload({ folder: 'shovel-logs' });
+
+  // Restore photo previews from persistence on mount
+  useEffect(() => {
+    if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
+      photoUpload.restorePreviews(formData.photoPreviews);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  // Persist form changes
+  useEffect(() => {
+    updateField('areasCleared', areasCleared);
+  }, [areasCleared, updateField]);
+
+  useEffect(() => {
+    updateField('iceMeltUsed', iceMeltUsed);
+  }, [iceMeltUsed, updateField]);
+
+  useEffect(() => {
+    updateField('weather', weather);
+  }, [weather, updateField]);
+
+  useEffect(() => {
+    updateField('notes', notes);
+  }, [notes, updateField]);
+
+  // Persist photo previews when they change
+  useEffect(() => {
+    if (photoUpload.previews.length > 0) {
+      updatePhotoPreviews(photoUpload.previews);
+    }
+  }, [photoUpload.previews, updatePhotoPreviews]);
 
   const handleAreaToggle = (areaId: string) => {
     setAreasCleared((prev) =>
@@ -59,13 +100,19 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
       photoUrls = await photoUpload.uploadPhotos(workLog.id);
     }
     
-    await onCheckOut({
+    const success = await onCheckOut({
       areasCleared: areasCleared.length > 0 ? areasCleared : undefined,
       iceMeltUsedLbs: iceMeltUsed ? parseFloat(iceMeltUsed) : undefined,
       weatherConditions: weather || undefined,
       notes: notes || undefined,
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
     });
+    
+    // Clear persisted data on successful checkout
+    if (success) {
+      clearPersistedData();
+    }
+    
     setIsSubmitting(false);
   };
 
@@ -177,6 +224,7 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
           canAddMore={photoUpload.canAddMore}
           onAddPhotos={photoUpload.addPhotos}
           onRemovePhoto={photoUpload.removePhoto}
+          hasRestoredPreviews={photoUpload.hasRestoredPreviews}
         />
 
         <Button

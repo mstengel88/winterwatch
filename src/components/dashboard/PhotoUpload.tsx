@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Camera, X, Plus, Loader2 } from 'lucide-react';
+import { Camera, X, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PhotoUploadProps {
@@ -13,6 +13,7 @@ interface PhotoUploadProps {
   onAddPhotos: (files: FileList | File[]) => void;
   onRemovePhoto: (index: number) => void;
   maxPhotos?: number;
+  hasRestoredPreviews?: boolean; // True if showing restored previews without files
 }
 
 export function PhotoUpload({
@@ -24,6 +25,7 @@ export function PhotoUpload({
   onAddPhotos,
   onRemovePhoto,
   maxPhotos = 5,
+  hasRestoredPreviews = false,
 }: PhotoUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -53,11 +55,24 @@ export function PhotoUpload({
         <Progress value={uploadProgress} className="h-2" />
       )}
 
+      {/* Warning for restored previews */}
+      {hasRestoredPreviews && (
+        <div className="flex items-start gap-2 rounded-md bg-yellow-500/10 border border-yellow-500/20 p-2 text-xs text-yellow-600 dark:text-yellow-400">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Photos from your previous session are shown below. Please re-add them to include in checkout.
+          </span>
+        </div>
+      )}
+
       {/* Photo previews */}
       {previews.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {previews.map((preview, index) => (
-            <div key={index} className="relative aspect-square">
+            <div key={index} className={cn(
+              "relative aspect-square",
+              hasRestoredPreviews && index >= photos.length && "opacity-60"
+            )}>
               <img
                 src={preview}
                 alt={`Photo ${index + 1}`}
@@ -71,6 +86,13 @@ export function PhotoUpload({
               >
                 <X className="h-3 w-3" />
               </button>
+              {hasRestoredPreviews && index >= photos.length && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/30">
+                  <span className="text-[10px] text-white font-medium px-1.5 py-0.5 rounded bg-black/50">
+                    Re-add
+                  </span>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -123,7 +145,7 @@ export function PhotoUpload({
         </div>
       )}
 
-      {photos.length === 0 && !isUploading && (
+      {photos.length === 0 && !isUploading && !hasRestoredPreviews && (
         <p className="text-xs text-muted-foreground text-center py-2">
           Add before/after photos of the completed work
         </p>
