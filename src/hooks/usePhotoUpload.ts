@@ -7,7 +7,29 @@ interface UsePhotoUploadOptions {
   folder?: string;
   maxFiles?: number;
   maxSizeMB?: number;
-  initialPreviews?: string[]; // For restoring persisted previews
+}
+
+// Convert base64 data URL to File object
+function base64ToFile(base64: string, filename: string): File | null {
+  try {
+    const arr = base64.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) return null;
+    
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    
+    return new File([u8arr], filename, { type: mime });
+  } catch (error) {
+    console.error('Error converting base64 to file:', error);
+    return null;
+  }
 }
 
 export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
@@ -16,26 +38,42 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     folder = 'uploads',
     maxFiles = 5,
     maxSizeMB = 10,
-    initialPreviews = [],
   } = options;
 
   const [photos, setPhotos] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>(initialPreviews);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Restore previews from persistence (photos will need to be re-added)
-  const restorePreviews = useCallback((restoredPreviews: string[]) => {
-    setPreviews(restoredPreviews);
+  // Restore photos from persisted base64 previews - recreates File objects
+  const restorePhotosFromBase64 = useCallback((base64Previews: string[]) => {
+    const restoredFiles: File[] = [];
+    const validPreviews: string[] = [];
+    
+    base64Previews.forEach((base64, index) => {
+      const file = base64ToFile(base64, `restored-photo-${index}.jpg`);
+      if (file) {
+        restoredFiles.push(file);
+        validPreviews.push(base64);
+      }
+    });
+    
+    if (restoredFiles.length > 0) {
+      setPhotos(restoredFiles);
+      setPreviews(validPreviews);
+    }
   }, []);
+
+  // Legacy restore for previews only (deprecated, use restorePhotosFromBase64)
+  const restorePreviews = useCallback((restoredPreviews: string[]) => {
+    restorePhotosFromBase64(restoredPreviews);
+  }, [restorePhotosFromBase64]);
 
   const addPhotos = (files: FileList | File[]) => {
     const newFiles = Array.from(files);
     const validFiles: File[] = [];
     const maxSize = maxSizeMB * 1024 * 1024;
 
-    // Clear any restored previews when user adds new photos
-    // (since we can't upload the restored ones anyway)
     const currentPhotoCount = photos.length;
 
     for (const file of newFiles) {
@@ -55,11 +93,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     }
 
     if (validFiles.length > 0) {
-      // If we had restored previews without files, clear them first
-      if (previews.length > photos.length) {
-        setPreviews([]);
-      }
-      
       setPhotos((prev) => [...prev, ...validFiles]);
       
       // Create previews
@@ -167,7 +200,8 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     uploadPhotos,
     getSignedUrls,
     restorePreviews,
+    restorePhotosFromBase64,
     canAddMore: photos.length < maxFiles,
-    hasRestoredPreviews: previews.length > photos.length, // True if showing restored previews
+    hasRestoredPreviews: false, // No longer needed since we restore actual files
   };
 }
