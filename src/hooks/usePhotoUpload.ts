@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -7,6 +7,7 @@ interface UsePhotoUploadOptions {
   folder?: string;
   maxFiles?: number;
   maxSizeMB?: number;
+  initialPreviews?: string[]; // For restoring persisted previews
 }
 
 export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
@@ -15,17 +16,27 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     folder = 'uploads',
     maxFiles = 5,
     maxSizeMB = 10,
+    initialPreviews = [],
   } = options;
 
   const [photos, setPhotos] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<string[]>(initialPreviews);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Restore previews from persistence (photos will need to be re-added)
+  const restorePreviews = useCallback((restoredPreviews: string[]) => {
+    setPreviews(restoredPreviews);
+  }, []);
 
   const addPhotos = (files: FileList | File[]) => {
     const newFiles = Array.from(files);
     const validFiles: File[] = [];
     const maxSize = maxSizeMB * 1024 * 1024;
+
+    // Clear any restored previews when user adds new photos
+    // (since we can't upload the restored ones anyway)
+    const currentPhotoCount = photos.length;
 
     for (const file of newFiles) {
       if (!file.type.startsWith('image/')) {
@@ -36,7 +47,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
         toast.error(`${file.name} exceeds ${maxSizeMB}MB limit`);
         continue;
       }
-      if (photos.length + validFiles.length >= maxFiles) {
+      if (currentPhotoCount + validFiles.length >= maxFiles) {
         toast.error(`Maximum ${maxFiles} photos allowed`);
         break;
       }
@@ -44,6 +55,11 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     }
 
     if (validFiles.length > 0) {
+      // If we had restored previews without files, clear them first
+      if (previews.length > photos.length) {
+        setPreviews([]);
+      }
+      
       setPhotos((prev) => [...prev, ...validFiles]);
       
       // Create previews
@@ -150,6 +166,8 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     clearPhotos,
     uploadPhotos,
     getSignedUrls,
+    restorePreviews,
     canAddMore: photos.length < maxFiles,
+    hasRestoredPreviews: previews.length > photos.length, // True if showing restored previews
   };
 }
