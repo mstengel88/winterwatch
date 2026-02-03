@@ -11,6 +11,7 @@ import { MapPin, LogOut, Shovel, Loader2, Clock } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
+import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
 
 interface ActiveShovelWorkCardProps {
   workLog: ShovelWorkLog;
@@ -42,6 +43,8 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
     workLogId: workLog.id,
     variant: 'shovel',
   });
+
+  const storageKey = `winterwatch_checkout_form_shovel_${workLog.id}`;
   
   // Form state synced with persistence
   const [areasCleared, setAreasCleared] = useState<string[]>([]);
@@ -262,6 +265,8 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
           )}
           Check Out
         </Button>
+
+        <PersistenceDebugPanel storageKey={storageKey} />
       </CardContent>
     </Card>
   );
