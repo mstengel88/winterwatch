@@ -11,9 +11,9 @@ const config: CapacitorConfig = {
   // Setting hostname=localhost here can cause iOS to try loading winterwatch://localhost
   // which results in a blank/white screen.
   server: {
-    // DEV ONLY: Remove url + cleartext before App Store submission
-    url: "https://1a2b04be-8fe3-4bb1-abd6-59ca66ba99f4.lovableproject.com?forceHideBadge=true&debugPersistence=1",
-    cleartext: true,
+    // DEV ONLY: Uncomment url + cleartext for live reload during development
+    // url: "https://1a2b04be-8fe3-4bb1-abd6-59ca66ba99f4.lovableproject.com?forceHideBadge=true",
+    // cleartext: true,
     iosScheme: "https",
     androidScheme: "https",
   },
