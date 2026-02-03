@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
@@ -20,7 +22,7 @@ import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
 import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
 import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
-import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
+import { loadCheckoutPhotoPreviews, saveCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 import { 
   Snowflake, 
   Truck, 
