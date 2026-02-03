@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ShovelWorkLog, Account } from '@/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,48 +37,70 @@ const CLEARABLE_AREAS = [
 export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Use persistence hook
+  // Use persistence hook - formData updates when visibility changes
   const { formData, updateField, updatePhotoPreviews, clearPersistedData } = useCheckoutFormPersistence({
     workLogId: workLog.id,
     variant: 'shovel',
   });
   
-  // Initialize form state from persisted data
-  const [areasCleared, setAreasCleared] = useState<string[]>(formData.areasCleared || []);
-  const [iceMeltUsed, setIceMeltUsed] = useState(formData.iceMeltUsed || '');
-  const [weather, setWeather] = useState(formData.weather || '');
-  const [notes, setNotes] = useState(formData.notes || '');
+  // Form state synced with persistence
+  const [areasCleared, setAreasCleared] = useState<string[]>([]);
+  const [iceMeltUsed, setIceMeltUsed] = useState('');
+  const [weather, setWeather] = useState('');
+  const [notes, setNotes] = useState('');
+  const isRestoringRef = useRef(false);
   
   const photoUpload = usePhotoUpload({ folder: 'shovel-logs' });
 
-  // Restore photo previews from persistence on mount
+  // Restore form state from persisted data whenever formData changes
   useEffect(() => {
-    if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
-      photoUpload.restorePreviews(formData.photoPreviews);
+    if (Object.keys(formData).length > 0) {
+      isRestoringRef.current = true;
+      setAreasCleared(formData.areasCleared || []);
+      setIceMeltUsed(formData.iceMeltUsed || '');
+      setWeather(formData.weather || '');
+      setNotes(formData.notes || '');
+      
+      // Restore photos if available
+      if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
+        photoUpload.restorePreviews(formData.photoPreviews);
+      }
+      
+      // Reset flag after a tick to allow state to settle
+      setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 100);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, [formData]); // Re-run when formData updates (e.g., on visibility change)
 
-  // Persist form changes
+  // Persist form changes (skip during restoration)
   useEffect(() => {
-    updateField('areasCleared', areasCleared);
+    if (!isRestoringRef.current && areasCleared.length > 0) {
+      updateField('areasCleared', areasCleared);
+    }
   }, [areasCleared, updateField]);
 
   useEffect(() => {
-    updateField('iceMeltUsed', iceMeltUsed);
+    if (!isRestoringRef.current && iceMeltUsed) {
+      updateField('iceMeltUsed', iceMeltUsed);
+    }
   }, [iceMeltUsed, updateField]);
 
   useEffect(() => {
-    updateField('weather', weather);
+    if (!isRestoringRef.current && weather) {
+      updateField('weather', weather);
+    }
   }, [weather, updateField]);
 
   useEffect(() => {
-    updateField('notes', notes);
+    if (!isRestoringRef.current && notes) {
+      updateField('notes', notes);
+    }
   }, [notes, updateField]);
 
-  // Persist photo previews when they change
+  // Persist photo previews when they change (skip during restoration)
   useEffect(() => {
-    if (photoUpload.previews.length > 0) {
+    if (!isRestoringRef.current && photoUpload.previews.length > 0) {
       updatePhotoPreviews(photoUpload.previews);
     }
   }, [photoUpload.previews, updatePhotoPreviews]);

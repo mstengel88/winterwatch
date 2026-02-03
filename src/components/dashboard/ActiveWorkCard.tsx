@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WorkLog, Account } from '@/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,48 +28,70 @@ interface CheckOutData {
 export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: ActiveWorkCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Use persistence hook
+  // Use persistence hook - formData updates when visibility changes
   const { formData, updateField, updatePhotoPreviews, clearPersistedData } = useCheckoutFormPersistence({
     workLogId: workLog.id,
     variant: 'plow',
   });
   
-  // Initialize form state from persisted data
-  const [snowDepth, setSnowDepth] = useState(formData.snowDepth || '');
-  const [saltUsed, setSaltUsed] = useState(formData.saltUsed || '');
-  const [weather, setWeather] = useState(formData.weather || '');
-  const [notes, setNotes] = useState(formData.notes || '');
+  // Form state synced with persistence
+  const [snowDepth, setSnowDepth] = useState('');
+  const [saltUsed, setSaltUsed] = useState('');
+  const [weather, setWeather] = useState('');
+  const [notes, setNotes] = useState('');
+  const isRestoringRef = useRef(false);
   
   const photoUpload = usePhotoUpload({ folder: 'work-logs' });
 
-  // Restore photo previews from persistence on mount
+  // Restore form state from persisted data whenever formData changes
   useEffect(() => {
-    if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
-      photoUpload.restorePreviews(formData.photoPreviews);
+    if (Object.keys(formData).length > 0) {
+      isRestoringRef.current = true;
+      setSnowDepth(formData.snowDepth || '');
+      setSaltUsed(formData.saltUsed || '');
+      setWeather(formData.weather || '');
+      setNotes(formData.notes || '');
+      
+      // Restore photos if available
+      if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
+        photoUpload.restorePreviews(formData.photoPreviews);
+      }
+      
+      // Reset flag after a tick to allow state to settle
+      setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 100);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, [formData]); // Re-run when formData updates (e.g., on visibility change)
 
-  // Persist form changes
+  // Persist form changes (skip during restoration)
   useEffect(() => {
-    updateField('snowDepth', snowDepth);
+    if (!isRestoringRef.current && snowDepth) {
+      updateField('snowDepth', snowDepth);
+    }
   }, [snowDepth, updateField]);
 
   useEffect(() => {
-    updateField('saltUsed', saltUsed);
+    if (!isRestoringRef.current && saltUsed) {
+      updateField('saltUsed', saltUsed);
+    }
   }, [saltUsed, updateField]);
 
   useEffect(() => {
-    updateField('weather', weather);
+    if (!isRestoringRef.current && weather) {
+      updateField('weather', weather);
+    }
   }, [weather, updateField]);
 
   useEffect(() => {
-    updateField('notes', notes);
+    if (!isRestoringRef.current && notes) {
+      updateField('notes', notes);
+    }
   }, [notes, updateField]);
 
-  // Persist photo previews when they change
+  // Persist photo previews when they change (skip during restoration)
   useEffect(() => {
-    if (photoUpload.previews.length > 0) {
+    if (!isRestoringRef.current && photoUpload.previews.length > 0) {
       updatePhotoPreviews(photoUpload.previews);
     }
   }, [photoUpload.previews, updatePhotoPreviews]);
