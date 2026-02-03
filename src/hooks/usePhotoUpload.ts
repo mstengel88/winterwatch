@@ -69,7 +69,16 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     restorePhotosFromBase64(restoredPreviews);
   }, [restorePhotosFromBase64]);
 
-  const addPhotos = (files: FileList | File[]) => {
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(String(e.target?.result ?? ''));
+      reader.onerror = () => reject(reader.error ?? new Error('FileReader error'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const addPhotos = useCallback(async (files: FileList | File[]) => {
     const newFiles = Array.from(files);
     const validFiles: File[] = [];
     const maxSize = maxSizeMB * 1024 * 1024;
@@ -92,19 +101,26 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
       validFiles.push(file);
     }
 
-    if (validFiles.length > 0) {
-      setPhotos((prev) => [...prev, ...validFiles]);
-      
-      // Create previews
-      validFiles.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setPreviews((prev) => [...prev, e.target?.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
+    if (validFiles.length === 0) return previews;
+
+    // Read previews BEFORE updating state so callers can await and persist immediately
+    // (iOS can background/suspend quickly after returning from the photo picker).
+    let newPreviews: string[] = [];
+    try {
+      newPreviews = (await Promise.all(validFiles.map(readFileAsDataUrl))).filter(Boolean);
+    } catch (error) {
+      console.error('Error generating photo previews:', error);
+      toast.error('Could not generate photo previews');
+      return previews;
     }
-  };
+
+    const nextPreviews = [...previews, ...newPreviews];
+
+    setPhotos((prev) => [...prev, ...validFiles]);
+    setPreviews(nextPreviews);
+
+    return nextPreviews;
+  }, [maxFiles, maxSizeMB, photos.length, previews]);
 
   const removePhoto = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
