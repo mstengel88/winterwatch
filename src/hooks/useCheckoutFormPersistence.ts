@@ -61,6 +61,8 @@ export interface CheckoutFormData {
   photoPreviewRefs?: string[]; // Native-only file refs (keeps localStorage small)
 }
 
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 interface UseCheckoutFormPersistenceOptions {
   workLogId: string;
   variant: 'plow' | 'shovel';
@@ -69,6 +71,15 @@ interface UseCheckoutFormPersistenceOptions {
 export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFormPersistenceOptions) {
   const storageKey = `${STORAGE_KEY_PREFIX}${variant}_${workLogId}`;
   const isInitializedRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  
+  // Helper to show "saved" briefly then return to idle
+  const flashSaved = useCallback(() => {
+    setSaveStatus('saved');
+    if (saveStatusTimeoutRef.current) clearTimeout(saveStatusTimeoutRef.current);
+    saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
+  }, []);
   
   // Load initial state from localStorage
   const loadPersistedData = useCallback((): CheckoutFormData => {
@@ -176,11 +187,18 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     field: K,
     value: CheckoutFormData[K]
   ) => {
+    setSaveStatus('saving');
     setFormData(prev => {
       // Don't update if value hasn't changed
-      if (prev[field] === value) return prev;
+      if (prev[field] === value) {
+        flashSaved();
+        return prev;
+      }
       // Don't save empty values unless we're clearing a previously set value
-      if (!value && !prev[field]) return prev;
+      if (!value && !prev[field]) {
+        flashSaved();
+        return prev;
+      }
       
       const newData = { ...prev, [field]: value };
       // Always update memory first, even if localStorage throws
@@ -190,16 +208,20 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
         setDebugState(storageKey, { lastWriteError: undefined });
+        flashSaved();
       } catch (error) {
         console.error('Error persisting field update:', error);
         setDebugState(storageKey, { lastWriteError: String(error) });
+        setSaveStatus('error');
       }
       return newData;
     });
-  }, [storageKey]);
+  }, [storageKey, flashSaved]);
 
   // Update photo previews
   const updatePhotoPreviews = useCallback(async (previews: string[]) => {
+    setSaveStatus('saving');
+    
     // On native, store previews on Filesystem and persist only lightweight refs in localStorage.
     if (canUseNativePreviewStore()) {
       try {
@@ -207,7 +229,10 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
 
         setFormData(prev => {
           // Avoid unnecessary updates
-          if (JSON.stringify(prev.photoPreviewRefs) === JSON.stringify(refs)) return prev;
+          if (JSON.stringify(prev.photoPreviewRefs) === JSON.stringify(refs)) {
+            flashSaved();
+            return prev;
+          }
 
           const newData: CheckoutFormData = {
             ...prev,
@@ -221,22 +246,28 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
             localStorage.setItem(storageKey, JSON.stringify(newData));
             setDebugState(storageKey, { lastWriteError: undefined });
             console.log('[Persistence] Saved photo preview refs');
+            flashSaved();
           } catch (error) {
             console.error('Error persisting photo preview refs:', error);
             setDebugState(storageKey, { lastWriteError: String(error) });
+            setSaveStatus('error');
           }
           return newData;
         });
       } catch (error) {
         console.error('Error saving native photo previews:', error);
         setDebugState(storageKey, { lastWriteError: String(error) });
+        setSaveStatus('error');
       }
       return;
     }
 
     // Web fallback: keep existing base64 behavior
     setFormData(prev => {
-      if (JSON.stringify(prev.photoPreviews) === JSON.stringify(previews)) return prev;
+      if (JSON.stringify(prev.photoPreviews) === JSON.stringify(previews)) {
+        flashSaved();
+        return prev;
+      }
 
       const newData = { ...prev, photoPreviews: previews };
       memoryCache.set(storageKey, newData);
@@ -245,13 +276,15 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
         localStorage.setItem(storageKey, JSON.stringify(newData));
         setDebugState(storageKey, { lastWriteError: undefined });
         console.log('[Persistence] Saved photo previews');
+        flashSaved();
       } catch (error) {
         console.error('Error persisting photo previews:', error);
         setDebugState(storageKey, { lastWriteError: String(error) });
+        setSaveStatus('error');
       }
       return newData;
     });
-  }, [storageKey]);
+  }, [storageKey, flashSaved]);
 
   // Clear persisted data (call on successful checkout)
   const clearPersistedData = useCallback(() => {
@@ -273,6 +306,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     updateField,
     updatePhotoPreviews,
     clearPersistedData,
+    saveStatus,
   };
 }
 
