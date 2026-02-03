@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
-import { generateWorkLogsPDF } from '@/lib/pdfExport';
+import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF } from '@/lib/pdfExport';
 import { toast } from 'sonner';
 import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
@@ -574,31 +574,26 @@ export default function ReportsPage() {
   };
 
   const handleExportTimeSheets = () => {
-    // Generate CSV for time sheets
-    const headers = ['Employee', 'Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Location'];
-    const rows = filteredShifts.map(shift => {
+    // Generate PDF for time sheets
+    const entries = filteredShifts.map(shift => {
       const employeeName = shift.employee ? `${shift.employee.first_name} ${shift.employee.last_name}` : 'Unknown';
       const hours = formatHours(shift.clock_in_time, shift.clock_out_time);
       const location = shift.clock_in_latitude && shift.clock_in_longitude 
         ? `${shift.clock_in_latitude.toFixed(4)}, ${shift.clock_in_longitude.toFixed(4)}` 
         : '-';
-      return [
+      return {
         employeeName,
-        format(new Date(shift.clock_in_time), 'MM/dd/yyyy'),
-        format(new Date(shift.clock_in_time), 'HH:mm'),
-        shift.clock_out_time ? format(new Date(shift.clock_out_time), 'HH:mm') : '-',
-        hours,
+        date: format(new Date(shift.clock_in_time), 'MM/dd/yyyy'),
+        clockIn: format(new Date(shift.clock_in_time), 'HH:mm'),
+        clockOut: shift.clock_out_time ? format(new Date(shift.clock_out_time), 'HH:mm') : '-',
+        hoursWorked: hours,
         location
-      ];
+      };
     });
 
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `timesheets_${format(new Date(fromDate), 'yyyy-MM-dd')}_to_${format(new Date(toDate), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    toast.success('Time sheets exported successfully');
+    const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
+    generateTimesheetsPDF(entries, dateRange);
+    toast.success('Time sheets PDF exported successfully');
   };
 
   const handleExportSummary = () => {
@@ -622,36 +617,23 @@ export default function ReportsPage() {
       ...filteredWorkLogs.map(l => l.employee_id)
     ].filter(Boolean)).size;
 
-    const summaryData = [
-      ['WinterWatch-Pro Summary Report'],
-      [`Period: ${format(new Date(fromDate), 'MM/dd/yyyy')} to ${format(new Date(toDate), 'MM/dd/yyyy')}`],
-      [`Generated: ${format(new Date(), 'MM/dd/yyyy HH:mm')}`],
-      [''],
-      ['TIME CLOCK SUMMARY'],
-      ['Total Shifts', filteredShifts.length.toString()],
-      ['Total Hours', totalShiftHours.toFixed(1)],
-      [''],
-      ['WORK LOG SUMMARY'],
-      ['Total Jobs', stats.total.toString()],
-      ['Plow Jobs', stats.plow.toString()],
-      ['Shovel Jobs', stats.shovel.toString()],
-      ['Salt Applications', stats.salt.toString()],
-      ['Total Work Hours', totalWorkLogHours.toFixed(1)],
-      ['Unique Locations', stats.locations.toString()],
-      [''],
-      ['OVERALL'],
-      ['Active Employees', uniqueEmployees.toString()],
-      ['Total Salt Used (lbs)', filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0).toString()],
-      ['Total Ice Melt Used (lbs)', filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0).toString()],
-    ];
+    const summaryStats = {
+      totalShifts: filteredShifts.length,
+      totalShiftHours,
+      totalJobs: stats.total,
+      plowJobs: stats.plow,
+      shovelJobs: stats.shovel,
+      saltApplications: stats.salt,
+      totalWorkHours: totalWorkLogHours,
+      uniqueLocations: stats.locations,
+      activeEmployees: uniqueEmployees,
+      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
+      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
+    };
 
-    const csvContent = summaryData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `summary_${format(new Date(fromDate), 'yyyy-MM-dd')}_to_${format(new Date(toDate), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    toast.success('Summary report exported successfully');
+    const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
+    generateSummaryPDF(summaryStats, dateRange);
+    toast.success('Summary PDF exported successfully');
   };
 
   const toggleAllShifts = () => {

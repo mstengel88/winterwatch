@@ -186,7 +186,7 @@ export function WorkLogDialog({
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[200] bg-popover">
                   <SelectItem value="plow">Plow (Driver)</SelectItem>
                   <SelectItem value="shovel">Shovel (Crew)</SelectItem>
                 </SelectContent>
@@ -201,7 +201,7 @@ export function WorkLogDialog({
                   <SelectTrigger>
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
                     {accounts
                       .filter((acc) => acc.id && acc.id.trim() !== '')
                       .map((acc) => (
@@ -216,7 +216,7 @@ export function WorkLogDialog({
                   <SelectTrigger>
                     <SelectValue placeholder="Select employee" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
                     {employees
                       .filter((emp) => emp.id && emp.id.trim() !== '')
                       .map((emp) => (
@@ -237,7 +237,7 @@ export function WorkLogDialog({
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-[200] bg-popover">
                     {serviceTypeOptions.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
@@ -251,7 +251,7 @@ export function WorkLogDialog({
                     <SelectTrigger>
                       <SelectValue placeholder="Select equipment" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
                       <SelectItem value="none">None</SelectItem>
                       {equipment
                         .filter((eq) => eq.id && eq.id.trim() !== '')
