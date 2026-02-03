@@ -3,7 +3,7 @@
  * Stores form data in localStorage keyed by work log ID
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const STORAGE_KEY_PREFIX = 'winterwatch_checkout_form_';
 
@@ -24,13 +24,16 @@ interface UseCheckoutFormPersistenceOptions {
 
 export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFormPersistenceOptions) {
   const storageKey = `${STORAGE_KEY_PREFIX}${variant}_${workLogId}`;
+  const isInitializedRef = useRef(false);
   
   // Load initial state from localStorage
   const loadPersistedData = useCallback((): CheckoutFormData => {
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        console.log('[Persistence] Loaded data for', storageKey, parsed);
+        return parsed;
       }
     } catch (error) {
       console.error('Error loading persisted checkout form:', error);
@@ -38,12 +41,50 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     return {};
   }, [storageKey]);
 
-  const [formData, setFormData] = useState<CheckoutFormData>(loadPersistedData);
+  const [formData, setFormData] = useState<CheckoutFormData>(() => loadPersistedData());
 
-  // Save to localStorage whenever form data changes
+  // Re-load from localStorage when component mounts or when visibility changes
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const freshData = loadPersistedData();
+        if (Object.keys(freshData).length > 0) {
+          console.log('[Persistence] Reloading data on visibility change');
+          setFormData(freshData);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also reload on focus (for iOS apps that don't trigger visibilitychange)
+    const handleFocus = () => {
+      const freshData = loadPersistedData();
+      if (Object.keys(freshData).length > 0) {
+        console.log('[Persistence] Reloading data on focus');
+        setFormData(freshData);
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadPersistedData]);
+
+  // Save to localStorage whenever form data changes (but skip the initial empty save)
+  useEffect(() => {
+    // Skip saving on first render to avoid overwriting with initial empty state
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      return;
+    }
+    
     try {
       if (Object.keys(formData).length > 0) {
+        console.log('[Persistence] Saving data for', storageKey, formData);
         localStorage.setItem(storageKey, JSON.stringify(formData));
       }
     } catch (error) {
@@ -56,17 +97,45 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     field: K,
     value: CheckoutFormData[K]
   ) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
+    setFormData(prev => {
+      // Don't update if value hasn't changed
+      if (prev[field] === value) return prev;
+      // Don't save empty values unless we're clearing a previously set value
+      if (!value && !prev[field]) return prev;
+      
+      const newData = { ...prev, [field]: value };
+      // Immediately save to localStorage for reliability
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(newData));
+      } catch (error) {
+        console.error('Error persisting field update:', error);
+      }
+      return newData;
+    });
+  }, [storageKey]);
 
   // Update photo previews
   const updatePhotoPreviews = useCallback((previews: string[]) => {
-    setFormData(prev => ({ ...prev, photoPreviews: previews }));
-  }, []);
+    setFormData(prev => {
+      // Don't update if previews are the same
+      if (JSON.stringify(prev.photoPreviews) === JSON.stringify(previews)) return prev;
+      
+      const newData = { ...prev, photoPreviews: previews };
+      // Immediately save to localStorage for reliability
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(newData));
+        console.log('[Persistence] Saved photo previews');
+      } catch (error) {
+        console.error('Error persisting photo previews:', error);
+      }
+      return newData;
+    });
+  }, [storageKey]);
 
   // Clear persisted data (call on successful checkout)
   const clearPersistedData = useCallback(() => {
     try {
+      console.log('[Persistence] Clearing data for', storageKey);
       localStorage.removeItem(storageKey);
       setFormData({});
     } catch (error) {
