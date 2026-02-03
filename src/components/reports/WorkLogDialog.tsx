@@ -5,7 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, ChevronDown, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Account {
   id: string;
@@ -28,6 +31,7 @@ export interface WorkLogFormData {
   type: 'plow' | 'shovel';
   account_id: string;
   employee_id: string;
+  employee_ids: string[];
   equipment_id?: string;
   service_type: string;
   date: string;
@@ -77,8 +81,9 @@ export function WorkLogDialog({
 }: WorkLogDialogProps) {
   const [type, setType] = useState<'plow' | 'shovel'>('plow');
   const [accountId, setAccountId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
+  const [employeeIds, setEmployeeIds] = useState<string[]>([]);
   const [equipmentId, setEquipmentId] = useState('');
+  const [employeePopoverOpen, setEmployeePopoverOpen] = useState(false);
   const [serviceType, setServiceType] = useState('plow');
   const [date, setDate] = useState('');
   const [checkInTime, setCheckInTime] = useState('');
@@ -93,7 +98,8 @@ export function WorkLogDialog({
     if (initialData) {
       setType(initialData.type);
       setAccountId(initialData.account_id);
-      setEmployeeId(initialData.employee_id || '');
+      // Support both single employee_id and loading as array
+      setEmployeeIds(initialData.employee_id ? [initialData.employee_id] : []);
       setEquipmentId(initialData.equipment_id || '');
       setServiceType(initialData.service_type);
       if (initialData.check_in_time) {
@@ -113,7 +119,7 @@ export function WorkLogDialog({
     } else {
       setType('plow');
       setAccountId('');
-      setEmployeeId('');
+      setEmployeeIds([]);
       setEquipmentId('');
       setServiceType('plow');
       setDate(new Date().toISOString().split('T')[0]);
@@ -133,7 +139,8 @@ export function WorkLogDialog({
       id: initialData?.id,
       type,
       account_id: accountId,
-      employee_id: employeeId,
+      employee_id: employeeIds[0] || '',
+      employee_ids: employeeIds,
       equipment_id: equipmentId || undefined,
       service_type: serviceType,
       date,
@@ -145,6 +152,24 @@ export function WorkLogDialog({
       weather_conditions: weather || undefined,
       notes: notes || undefined,
     });
+  };
+
+  const toggleEmployee = (empId: string) => {
+    setEmployeeIds(prev => 
+      prev.includes(empId) 
+        ? prev.filter(id => id !== empId)
+        : [...prev, empId]
+    );
+  };
+
+  const getSelectedEmployeeNames = () => {
+    return employeeIds
+      .map(id => {
+        const emp = employees.find(e => e.id === id);
+        return emp ? `${emp.first_name} ${emp.last_name}` : '';
+      })
+      .filter(Boolean)
+      .join(', ');
   };
 
   const isEdit = !!initialData;
@@ -211,21 +236,60 @@ export function WorkLogDialog({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Employee</Label>
-                <Select value={employeeId} onValueChange={setEmployeeId} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select employee" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
-                    {employees
-                      .filter((emp) => emp.id && emp.id.trim() !== '')
-                      .map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.first_name} {emp.last_name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <Label>Employee(s)</Label>
+                <Popover open={employeePopoverOpen} onOpenChange={setEmployeePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between min-h-[40px] h-auto",
+                        employeeIds.length === 0 && "text-muted-foreground"
+                      )}
+                    >
+                      <span className="truncate text-left flex-1">
+                        {employeeIds.length === 0
+                          ? "Select employees"
+                          : getSelectedEmployeeNames()}
+                      </span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0 z-[200] bg-popover" align="start">
+                    <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
+                      {employees
+                        .filter((emp) => emp.id && emp.id.trim() !== '')
+                        .map((emp) => (
+                          <div
+                            key={emp.id}
+                            className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md cursor-pointer"
+                            onClick={() => toggleEmployee(emp.id)}
+                          >
+                            <Checkbox
+                              checked={employeeIds.includes(emp.id)}
+                              onCheckedChange={() => toggleEmployee(emp.id)}
+                            />
+                            <span className="text-sm">
+                              {emp.first_name} {emp.last_name}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                    {employeeIds.length > 0 && (
+                      <div className="border-t p-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-muted-foreground"
+                          onClick={() => setEmployeeIds([])}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Clear all
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -349,7 +413,7 @@ export function WorkLogDialog({
             </Button>
             <Button 
               type="submit" 
-              disabled={isLoading || !accountId || !employeeId}
+              disabled={isLoading || !accountId || employeeIds.length === 0}
               className="min-h-[44px]"
             >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
