@@ -22,7 +22,7 @@ import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
 import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
 import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
-import { loadCheckoutPhotoPreviews, saveCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
+import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 import { 
   Snowflake, 
   Truck, 
@@ -272,20 +272,18 @@ export default function DriverDashboard() {
 
     const listener = App.addListener('appStateChange', ({ isActive }) => {
       if (!isActive && previews.length > 0) {
-        console.log('[Persistence] App backgrounding – saving photos synchronously');
-        // Fire off the save immediately. We can't truly await here, but Capacitor
-        // Filesystem writes are fast enough to typically complete before full suspension.
-        void saveCheckoutPhotoPreviews({
-          storageKey: `winterwatch_checkout_form_plow_${activeWorkLogIdForPersistence}`,
-          previews,
-        }).catch((err) => console.error('[Persistence] Background save failed:', err));
+        console.log('[Persistence] App backgrounding – persisting photo previews');
+        // IMPORTANT: Saving the preview files alone is not enough; we also need the
+        // refs list persisted into the checkout-form JSON so we can restore on resume.
+        // Fire-and-forget (iOS may suspend quickly).
+        void updatePhotoPreviews(previews);
       }
     });
 
     return () => {
       void listener.then((l) => l.remove());
     };
-  }, [activeWorkLogIdForPersistence, previews]);
+  }, [activeWorkLogIdForPersistence, previews, updatePhotoPreviews]);
 // 🔍 DEBUG: check what accounts DriverDashboard is actually receiving
   useEffect(() => {
     const withCoords = accounts.filter(
