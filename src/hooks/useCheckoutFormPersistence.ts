@@ -7,6 +7,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 const STORAGE_KEY_PREFIX = 'winterwatch_checkout_form_';
 
+// In-memory fallback (helps on native iOS when the WebView temporarily remounts
+// and localStorage returns empty during app-switching)
+const memoryCache = new Map<string, CheckoutFormData>();
+
 export interface CheckoutFormData {
   snowDepth?: string;
   saltUsed?: string;
@@ -33,11 +37,21 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       if (stored) {
         const parsed = JSON.parse(stored);
         console.log('[Persistence] Loaded data for', storageKey, parsed);
+        memoryCache.set(storageKey, parsed);
         return parsed;
       }
     } catch (error) {
       console.error('Error loading persisted checkout form:', error);
     }
+
+    // Fallback: if localStorage is empty/unavailable during a native remount,
+    // use the last known in-memory value so fields don't appear to "clear".
+    const cached = memoryCache.get(storageKey);
+    if (cached && Object.keys(cached).length > 0) {
+      console.log('[Persistence] Falling back to memory cache for', storageKey);
+      return cached;
+    }
+
     return {};
   }, [storageKey]);
 
@@ -51,6 +65,13 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
         if (Object.keys(freshData).length > 0) {
           console.log('[Persistence] Reloading data on visibility change');
           setFormData(freshData);
+        } else {
+          // If localStorage returns empty on resume, keep the last known value.
+          const cached = memoryCache.get(storageKey);
+          if (cached && Object.keys(cached).length > 0) {
+            console.log('[Persistence] Restoring from memory cache on visibility change');
+            setFormData(cached);
+          }
         }
       }
     };
@@ -63,6 +84,12 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       if (Object.keys(freshData).length > 0) {
         console.log('[Persistence] Reloading data on focus');
         setFormData(freshData);
+      } else {
+        const cached = memoryCache.get(storageKey);
+        if (cached && Object.keys(cached).length > 0) {
+          console.log('[Persistence] Restoring from memory cache on focus');
+          setFormData(cached);
+        }
       }
     };
     
@@ -86,6 +113,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       if (Object.keys(formData).length > 0) {
         console.log('[Persistence] Saving data for', storageKey, formData);
         localStorage.setItem(storageKey, JSON.stringify(formData));
+        memoryCache.set(storageKey, formData);
       }
     } catch (error) {
       console.error('Error persisting checkout form:', error);
@@ -107,6 +135,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       // Immediately save to localStorage for reliability
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
+        memoryCache.set(storageKey, newData);
       } catch (error) {
         console.error('Error persisting field update:', error);
       }
@@ -124,6 +153,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       // Immediately save to localStorage for reliability
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
+        memoryCache.set(storageKey, newData);
         console.log('[Persistence] Saved photo previews');
       } catch (error) {
         console.error('Error persisting photo previews:', error);
@@ -137,6 +167,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     try {
       console.log('[Persistence] Clearing data for', storageKey);
       localStorage.removeItem(storageKey);
+      memoryCache.delete(storageKey);
       setFormData({});
     } catch (error) {
       console.error('Error clearing persisted checkout form:', error);
