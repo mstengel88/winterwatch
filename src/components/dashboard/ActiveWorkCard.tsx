@@ -10,6 +10,7 @@ import { MapPin, LogOut, Snowflake, Loader2, Clock } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
+import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
 
 interface ActiveWorkCardProps {
   workLog: WorkLog;
@@ -33,6 +34,8 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
     workLogId: workLog.id,
     variant: 'plow',
   });
+
+  const storageKey = `winterwatch_checkout_form_plow_${workLog.id}`;
   
   // Form state synced with persistence
   const [snowDepth, setSnowDepth] = useState('');
@@ -241,6 +244,8 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
           )}
           Check Out
         </Button>
+
+        <PersistenceDebugPanel storageKey={storageKey} />
       </CardContent>
     </Card>
   );

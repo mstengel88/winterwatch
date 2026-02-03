@@ -11,6 +11,40 @@ const STORAGE_KEY_PREFIX = 'winterwatch_checkout_form_';
 // and localStorage returns empty during app-switching)
 const memoryCache = new Map<string, CheckoutFormData>();
 
+export type CheckoutPersistenceDebugSnapshot = {
+  storageKey: string;
+  lastLoadSource?: 'localStorage' | 'memoryCache' | 'empty' | 'error';
+  localStorageBytes?: number;
+  memoryCacheBytes?: number;
+  lastWriteError?: string;
+};
+
+const debugStateByKey = new Map<string, Omit<CheckoutPersistenceDebugSnapshot, 'storageKey'>>();
+
+function setDebugState(storageKey: string, patch: Partial<Omit<CheckoutPersistenceDebugSnapshot, 'storageKey'>>) {
+  const prev = debugStateByKey.get(storageKey) ?? {};
+  debugStateByKey.set(storageKey, { ...prev, ...patch });
+}
+
+export function getCheckoutPersistenceDebugSnapshot(storageKey: string): CheckoutPersistenceDebugSnapshot {
+  const memory = memoryCache.get(storageKey);
+  const local = (() => {
+    try {
+      return localStorage.getItem(storageKey);
+    } catch {
+      return null;
+    }
+  })();
+
+  const extra = debugStateByKey.get(storageKey) ?? {};
+  return {
+    storageKey,
+    ...extra,
+    localStorageBytes: typeof local === 'string' ? local.length : undefined,
+    memoryCacheBytes: memory ? JSON.stringify(memory).length : undefined,
+  };
+}
+
 export interface CheckoutFormData {
   snowDepth?: string;
   saltUsed?: string;
@@ -38,10 +72,12 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
         const parsed = JSON.parse(stored);
         console.log('[Persistence] Loaded data for', storageKey, parsed);
         memoryCache.set(storageKey, parsed);
+        setDebugState(storageKey, { lastLoadSource: 'localStorage' });
         return parsed;
       }
     } catch (error) {
       console.error('Error loading persisted checkout form:', error);
+      setDebugState(storageKey, { lastLoadSource: 'error' });
     }
 
     // Fallback: if localStorage is empty/unavailable during a native remount,
@@ -49,9 +85,11 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     const cached = memoryCache.get(storageKey);
     if (cached && Object.keys(cached).length > 0) {
       console.log('[Persistence] Falling back to memory cache for', storageKey);
+      setDebugState(storageKey, { lastLoadSource: 'memoryCache' });
       return cached;
     }
 
+    setDebugState(storageKey, { lastLoadSource: 'empty' });
     return {};
   }, [storageKey]);
 
@@ -112,8 +150,15 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     try {
       if (Object.keys(formData).length > 0) {
         console.log('[Persistence] Saving data for', storageKey, formData);
-        localStorage.setItem(storageKey, JSON.stringify(formData));
+        // Always update memory first, even if localStorage throws (iOS quota / DOMException)
         memoryCache.set(storageKey, formData);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(formData));
+          setDebugState(storageKey, { lastWriteError: undefined });
+        } catch (error) {
+          setDebugState(storageKey, { lastWriteError: String(error) });
+          throw error;
+        }
       }
     } catch (error) {
       console.error('Error persisting checkout form:', error);
@@ -132,12 +177,16 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       if (!value && !prev[field]) return prev;
       
       const newData = { ...prev, [field]: value };
+      // Always update memory first, even if localStorage throws
+      memoryCache.set(storageKey, newData);
+
       // Immediately save to localStorage for reliability
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
-        memoryCache.set(storageKey, newData);
+        setDebugState(storageKey, { lastWriteError: undefined });
       } catch (error) {
         console.error('Error persisting field update:', error);
+        setDebugState(storageKey, { lastWriteError: String(error) });
       }
       return newData;
     });
@@ -150,13 +199,17 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       if (JSON.stringify(prev.photoPreviews) === JSON.stringify(previews)) return prev;
       
       const newData = { ...prev, photoPreviews: previews };
+      // Always update memory first, even if localStorage throws
+      memoryCache.set(storageKey, newData);
+
       // Immediately save to localStorage for reliability
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
-        memoryCache.set(storageKey, newData);
+        setDebugState(storageKey, { lastWriteError: undefined });
         console.log('[Persistence] Saved photo previews');
       } catch (error) {
         console.error('Error persisting photo previews:', error);
+        setDebugState(storageKey, { lastWriteError: String(error) });
       }
       return newData;
     });
@@ -168,6 +221,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       console.log('[Persistence] Clearing data for', storageKey);
       localStorage.removeItem(storageKey);
       memoryCache.delete(storageKey);
+      debugStateByKey.delete(storageKey);
       setFormData({});
     } catch (error) {
       console.error('Error clearing persisted checkout form:', error);
