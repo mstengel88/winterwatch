@@ -100,7 +100,7 @@ export function ShiftDialog({
                 <SelectTrigger>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
                   {employees
                     .filter((emp) => emp.id && emp.id.trim() !== '')
                     .map((emp) => (
