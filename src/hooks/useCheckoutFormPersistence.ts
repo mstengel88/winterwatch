@@ -4,6 +4,8 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import {
   canUseNativePreviewStore,
   clearCheckoutPhotoPreviews,
@@ -11,6 +13,18 @@ import {
 } from '@/lib/checkoutPhotoPreviewStore';
 
 const STORAGE_KEY_PREFIX = 'winterwatch_checkout_form_';
+
+function safeKeySegment(input: string) {
+  return input.replace(/[^a-zA-Z0-9-_]/g, '_');
+}
+
+function nativeFormPath(storageKey: string) {
+  return `checkout-form/${safeKeySegment(storageKey)}.json`;
+}
+
+function canUseNativeFormStore() {
+  return Capacitor.isNativePlatform();
+}
 
 // In-memory fallback (helps on native iOS when the WebView temporarily remounts
 // and localStorage returns empty during app-switching)
@@ -73,6 +87,37 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
   const isInitializedRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const saveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const loadFromNativeStore = useCallback(async (): Promise<CheckoutFormData | null> => {
+    if (!canUseNativeFormStore()) return null;
+    try {
+      const res = await Filesystem.readFile({
+        path: nativeFormPath(storageKey),
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+      const raw = String(res.data ?? '').trim();
+      if (!raw) return {};
+      return JSON.parse(raw) as CheckoutFormData;
+    } catch {
+      // File may not exist yet; treat as empty.
+      return null;
+    }
+  }, [storageKey]);
+
+  const saveToNativeStore = useCallback(
+    async (data: CheckoutFormData) => {
+      if (!canUseNativeFormStore()) return;
+      await Filesystem.writeFile({
+        path: nativeFormPath(storageKey),
+        directory: Directory.Data,
+        data: JSON.stringify(data),
+        encoding: Encoding.UTF8,
+        recursive: true,
+      });
+    },
+    [storageKey],
+  );
   
   // Helper to show "saved" briefly then return to idle
   const flashSaved = useCallback(() => {
@@ -81,7 +126,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
   }, []);
   
-  // Load initial state from localStorage
+  // Load initial state from localStorage (native gets an async Filesystem load too)
   const loadPersistedData = useCallback((): CheckoutFormData => {
     try {
       const stored = localStorage.getItem(storageKey);
@@ -111,6 +156,27 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
   }, [storageKey]);
 
   const [formData, setFormData] = useState<CheckoutFormData>(() => loadPersistedData());
+
+  // Native iOS: localStorage can come back empty if the WebView process is killed.
+  // We keep an authoritative copy on the Capacitor Filesystem.
+  useEffect(() => {
+    if (!canUseNativeFormStore()) return;
+    let cancelled = false;
+
+    void (async () => {
+      const nativeData = await loadFromNativeStore();
+      if (cancelled) return;
+      if (nativeData && Object.keys(nativeData).length > 0) {
+        console.log('[Persistence] Loaded data from native store for', storageKey);
+        memoryCache.set(storageKey, nativeData);
+        setFormData(nativeData);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadFromNativeStore, storageKey]);
 
   // IMPORTANT: storageKey can change at runtime (e.g., after app resume when activeWorkLog
   // is re-fetched). When it changes, we must reload the corresponding persisted state.
@@ -158,12 +224,30 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     };
     
     window.addEventListener('focus', handleFocus);
+
+    // Native store reload as well (best-effort)
+    const handleNativeReload = () => {
+      if (!canUseNativeFormStore()) return;
+      void (async () => {
+        const nativeData = await loadFromNativeStore();
+        if (nativeData && Object.keys(nativeData).length > 0) {
+          console.log('[Persistence] Reloading data from native store');
+          memoryCache.set(storageKey, nativeData);
+          setFormData(nativeData);
+        }
+      })();
+    };
+
+    document.addEventListener('visibilitychange', handleNativeReload);
+    window.addEventListener('focus', handleNativeReload);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleNativeReload);
+      window.removeEventListener('focus', handleNativeReload);
     };
-  }, [loadPersistedData]);
+  }, [loadPersistedData, loadFromNativeStore, storageKey]);
 
   // Save to localStorage whenever form data changes (but skip the initial empty save)
   useEffect(() => {
@@ -178,6 +262,11 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
         console.log('[Persistence] Saving data for', storageKey, formData);
         // Always update memory first, even if localStorage throws (iOS quota / DOMException)
         memoryCache.set(storageKey, formData);
+        // Native iOS: also persist to Filesystem so it survives WebView process kills.
+        void saveToNativeStore(formData).catch((error) => {
+          setDebugState(storageKey, { lastWriteError: String(error) });
+          console.error('Error persisting checkout form to native store:', error);
+        });
         try {
           localStorage.setItem(storageKey, JSON.stringify(formData));
           setDebugState(storageKey, { lastWriteError: undefined });
@@ -189,7 +278,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
     } catch (error) {
       console.error('Error persisting checkout form:', error);
     }
-  }, [formData, storageKey]);
+  }, [formData, storageKey, saveToNativeStore]);
 
   // Update a single field
   const updateField = useCallback(<K extends keyof CheckoutFormData>(
@@ -213,6 +302,13 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       // Always update memory first, even if localStorage throws
       memoryCache.set(storageKey, newData);
 
+      // Native iOS: persist to Filesystem (fire-and-forget)
+      void saveToNativeStore(newData).catch((error) => {
+        console.error('Error persisting field update to native store:', error);
+        setDebugState(storageKey, { lastWriteError: String(error) });
+        setSaveStatus('error');
+      });
+
       // Immediately save to localStorage for reliability
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
@@ -225,7 +321,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       }
       return newData;
     });
-  }, [storageKey, flashSaved]);
+  }, [storageKey, flashSaved, saveToNativeStore]);
 
   // Update photo previews
   const updatePhotoPreviews = useCallback(async (previews: string[]) => {
@@ -251,6 +347,12 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
           };
 
           memoryCache.set(storageKey, newData);
+          // Keep the JSON in native store too (refs only)
+          void saveToNativeStore(newData).catch((error) => {
+            console.error('Error persisting photo preview refs to native store:', error);
+            setDebugState(storageKey, { lastWriteError: String(error) });
+            setSaveStatus('error');
+          });
           try {
             localStorage.setItem(storageKey, JSON.stringify(newData));
             setDebugState(storageKey, { lastWriteError: undefined });
@@ -281,6 +383,12 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       const newData = { ...prev, photoPreviews: previews };
       memoryCache.set(storageKey, newData);
 
+      void saveToNativeStore(newData).catch((error) => {
+        console.error('Error persisting photo previews to native store:', error);
+        setDebugState(storageKey, { lastWriteError: String(error) });
+        setSaveStatus('error');
+      });
+
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
         setDebugState(storageKey, { lastWriteError: undefined });
@@ -293,7 +401,7 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       }
       return newData;
     });
-  }, [storageKey, flashSaved]);
+  }, [storageKey, flashSaved, saveToNativeStore]);
 
   // Clear persisted data (call on successful checkout)
   const clearPersistedData = useCallback(() => {
@@ -305,6 +413,16 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       setFormData({});
       // Best-effort cleanup of native photo preview files
       void clearCheckoutPhotoPreviews(storageKey);
+
+      // Best-effort cleanup of native JSON
+      if (canUseNativeFormStore()) {
+        void Filesystem.deleteFile({
+          path: nativeFormPath(storageKey),
+          directory: Directory.Data,
+        }).catch(() => {
+          // ignore
+        });
+      }
     } catch (error) {
       console.error('Error clearing persisted checkout form:', error);
     }
