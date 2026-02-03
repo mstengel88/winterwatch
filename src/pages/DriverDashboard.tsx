@@ -162,22 +162,24 @@ export default function DriverDashboard() {
   const handleAddPhotos = useCallback(
     async (files: FileList | File[]) => {
       const nextPreviews = (await addPhotos(files)) as unknown as string[];
-      if (!activeWorkLog) return;
+      // IMPORTANT: On iOS, `activeWorkLog` can briefly go undefined on resume / after photo picker.
+      // Persist against the stable persisted ID instead of requiring `activeWorkLog`.
+      if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
       if (isRestoringCheckoutRef.current) return;
       await updatePhotoPreviews(nextPreviews);
     },
-    [addPhotos, activeWorkLog, updatePhotoPreviews],
+    [addPhotos, activeWorkLogIdForPersistence, updatePhotoPreviews],
   );
 
   const handleRemovePhoto = useCallback(
     (index: number) => {
       const nextPreviews = previews.filter((_, i) => i !== index);
       removePhoto(index);
-      if (!activeWorkLog) return;
+      if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
       if (isRestoringCheckoutRef.current) return;
       void updatePhotoPreviews(nextPreviews);
     },
-    [activeWorkLog, previews, removePhoto, updatePhotoPreviews],
+    [activeWorkLogIdForPersistence, previews, removePhoto, updatePhotoPreviews],
   );
 
   // If the active work log changes (or rehydrates after resume), allow native preview restore again.
@@ -253,11 +255,12 @@ export default function DriverDashboard() {
   }, [activeWorkLog, selectedEquipment, updateField]);
 
   useEffect(() => {
-    if (!activeWorkLog) return;
+    // Same reasoning as above: use the stable ID, not the live activeWorkLog reference.
+    if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
     if (isRestoringCheckoutRef.current) return;
     if (previews.length === 0) return;
     void updatePhotoPreviews(previews);
-  }, [activeWorkLog, previews, updatePhotoPreviews]);
+  }, [activeWorkLogIdForPersistence, previews, updatePhotoPreviews]);
 // 🔍 DEBUG: check what accounts DriverDashboard is actually receiving
   useEffect(() => {
     const withCoords = accounts.filter(
