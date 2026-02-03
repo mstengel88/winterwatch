@@ -4,6 +4,11 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  canUseNativePreviewStore,
+  clearCheckoutPhotoPreviews,
+  saveCheckoutPhotoPreviews,
+} from '@/lib/checkoutPhotoPreviewStore';
 
 const STORAGE_KEY_PREFIX = 'winterwatch_checkout_form_';
 
@@ -53,6 +58,7 @@ export interface CheckoutFormData {
   notes?: string;
   areasCleared?: string[];
   photoPreviews?: string[]; // Base64 previews for restoration
+  photoPreviewRefs?: string[]; // Native-only file refs (keeps localStorage small)
 }
 
 interface UseCheckoutFormPersistenceOptions {
@@ -193,16 +199,48 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
   }, [storageKey]);
 
   // Update photo previews
-  const updatePhotoPreviews = useCallback((previews: string[]) => {
+  const updatePhotoPreviews = useCallback(async (previews: string[]) => {
+    // On native, store previews on Filesystem and persist only lightweight refs in localStorage.
+    if (canUseNativePreviewStore()) {
+      try {
+        const refs = await saveCheckoutPhotoPreviews({ storageKey, previews });
+
+        setFormData(prev => {
+          // Avoid unnecessary updates
+          if (JSON.stringify(prev.photoPreviewRefs) === JSON.stringify(refs)) return prev;
+
+          const newData: CheckoutFormData = {
+            ...prev,
+            photoPreviewRefs: refs,
+            // Ensure we don't bloat localStorage with base64.
+            photoPreviews: undefined,
+          };
+
+          memoryCache.set(storageKey, newData);
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(newData));
+            setDebugState(storageKey, { lastWriteError: undefined });
+            console.log('[Persistence] Saved photo preview refs');
+          } catch (error) {
+            console.error('Error persisting photo preview refs:', error);
+            setDebugState(storageKey, { lastWriteError: String(error) });
+          }
+          return newData;
+        });
+      } catch (error) {
+        console.error('Error saving native photo previews:', error);
+        setDebugState(storageKey, { lastWriteError: String(error) });
+      }
+      return;
+    }
+
+    // Web fallback: keep existing base64 behavior
     setFormData(prev => {
-      // Don't update if previews are the same
       if (JSON.stringify(prev.photoPreviews) === JSON.stringify(previews)) return prev;
-      
+
       const newData = { ...prev, photoPreviews: previews };
-      // Always update memory first, even if localStorage throws
       memoryCache.set(storageKey, newData);
 
-      // Immediately save to localStorage for reliability
       try {
         localStorage.setItem(storageKey, JSON.stringify(newData));
         setDebugState(storageKey, { lastWriteError: undefined });
@@ -223,6 +261,8 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
       memoryCache.delete(storageKey);
       debugStateByKey.delete(storageKey);
       setFormData({});
+      // Best-effort cleanup of native photo preview files
+      void clearCheckoutPhotoPreviews(storageKey);
     } catch (error) {
       console.error('Error clearing persisted checkout form:', error);
     }

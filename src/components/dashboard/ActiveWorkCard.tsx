@@ -11,6 +11,7 @@ import { PhotoUpload } from './PhotoUpload';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
+import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 
 interface ActiveWorkCardProps {
   workLog: WorkLog;
@@ -45,6 +46,7 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
   const isRestoringRef = useRef(false);
   
   const photoUpload = usePhotoUpload({ folder: 'work-logs' });
+  const hasLoadedNativePreviewsRef = useRef(false);
 
   // Restore form state from persisted data whenever formData changes
   useEffect(() => {
@@ -66,6 +68,25 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
       }, 100);
     }
   }, [formData]); // Re-run when formData updates (e.g., on visibility change)
+
+  // Native iOS: restore photo previews from Filesystem refs
+  useEffect(() => {
+    if (hasLoadedNativePreviewsRef.current) return;
+    if (photoUpload.previews.length > 0) return;
+    if (!formData.photoPreviewRefs || formData.photoPreviewRefs.length === 0) return;
+
+    hasLoadedNativePreviewsRef.current = true;
+    void (async () => {
+      try {
+        const previews = await loadCheckoutPhotoPreviews(formData.photoPreviewRefs!);
+        if (previews.length > 0) {
+          photoUpload.restorePreviews(previews);
+        }
+      } catch {
+        // best-effort
+      }
+    })();
+  }, [formData.photoPreviewRefs, photoUpload]);
 
   // Persist form changes (skip during restoration)
   useEffect(() => {
