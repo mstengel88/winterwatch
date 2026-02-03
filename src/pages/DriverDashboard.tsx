@@ -136,13 +136,31 @@ export default function DriverDashboard() {
   } = useWorkLogs({ employeeId: employee?.id });
 
   // Plow checkout persistence (for the active work checkout section on this page)
-  const activeWorkLogId = activeWorkLog?.id ?? 'inactive';
-  const storageKey = `winterwatch_checkout_form_plow_${activeWorkLogId}`;
+  // NOTE: On iOS app-switch, `activeWorkLog` can be temporarily undefined while data refetches.
+  // Using a placeholder like "inactive" causes the hook to initialize against the wrong key
+  // and the UI restores blank. Keep a stable last-known workLogId instead.
+  const [persistedActiveWorkLogId, setPersistedActiveWorkLogId] = useState<string>('');
+
+  useEffect(() => {
+    if (activeWorkLog?.id && activeWorkLog.id !== persistedActiveWorkLogId) {
+      setPersistedActiveWorkLogId(activeWorkLog.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkLog?.id]);
+
+  const activeWorkLogIdForPersistence = persistedActiveWorkLogId || activeWorkLog?.id || '__no_active_worklog__';
+  const storageKey = `winterwatch_checkout_form_plow_${activeWorkLogIdForPersistence}`;
+
   const { formData, updateField, updatePhotoPreviews, clearPersistedData, saveStatus } =
-    useCheckoutFormPersistence({ workLogId: activeWorkLogId, variant: 'plow' });
+    useCheckoutFormPersistence({ workLogId: activeWorkLogIdForPersistence, variant: 'plow' });
 
   const isRestoringCheckoutRef = useRef(false);
   const hasLoadedNativePreviewsRef = useRef(false);
+
+  // If the active work log changes (or rehydrates after resume), allow native preview restore again.
+  useEffect(() => {
+    hasLoadedNativePreviewsRef.current = false;
+  }, [activeWorkLog?.id]);
 
   // Restore persisted checkout state when we have an active work log
   useEffect(() => {
@@ -158,7 +176,7 @@ export default function DriverDashboard() {
     window.setTimeout(() => {
       isRestoringCheckoutRef.current = false;
     }, 100);
-  }, [activeWorkLogId, activeWorkLog, formData]);
+  }, [activeWorkLog, formData]);
 
   // Native iOS: restore photo previews from Filesystem refs
   useEffect(() => {
