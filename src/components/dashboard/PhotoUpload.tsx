@@ -9,7 +9,8 @@ interface PhotoUploadProps {
   isUploading: boolean;
   uploadProgress: number;
   canAddMore: boolean;
-  onAddPhotos: (files: FileList | File[]) => void;
+  // Some callers (native persistence) return the updated preview list.
+  onAddPhotos: (files: FileList | File[]) => void | Promise<unknown>;
   onRemovePhoto: (index: number) => void;
   maxPhotos?: number;
   hasRestoredPreviews?: boolean; // Kept for backwards compatibility but no longer used
@@ -30,7 +31,7 @@ export function PhotoUpload({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onAddPhotos(e.target.files);
+      void onAddPhotos(e.target.files);
       e.target.value = '';
     }
   };
