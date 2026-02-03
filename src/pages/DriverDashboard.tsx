@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
@@ -20,7 +22,7 @@ import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
 import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
 import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
 import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
-import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
+import { loadCheckoutPhotoPreviews, saveCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 import { 
   Snowflake, 
   Truck, 
@@ -261,6 +263,29 @@ export default function DriverDashboard() {
     if (previews.length === 0) return;
     void updatePhotoPreviews(previews);
   }, [activeWorkLogIdForPersistence, previews, updatePhotoPreviews]);
+
+  // iOS: Persist photo previews immediately when app goes to background
+  // This catches the case where iOS suspends JS before the async write completes.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
+
+    const listener = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive && previews.length > 0) {
+        console.log('[Persistence] App backgrounding – saving photos synchronously');
+        // Fire off the save immediately. We can't truly await here, but Capacitor
+        // Filesystem writes are fast enough to typically complete before full suspension.
+        void saveCheckoutPhotoPreviews({
+          storageKey: `winterwatch_checkout_form_plow_${activeWorkLogIdForPersistence}`,
+          previews,
+        }).catch((err) => console.error('[Persistence] Background save failed:', err));
+      }
+    });
+
+    return () => {
+      void listener.then((l) => l.remove());
+    };
+  }, [activeWorkLogIdForPersistence, previews]);
 // 🔍 DEBUG: check what accounts DriverDashboard is actually receiving
   useEffect(() => {
     const withCoords = accounts.filter(
