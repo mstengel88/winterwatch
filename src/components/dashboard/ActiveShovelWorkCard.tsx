@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { MapPin, LogOut, Shovel, Loader2, Clock } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
+import { SaveStatusIndicator } from './SaveStatusIndicator';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
@@ -40,7 +41,7 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Use persistence hook - formData updates when visibility changes
-  const { formData, updateField, updatePhotoPreviews, clearPersistedData } = useCheckoutFormPersistence({
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData, saveStatus } = useCheckoutFormPersistence({
     workLogId: workLog.id,
     variant: 'shovel',
   });
@@ -272,6 +273,7 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
           onRemovePhoto={photoUpload.removePhoto}
           hasRestoredPreviews={photoUpload.hasRestoredPreviews}
         />
+        <SaveStatusIndicator status={saveStatus} />
 
         <Button
           onClick={handleCheckOut}
