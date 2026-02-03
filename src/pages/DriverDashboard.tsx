@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
@@ -6,6 +6,7 @@ import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useWeather } from '@/hooks/useWeather';
+import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
+import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
+import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
 import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
+import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 import { 
   Snowflake, 
   Truck, 
@@ -82,6 +86,7 @@ export default function DriverDashboard() {
     clearPhotos,
     uploadPhotos,
     canAddMore,
+    restorePreviews,
   } = usePhotoUpload({ folder: 'work-logs' });
 
   // Form state
@@ -129,6 +134,81 @@ export default function DriverDashboard() {
     checkIn,
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
+
+  // Plow checkout persistence (for the active work checkout section on this page)
+  const activeWorkLogId = activeWorkLog?.id ?? 'inactive';
+  const storageKey = `winterwatch_checkout_form_plow_${activeWorkLogId}`;
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData, saveStatus } =
+    useCheckoutFormPersistence({ workLogId: activeWorkLogId, variant: 'plow' });
+
+  const isRestoringCheckoutRef = useRef(false);
+  const hasLoadedNativePreviewsRef = useRef(false);
+
+  // Restore persisted checkout state when we have an active work log
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (!formData || Object.keys(formData).length === 0) return;
+
+    isRestoringCheckoutRef.current = true;
+    setSnowDepth(formData.snowDepth || '');
+    setSaltUsed(formData.saltUsed || '');
+    setNotes(formData.notes || '');
+    if (formData.weather) setWeather(formData.weather);
+
+    window.setTimeout(() => {
+      isRestoringCheckoutRef.current = false;
+    }, 100);
+  }, [activeWorkLogId, activeWorkLog, formData]);
+
+  // Native iOS: restore photo previews from Filesystem refs
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (hasLoadedNativePreviewsRef.current) return;
+    if (previews.length > 0) return;
+    if (!formData.photoPreviewRefs || formData.photoPreviewRefs.length === 0) return;
+
+    hasLoadedNativePreviewsRef.current = true;
+    void (async () => {
+      try {
+        const restored = await loadCheckoutPhotoPreviews(formData.photoPreviewRefs!);
+        if (restored.length > 0) restorePreviews(restored);
+      } catch {
+        // best-effort
+      }
+    })();
+  }, [activeWorkLog, formData.photoPreviewRefs, previews.length, restorePreviews]);
+
+  // Persist checkout fields (only while active)
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('snowDepth', snowDepth);
+  }, [activeWorkLog, snowDepth, updateField]);
+
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('saltUsed', saltUsed);
+  }, [activeWorkLog, saltUsed, updateField]);
+
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('weather', weather);
+  }, [activeWorkLog, weather, updateField]);
+
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('notes', notes);
+  }, [activeWorkLog, notes, updateField]);
+
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (isRestoringCheckoutRef.current) return;
+    if (previews.length === 0) return;
+    void updatePhotoPreviews(previews);
+  }, [activeWorkLog, previews, updatePhotoPreviews]);
 // 🔍 DEBUG: check what accounts DriverDashboard is actually receiving
   useEffect(() => {
     const withCoords = accounts.filter(
@@ -431,6 +511,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
     });
     if (success) {
       toast({ title: 'Work completed!' });
+      clearPersistedData();
       setNotes('');
       setSnowDepth('');
       setSaltUsed('');
@@ -843,7 +924,10 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 onAddPhotos={addPhotos}
                 onRemovePhoto={removePhoto}
               />
+              <SaveStatusIndicator status={saveStatus} />
             </div>
+
+            <PersistenceDebugPanel storageKey={storageKey} />
 
             {/* Submit Button */}
             {activeWorkLog ? (
