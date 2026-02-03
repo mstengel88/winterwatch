@@ -73,6 +73,7 @@ export interface CheckoutFormData {
   areasCleared?: string[];
   photoPreviews?: string[]; // Base64 previews for restoration
   photoPreviewRefs?: string[]; // Native-only file refs (keeps localStorage small)
+  equipmentId?: string; // Selected equipment for plow jobs
 }
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';

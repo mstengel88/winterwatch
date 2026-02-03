@@ -172,6 +172,7 @@ export default function DriverDashboard() {
     setSaltUsed(formData.saltUsed || '');
     setNotes(formData.notes || '');
     if (formData.weather) setWeather(formData.weather);
+    if (formData.equipmentId) setSelectedEquipment(formData.equipmentId);
 
     window.setTimeout(() => {
       isRestoringCheckoutRef.current = false;
@@ -220,6 +221,13 @@ export default function DriverDashboard() {
     if (isRestoringCheckoutRef.current) return;
     updateField('notes', notes);
   }, [activeWorkLog, notes, updateField]);
+
+  // Persist equipment selection
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (isRestoringCheckoutRef.current) return;
+    if (selectedEquipment) updateField('equipmentId', selectedEquipment);
+  }, [activeWorkLog, selectedEquipment, updateField]);
 
   useEffect(() => {
     if (!activeWorkLog) return;
