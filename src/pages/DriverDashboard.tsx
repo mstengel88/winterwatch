@@ -157,6 +157,29 @@ export default function DriverDashboard() {
   const isRestoringCheckoutRef = useRef(false);
   const hasLoadedNativePreviewsRef = useRef(false);
 
+  // iOS app switching can suspend the JS thread quickly after returning from the photo picker.
+  // Persist previews immediately (instead of waiting for a later effect) so they restore reliably.
+  const handleAddPhotos = useCallback(
+    async (files: FileList | File[]) => {
+      const nextPreviews = (await addPhotos(files)) as unknown as string[];
+      if (!activeWorkLog) return;
+      if (isRestoringCheckoutRef.current) return;
+      await updatePhotoPreviews(nextPreviews);
+    },
+    [addPhotos, activeWorkLog, updatePhotoPreviews],
+  );
+
+  const handleRemovePhoto = useCallback(
+    (index: number) => {
+      const nextPreviews = previews.filter((_, i) => i !== index);
+      removePhoto(index);
+      if (!activeWorkLog) return;
+      if (isRestoringCheckoutRef.current) return;
+      void updatePhotoPreviews(nextPreviews);
+    },
+    [activeWorkLog, previews, removePhoto, updatePhotoPreviews],
+  );
+
   // If the active work log changes (or rehydrates after resume), allow native preview restore again.
   useEffect(() => {
     hasLoadedNativePreviewsRef.current = false;
@@ -947,8 +970,8 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 isUploading={isUploading}
                 uploadProgress={uploadProgress}
                 canAddMore={canAddMore}
-                onAddPhotos={addPhotos}
-                onRemovePhoto={removePhoto}
+                onAddPhotos={handleAddPhotos}
+                onRemovePhoto={handleRemovePhoto}
               />
               <SaveStatusIndicator status={saveStatus} />
             </div>
