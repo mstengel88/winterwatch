@@ -112,6 +112,15 @@ export function useCheckoutFormPersistence({ workLogId, variant }: UseCheckoutFo
 
   const [formData, setFormData] = useState<CheckoutFormData>(() => loadPersistedData());
 
+  // IMPORTANT: storageKey can change at runtime (e.g., after app resume when activeWorkLog
+  // is re-fetched). When it changes, we must reload the corresponding persisted state.
+  // Otherwise the UI will show empty values even though data exists under the new key.
+  useEffect(() => {
+    // Reset initialization guard so we don't immediately overwrite the freshly-loaded value.
+    isInitializedRef.current = false;
+    setFormData(loadPersistedData());
+  }, [storageKey, loadPersistedData]);
+
   // Re-load from localStorage when component mounts or when visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
