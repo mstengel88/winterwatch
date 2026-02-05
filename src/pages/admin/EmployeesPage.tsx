@@ -17,7 +17,7 @@ import { Profile } from '@/types/auth';
 import { employeeSchema, getValidationError } from '@/lib/validations';
 import { OvertimeNotificationSettings } from '@/components/admin/OvertimeNotificationSettings';
 
-const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both'];
+const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both', 'manager'];
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);

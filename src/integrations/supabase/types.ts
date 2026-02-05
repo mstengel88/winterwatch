@@ -876,7 +876,7 @@ export type Database = {
         | "shovel_crew"
         | "client"
         | "work_log_viewer"
-      employee_category: "plow" | "shovel" | "both"
+      employee_category: "plow" | "shovel" | "both" | "manager"
       notification_sound: "default" | "chime" | "bell" | "alert" | "none"
       notification_type:
         | "shift_status"
@@ -1019,7 +1019,7 @@ export const Constants = {
         "client",
         "work_log_viewer",
       ],
-      employee_category: ["plow", "shovel", "both"],
+      employee_category: ["plow", "shovel", "both", "manager"],
       notification_sound: ["default", "chime", "bell", "alert", "none"],
       notification_type: [
         "shift_status",
