@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -35,6 +36,7 @@ export default function EmployeesPage() {
     category: 'both' as EmployeeCategory,
     hourly_rate: '',
     user_id: '',
+    is_active: true,
   });
 
   const fetchData = async () => {
@@ -73,6 +75,7 @@ export default function EmployeesPage() {
         category: employee.category,
         hourly_rate: employee.hourly_rate?.toString() || '',
         user_id: employee.user_id || '',
+        is_active: employee.is_active,
       });
     } else {
       setEditingEmployee(null);
@@ -84,6 +87,7 @@ export default function EmployeesPage() {
         category: 'both',
         hourly_rate: '',
         user_id: '',
+        is_active: true,
       });
     }
     setIsDialogOpen(true);
@@ -108,6 +112,7 @@ export default function EmployeesPage() {
         category: validated.category,
         hourly_rate: validated.hourly_rate ? parseFloat(validated.hourly_rate) : null,
         user_id: validated.user_id || null,
+        is_active: formData.is_active,
       };
 
       if (editingEmployee) {
@@ -464,6 +469,19 @@ export default function EmployeesPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="is_active">Active Status</Label>
+                <p className="text-sm text-muted-foreground">
+                  Inactive employees won't appear in work log selections
+                </p>
+              </div>
+              <Switch
+                id="is_active"
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              />
             </div>
           </div>
           <DialogFooter>

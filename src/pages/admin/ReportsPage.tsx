@@ -80,6 +80,7 @@ interface Employee {
   first_name: string;
   last_name: string;
   category: string;
+  is_active?: boolean;
 }
 
 interface Equipment {
