@@ -259,7 +259,7 @@ export function WorkLogDialog({
                   <PopoverContent className="w-[250px] p-0 z-[200] bg-popover" align="start">
                     <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
                       {employees
-                        .filter((emp) => emp.id && emp.id.trim() !== '')
+                        .filter((emp) => emp.id && emp.id.trim() !== '' && emp.is_active !== false)
                         .map((emp) => (
                           <div
                             key={emp.id}
