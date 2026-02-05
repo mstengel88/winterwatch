@@ -1072,6 +1072,122 @@ export default function ReportsPage() {
     setDeleteDialogOpen(true);
   };
 
+  // Bulk edit handler for work logs
+  const handleBulkEditWorkLogs = async (data: BulkEditFormData) => {
+    const ids = Array.from(selectedWorkLogs);
+    if (ids.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      const plowLogs = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow');
+      const shovelLogs = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel');
+      const plowIds = plowLogs.map(l => l.id);
+      const shovelIds = shovelLogs.map(l => l.id);
+
+      // Build update payloads based on what fields were toggled
+      const buildPlowPayload = () => {
+        const payload: Record<string, any> = {};
+        if (data.account_id) payload.account_id = data.account_id;
+        if (data.employee_ids && data.employee_ids.length > 0) payload.employee_id = data.employee_ids[0];
+        if (data.equipment_id !== undefined) payload.equipment_id = data.equipment_id || null;
+        if (data.service_type) payload.service_type = data.service_type;
+        if (data.snow_depth_inches !== undefined) payload.snow_depth_inches = data.snow_depth_inches ?? null;
+        if (data.salt_used_lbs !== undefined) payload.salt_used_lbs = data.salt_used_lbs ?? null;
+        if (data.weather_conditions !== undefined) payload.weather_conditions = data.weather_conditions || null;
+        if (data.notes !== undefined) payload.notes = data.notes || null;
+        if (data.billing_status) payload.billing_status = data.billing_status;
+        if (data.billing_status === 'completed') payload.billed = true;
+        if (data.billing_status === 'billable' || data.billing_status === 'current') payload.billed = false;
+        return payload;
+      };
+
+      const buildShovelPayload = () => {
+        const payload: Record<string, any> = {};
+        if (data.account_id) payload.account_id = data.account_id;
+        if (data.employee_ids && data.employee_ids.length > 0) {
+          payload.employee_id = data.employee_ids[0];
+          payload.team_member_ids = data.employee_ids;
+        }
+        if (data.service_type) payload.service_type = data.service_type;
+        if (data.snow_depth_inches !== undefined) payload.snow_depth_inches = data.snow_depth_inches ?? null;
+        if (data.salt_used_lbs !== undefined) payload.ice_melt_used_lbs = data.salt_used_lbs ?? null;
+        if (data.weather_conditions !== undefined) payload.weather_conditions = data.weather_conditions || null;
+        if (data.notes !== undefined) payload.notes = data.notes || null;
+        if (data.billing_status) payload.billing_status = data.billing_status;
+        if (data.billing_status === 'completed') payload.billed = true;
+        if (data.billing_status === 'billable' || data.billing_status === 'current') payload.billed = false;
+        return payload;
+      };
+
+      // Handle date/time updates - need to update each log individually if dates are involved
+      if (data.date || data.check_in_time !== undefined || data.check_out_time !== undefined) {
+        // Update each log individually to handle date/time correctly
+        for (const logId of plowIds) {
+          const log = plowLogs.find(l => l.id === logId);
+          if (!log) continue;
+          
+          const payload = buildPlowPayload();
+          const baseDate = data.date || (log.check_in_time ? new Date(log.check_in_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+          
+          if (data.check_in_time !== undefined) {
+            payload.check_in_time = data.check_in_time ? new Date(`${baseDate}T${data.check_in_time}`).toISOString() : null;
+          }
+          if (data.check_out_time !== undefined) {
+            payload.check_out_time = data.check_out_time ? new Date(`${baseDate}T${data.check_out_time}`).toISOString() : null;
+          }
+          
+          if (Object.keys(payload).length > 0) {
+            const { error } = await supabase.from('work_logs').update(payload).eq('id', logId);
+            if (error) throw error;
+          }
+        }
+
+        for (const logId of shovelIds) {
+          const log = shovelLogs.find(l => l.id === logId);
+          if (!log) continue;
+          
+          const payload = buildShovelPayload();
+          const baseDate = data.date || (log.check_in_time ? new Date(log.check_in_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+          
+          if (data.check_in_time !== undefined) {
+            payload.check_in_time = data.check_in_time ? new Date(`${baseDate}T${data.check_in_time}`).toISOString() : null;
+          }
+          if (data.check_out_time !== undefined) {
+            payload.check_out_time = data.check_out_time ? new Date(`${baseDate}T${data.check_out_time}`).toISOString() : null;
+          }
+          
+          if (Object.keys(payload).length > 0) {
+            const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', logId);
+            if (error) throw error;
+          }
+        }
+      } else {
+        // No date/time updates - can use bulk update
+        const plowPayload = buildPlowPayload();
+        const shovelPayload = buildShovelPayload();
+
+        if (plowIds.length > 0 && Object.keys(plowPayload).length > 0) {
+          const { error } = await supabase.from('work_logs').update(plowPayload).in('id', plowIds);
+          if (error) throw error;
+        }
+        if (shovelIds.length > 0 && Object.keys(shovelPayload).length > 0) {
+          const { error } = await supabase.from('shovel_work_logs').update(shovelPayload).in('id', shovelIds);
+          if (error) throw error;
+        }
+      }
+
+      toast.success(`${ids.length} work log(s) updated successfully`);
+      setSelectedWorkLogs(new Set());
+      setBulkEditDialogOpen(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Error bulk editing work logs:', error);
+      toast.error('Failed to update work logs');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
