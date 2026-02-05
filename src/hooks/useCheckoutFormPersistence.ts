@@ -74,6 +74,10 @@ export interface CheckoutFormData {
   photoPreviews?: string[]; // Base64 previews for restoration
   photoPreviewRefs?: string[]; // Native-only file refs (keeps localStorage small)
   equipmentId?: string; // Selected equipment for plow jobs
+  // Shovel dashboard specific fields
+  serviceType?: 'shovel' | 'salt' | 'both';
+  temperature?: string;
+  wind?: string;
 }
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
