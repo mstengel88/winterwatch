@@ -148,6 +148,7 @@ export default function ReportsPage() {
   // Dialog state
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
   const [workLogDialogOpen, setWorkLogDialogOpen] = useState(false);
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [bulkDeleteType, setBulkDeleteType] = useState<'shifts' | 'worklogs'>('shifts');
