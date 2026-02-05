@@ -705,7 +705,7 @@ export default function AccountsPage() {
                 <SelectTrigger className="bg-card">
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
-                <SelectContent className="bg-card">
+                <SelectContent position="popper" className="bg-card z-[200]">
                   <SelectItem value="true">Active</SelectItem>
                   <SelectItem value="false">Inactive</SelectItem>
                 </SelectContent>
