@@ -619,7 +619,7 @@ export default function AccountsPage() {
                   <SelectTrigger className="bg-card">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card">
+                  <SelectContent position="popper" className="bg-card z-[200]">
                     {SERVICE_TYPE_OPTIONS.map((service) => (
                       <SelectItem key={service} value={service}>
                         <span className="capitalize">{service}</span>
