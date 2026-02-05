@@ -74,8 +74,9 @@ export interface CheckoutFormData {
   photoPreviews?: string[]; // Base64 previews for restoration
   photoPreviewRefs?: string[]; // Native-only file refs (keeps localStorage small)
   equipmentId?: string; // Selected equipment for plow jobs
+  // Service type for both dashboards (plow: 'plow'|'salt'|'both', shovel: 'shovel'|'salt'|'both')
+  serviceType?: 'plow' | 'shovel' | 'salt' | 'both';
   // Shovel dashboard specific fields
-  serviceType?: 'shovel' | 'salt' | 'both';
   temperature?: string;
   wind?: string;
 }
