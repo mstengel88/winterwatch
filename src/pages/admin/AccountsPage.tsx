@@ -678,7 +678,7 @@ export default function AccountsPage() {
                 <SelectTrigger className="bg-card">
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
-                <SelectContent className="bg-card">
+                <SelectContent position="popper" className="bg-card z-[200]">
                   <SelectItem value="plow">Plow</SelectItem>
                   <SelectItem value="shovel">Shovel</SelectItem>
                   <SelectItem value="both">Both</SelectItem>
