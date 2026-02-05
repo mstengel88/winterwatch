@@ -904,6 +904,9 @@ export default function ReportsPage() {
     }
   };
  // CRUD Handlers for Work Logs
+   };
+
+   // CRUD Handlers for Work Logs
  const handleSaveWorkLog = async (data: WorkLogFormData) => {
    setIsSaving(true);
    try {
