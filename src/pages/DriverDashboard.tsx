@@ -267,6 +267,16 @@ export default function DriverDashboard() {
     if (selectedEquipment) updateField('equipmentId', selectedEquipment);
   }, [activeWorkLog, selectedEquipment, updateField]);
 
+  // Persist service type selection
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (isRestoringCheckoutRef.current) return;
+    // Only persist if user has interacted OR we previously restored a value
+    if (hasRestoredServiceTypeRef.current || serviceType !== 'plow') {
+      updateField('serviceType', serviceType);
+    }
+  }, [activeWorkLog, serviceType, updateField]);
+
   useEffect(() => {
     // Same reasoning as above: use the stable ID, not the live activeWorkLog reference.
     if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
