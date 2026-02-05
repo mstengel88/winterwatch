@@ -713,10 +713,15 @@ export default function ReportsPage() {
         ? new Date(`${data.date}T${data.check_out_time}`)
         : null;
 
+      // Persist multi-select employees:
+      // - plow logs only store a single employee_id (legacy) -> use the first selected
+      // - shovel logs store full crew in team_member_ids
+      const primaryEmployeeId = (data.employee_ids?.[0] || data.employee_id || '').trim();
+
       if (data.type === 'plow') {
         const payload = {
           account_id: data.account_id,
-          employee_id: data.employee_id,
+          employee_id: primaryEmployeeId,
           equipment_id: data.equipment_id || null,
           service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
           status: 'completed' as const,
@@ -740,7 +745,8 @@ export default function ReportsPage() {
       } else {
         const payload = {
           account_id: data.account_id,
-          employee_id: data.employee_id,
+          employee_id: primaryEmployeeId,
+          team_member_ids: (data.employee_ids || []).filter(Boolean),
           service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
           status: 'completed' as const,
           check_in_time: checkInDateTime?.toISOString() || null,
