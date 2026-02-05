@@ -470,6 +470,19 @@ export default function EmployeesPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="is_active">Active Status</Label>
+                <p className="text-sm text-muted-foreground">
+                  Inactive employees won't appear in work log selections
+                </p>
+              </div>
+              <Switch
+                id="is_active"
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
