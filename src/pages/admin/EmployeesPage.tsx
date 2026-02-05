@@ -35,6 +35,7 @@ export default function EmployeesPage() {
     category: 'both' as EmployeeCategory,
     hourly_rate: '',
     user_id: '',
+    is_active: true,
   });
 
   const fetchData = async () => {
