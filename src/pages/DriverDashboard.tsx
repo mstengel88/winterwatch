@@ -158,6 +158,8 @@ export default function DriverDashboard() {
 
   const isRestoringCheckoutRef = useRef(false);
   const hasLoadedNativePreviewsRef = useRef(false);
+  const hasRestoredServiceTypeRef = useRef(false);
+  const hasRestoredFormRef = useRef(false);
 
   // iOS app switching can suspend the JS thread quickly after returning from the photo picker.
   // Persist previews immediately (instead of waiting for a later effect) so they restore reliably.
@@ -187,19 +189,28 @@ export default function DriverDashboard() {
   // If the active work log changes (or rehydrates after resume), allow native preview restore again.
   useEffect(() => {
     hasLoadedNativePreviewsRef.current = false;
+    hasRestoredFormRef.current = false;
+    hasRestoredServiceTypeRef.current = false;
   }, [activeWorkLog?.id]);
 
   // Restore persisted checkout state when we have an active work log
   useEffect(() => {
     if (!activeWorkLog) return;
     if (!formData || Object.keys(formData).length === 0) return;
+    if (hasRestoredFormRef.current) return;
 
+    hasRestoredFormRef.current = true;
     isRestoringCheckoutRef.current = true;
-    setSnowDepth(formData.snowDepth || '');
-    setSaltUsed(formData.saltUsed || '');
-    setNotes(formData.notes || '');
+    
+    if (formData.snowDepth) setSnowDepth(formData.snowDepth);
+    if (formData.saltUsed) setSaltUsed(formData.saltUsed);
+    if (formData.notes) setNotes(formData.notes);
     if (formData.weather) setWeather(formData.weather);
     if (formData.equipmentId) setSelectedEquipment(formData.equipmentId);
+    if (formData.serviceType) {
+      setServiceType(formData.serviceType as 'plow' | 'salt' | 'both');
+      hasRestoredServiceTypeRef.current = true;
+    }
 
     window.setTimeout(() => {
       isRestoringCheckoutRef.current = false;
