@@ -221,10 +221,6 @@ export default function DriverDashboard() {
     }, 100);
   }, [activeWorkLog, formData]);
 
-    window.setTimeout(() => {
-      isRestoringCheckoutRef.current = false;
-    }, 100);
-  }, [activeWorkLog, formData]);
 
   // Native iOS: restore photo previews from Filesystem refs
   useEffect(() => {
