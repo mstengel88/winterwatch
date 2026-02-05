@@ -874,8 +874,12 @@ export default function ShovelDashboard() {
                 canAddMore={canAddMore}
                 onAddPhotos={addPhotos}
                 onRemovePhoto={removePhoto}
+                hasRestoredPreviews={hasRestoredPreviews}
               />
             </div>
+            
+            {/* Save Status */}
+            <SaveStatusIndicator status={saveStatus} />
 
             {/* Log Service Button */}
             <Button
