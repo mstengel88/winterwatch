@@ -25,6 +25,7 @@ import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF } from '
 import { toast } from 'sonner';
 import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
+import { BulkEditWorkLogDialog, BulkEditFormData } from '@/components/reports/BulkEditWorkLogDialog';
 import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
 import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
