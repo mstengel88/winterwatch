@@ -619,7 +619,7 @@ export default function AccountsPage() {
                   <SelectTrigger className="bg-card">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card">
+                  <SelectContent position="popper" className="bg-card z-[200]">
                     {SERVICE_TYPE_OPTIONS.map((service) => (
                       <SelectItem key={service} value={service}>
                         <span className="capitalize">{service}</span>
@@ -678,7 +678,7 @@ export default function AccountsPage() {
                 <SelectTrigger className="bg-card">
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
-                <SelectContent className="bg-card">
+                <SelectContent position="popper" className="bg-card z-[200]">
                   <SelectItem value="plow">Plow</SelectItem>
                   <SelectItem value="shovel">Shovel</SelectItem>
                   <SelectItem value="both">Both</SelectItem>
@@ -705,7 +705,7 @@ export default function AccountsPage() {
                 <SelectTrigger className="bg-card">
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
-                <SelectContent className="bg-card">
+                <SelectContent position="popper" className="bg-card z-[200]">
                   <SelectItem value="true">Active</SelectItem>
                   <SelectItem value="false">Inactive</SelectItem>
                 </SelectContent>
