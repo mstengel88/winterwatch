@@ -908,6 +908,10 @@ export default function ReportsPage() {
 
    // CRUD Handlers for Work Logs
  const handleSaveWorkLog = async (data: WorkLogFormData) => {
+   };
+
+  // CRUD Handlers for Work Logs
+  const handleSaveWorkLog = async (data: WorkLogFormData) => {
    setIsSaving(true);
    try {
      const checkInDateTime = data.check_in_time 
