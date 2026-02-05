@@ -2117,7 +2117,18 @@ export default function ReportsPage() {
         isLoading={isSaving}
       />
 
-      {/* Photo Viewer Dialog */}
+      {/* Bulk Edit Work Logs Dialog */}
+      <BulkEditWorkLogDialog
+        open={bulkEditDialogOpen}
+        onOpenChange={setBulkEditDialogOpen}
+        accounts={accounts}
+        employees={employees}
+        equipment={equipment}
+        selectedCount={selectedWorkLogs.size}
+        onSave={handleBulkEditWorkLogs}
+        isLoading={isSaving}
+      />
+
       <Dialog open={photoViewerOpen} onOpenChange={setPhotoViewerOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
