@@ -20,6 +20,7 @@ interface Employee {
   first_name: string;
   last_name: string;
   is_active?: boolean;
+  category?: 'plow' | 'shovel' | 'both';
 }
 
 interface Equipment {
