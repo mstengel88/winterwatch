@@ -903,6 +903,82 @@ export default function ReportsPage() {
       setIsSaving(false);
     }
   };
+ // CRUD Handlers for Work Logs
+ const handleSaveWorkLog = async (data: WorkLogFormData) => {
+   setIsSaving(true);
+   try {
+     const checkInDateTime = data.check_in_time 
+       ? new Date(`${data.date}T${data.check_in_time}`)
+       : null;
+     const checkOutDateTime = data.check_out_time 
+       ? new Date(`${data.date}T${data.check_out_time}`)
+       : null;
+
+     // Use employee_ids array if provided, otherwise fall back to employee_id
+     const employeeIds = data.employee_ids && data.employee_ids.length > 0 
+       ? data.employee_ids 
+       : (data.employee_id ? [data.employee_id] : []);
+
+     if (data.type === 'plow') {
+       const payload = {
+         account_id: data.account_id,
+         employee_id: employeeIds[0] || null,
+         equipment_id: data.equipment_id || null,
+         service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
+         status: 'completed' as const,
+         check_in_time: checkInDateTime?.toISOString() || null,
+         check_out_time: checkOutDateTime?.toISOString() || null,
+         snow_depth_inches: data.snow_depth_inches || null,
+         salt_used_lbs: data.salt_used_lbs || null,
+         weather_conditions: data.weather_conditions || null,
+         notes: data.notes || null,
+       };
+
+       if (data.id) {
+         const { error } = await supabase.from('work_logs').update(payload).eq('id', data.id);
+         if (error) throw error;
+         toast.success('Work log updated successfully');
+       } else {
+         const { error } = await supabase.from('work_logs').insert(payload);
+         if (error) throw error;
+         toast.success('Work log created successfully');
+       }
+     } else {
+       // For shovel logs, use team_member_ids for multiple employees
+       const payload = {
+         account_id: data.account_id,
+         employee_id: employeeIds[0] || null,
+         team_member_ids: employeeIds.length > 0 ? employeeIds : null,
+         service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
+         status: 'completed' as const,
+         check_in_time: checkInDateTime?.toISOString() || null,
+         check_out_time: checkOutDateTime?.toISOString() || null,
+         snow_depth_inches: data.snow_depth_inches || null,
+         ice_melt_used_lbs: data.ice_melt_used_lbs || null,
+         weather_conditions: data.weather_conditions || null,
+         notes: data.notes || null,
+       };
+
+       if (data.id) {
+         const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', data.id);
+         if (error) throw error;
+         toast.success('Work log updated successfully');
+       } else {
+         const { error } = await supabase.from('shovel_work_logs').insert(payload);
+         if (error) throw error;
+         toast.success('Work log created successfully');
+       }
+     }
+     setWorkLogDialogOpen(false);
+     setEditingWorkLog(null);
+     await fetchData();
+   } catch (error) {
+     console.error('Error saving work log:', error);
+     toast.error('Failed to save work log');
+   } finally {
+     setIsSaving(false);
+   }
+ };
 
   // Delete handlers
   const handleDelete = async () => {
