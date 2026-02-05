@@ -1659,6 +1659,15 @@ export default function ReportsPage() {
                         Unarchive ({selectedWorkLogs.size})
                       </Button>
                     )}
+                    <Button 
+                      size="sm" 
+                      variant="secondary" 
+                      onClick={() => setBulkEditDialogOpen(true)} 
+                      disabled={isSaving}
+                    >
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Edit ({selectedWorkLogs.size})
+                    </Button>
                     <Button size="sm" variant="destructive" onClick={openBulkDeleteWorkLogs} disabled={isSaving}>
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete ({selectedWorkLogs.size})
