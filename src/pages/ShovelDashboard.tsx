@@ -426,10 +426,13 @@ export default function ShovelDashboard() {
         localStorage.setItem(shiftTeamStorageKey, JSON.stringify(selectedTeamMembers));
       }
       toast({ title: 'Work completed!' });
+      // Clear form fields but keep team members and service type
       setNotes('');
       setSaltUsed('');
       setSnowDepth('');
       clearPhotos();
+      // Clear persisted form data (except team selection which has its own storage)
+      clearPersistedData();
     } else {
       toast({ variant: 'destructive', title: 'Failed to check out' });
     }
