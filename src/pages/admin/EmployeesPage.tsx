@@ -74,6 +74,7 @@ export default function EmployeesPage() {
         category: employee.category,
         hourly_rate: employee.hourly_rate?.toString() || '',
         user_id: employee.user_id || '',
+        is_active: employee.is_active,
       });
     } else {
       setEditingEmployee(null);
@@ -85,6 +86,7 @@ export default function EmployeesPage() {
         category: 'both',
         hourly_rate: '',
         user_id: '',
+        is_active: true,
       });
     }
     setIsDialogOpen(true);
