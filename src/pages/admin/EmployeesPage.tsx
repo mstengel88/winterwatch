@@ -426,7 +426,7 @@ export default function EmployeesPage() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-[200] max-h-[200px]">
                     {CATEGORIES.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         <span className="capitalize">{cat}</span>
