@@ -120,8 +120,8 @@ export default function ShovelDashboard() {
       hasLoadedFormDataRef.current = true;
       isRestoringRef.current = true;
       
-      if (formData.serviceType) {
-        setServiceType(formData.serviceType);
+      if (formData.serviceType && ['shovel', 'salt', 'both'].includes(formData.serviceType)) {
+        setServiceType(formData.serviceType as 'shovel' | 'salt' | 'both');
         hasRestoredServiceTypeRef.current = true;
       }
       if (formData.snowDepth) setSnowDepth(formData.snowDepth);
