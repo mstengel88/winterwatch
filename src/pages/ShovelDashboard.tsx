@@ -80,8 +80,22 @@ export default function ShovelDashboard() {
     clearPhotos,
     uploadPhotos,
     canAddMore,
+    restorePreviews,
+    hasRestoredPreviews,
   } = usePhotoUpload({ folder: 'shovel-logs' });
   const { toast } = useToast();
+
+  // Storage key for form persistence - tied to current shift
+  const persistenceWorkLogId = activeShift?.id || 'no-shift';
+  
+  // Use persistence hook for form fields
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData, saveStatus } = useCheckoutFormPersistence({
+    workLogId: persistenceWorkLogId,
+    variant: 'shovel',
+  });
+
+  const isRestoringRef = useRef(false);
+  const hasLoadedFormDataRef = useRef(false);
 
   const [selectedAccount, setSelectedAccount] = useState('');
   const [serviceType, setServiceType] = useState<'shovel' | 'salt' | 'both'>('shovel');
@@ -97,14 +111,94 @@ export default function ShovelDashboard() {
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
 
-  // Auto-populate weather fields when weather data is fetched
+  // Restore form state from persisted data
   useEffect(() => {
-    if (weatherData) {
+    if (Object.keys(formData).length > 0 && !hasLoadedFormDataRef.current) {
+      hasLoadedFormDataRef.current = true;
+      isRestoringRef.current = true;
+      
+      if (formData.serviceType) setServiceType(formData.serviceType);
+      if (formData.snowDepth) setSnowDepth(formData.snowDepth);
+      if (formData.saltUsed) setSaltUsed(formData.saltUsed);
+      if (formData.temperature) setTemperature(formData.temperature);
+      if (formData.weather) setWeather(formData.weather);
+      if (formData.wind) setWind(formData.wind);
+      if (formData.notes) setNotes(formData.notes);
+      
+      // Restore photos if available
+      if (formData.photoPreviews && formData.photoPreviews.length > 0 && previews.length === 0) {
+        restorePreviews(formData.photoPreviews);
+      }
+      
+      setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 100);
+    }
+  }, [formData, previews.length, restorePreviews]);
+
+  // Reset form data flag when shift changes
+  useEffect(() => {
+    hasLoadedFormDataRef.current = false;
+  }, [activeShift?.id]);
+
+  // Persist form changes (skip during restoration)
+  useEffect(() => {
+    if (!isRestoringRef.current && serviceType) {
+      updateField('serviceType', serviceType);
+    }
+  }, [serviceType, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && snowDepth) {
+      updateField('snowDepth', snowDepth);
+    }
+  }, [snowDepth, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && saltUsed) {
+      updateField('saltUsed', saltUsed);
+    }
+  }, [saltUsed, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && temperature) {
+      updateField('temperature', temperature);
+    }
+  }, [temperature, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && weather) {
+      updateField('weather', weather);
+    }
+  }, [weather, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && wind) {
+      updateField('wind', wind);
+    }
+  }, [wind, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && notes) {
+      updateField('notes', notes);
+    }
+  }, [notes, updateField]);
+
+  // Persist photo previews when they change
+  useEffect(() => {
+    if (!isRestoringRef.current && previews.length > 0) {
+      updatePhotoPreviews(previews);
+    }
+  }, [previews, updatePhotoPreviews]);
+
+  // Auto-populate weather fields when weather data is fetched (only if not restored)
+  useEffect(() => {
+    if (weatherData && !formData.temperature && !formData.weather && !formData.wind) {
       setTemperature(String(weatherData.temperature));
       setWeather(weatherData.conditions);
       setWind(String(weatherData.windSpeed));
     }
-  }, [weatherData]);
+  }, [weatherData, formData.temperature, formData.weather, formData.wind]);
 
   // Key for storing team members per shift in localStorage
   const shiftTeamStorageKey = activeShift ? `shovel-team-${activeShift.id}` : null;
