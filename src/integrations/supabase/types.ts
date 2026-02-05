@@ -224,6 +224,63 @@ export type Database = {
         }
         Relationships: []
       }
+      maintenance_logs: {
+        Row: {
+          cost: number | null
+          created_at: string
+          description: string | null
+          equipment_id: string
+          id: string
+          maintenance_type: string
+          next_service_date: string | null
+          performed_by_employee_id: string | null
+          performed_by_name: string | null
+          service_date: string
+          updated_at: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          equipment_id: string
+          id?: string
+          maintenance_type: string
+          next_service_date?: string | null
+          performed_by_employee_id?: string | null
+          performed_by_name?: string | null
+          service_date?: string
+          updated_at?: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          equipment_id?: string
+          id?: string
+          maintenance_type?: string
+          next_service_date?: string | null
+          performed_by_employee_id?: string | null
+          performed_by_name?: string | null
+          service_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_logs_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_performed_by_employee_id_fkey"
+            columns: ["performed_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           admin_announcements_enabled: boolean

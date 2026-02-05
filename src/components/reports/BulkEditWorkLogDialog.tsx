@@ -21,6 +21,7 @@ interface Employee {
   first_name: string;
   last_name: string;
   is_active?: boolean;
+  category?: string;
 }
 
 interface Equipment {
@@ -237,7 +238,11 @@ export function BulkEditWorkLogDialog({
                   <PopoverContent className="w-[250px] p-0 z-[200] bg-popover" align="start">
                     <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
                       {employees
-                        .filter((emp) => emp.id && emp.id.trim() !== '' && emp.is_active !== false)
+                        .filter((emp) => {
+                          if (!emp.id || emp.id.trim() === '' || emp.is_active === false) return false;
+                          // Only show employees with plow/shovel/both category
+                          return emp.category === 'plow' || emp.category === 'shovel' || emp.category === 'both';
+                        })
                         .map((emp) => (
                           <div
                             key={emp.id}
