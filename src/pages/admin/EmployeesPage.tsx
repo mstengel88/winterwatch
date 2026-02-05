@@ -111,6 +111,7 @@ export default function EmployeesPage() {
         category: validated.category,
         hourly_rate: validated.hourly_rate ? parseFloat(validated.hourly_rate) : null,
         user_id: validated.user_id || null,
+        is_active: formData.is_active,
       };
 
       if (editingEmployee) {
