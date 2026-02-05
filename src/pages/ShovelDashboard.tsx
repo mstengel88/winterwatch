@@ -111,13 +111,19 @@ export default function ShovelDashboard() {
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
 
+  // Track if we've restored the service type to avoid overwriting
+  const hasRestoredServiceTypeRef = useRef(false);
+
   // Restore form state from persisted data
   useEffect(() => {
     if (Object.keys(formData).length > 0 && !hasLoadedFormDataRef.current) {
       hasLoadedFormDataRef.current = true;
       isRestoringRef.current = true;
       
-      if (formData.serviceType) setServiceType(formData.serviceType);
+      if (formData.serviceType) {
+        setServiceType(formData.serviceType);
+        hasRestoredServiceTypeRef.current = true;
+      }
       if (formData.snowDepth) setSnowDepth(formData.snowDepth);
       if (formData.saltUsed) setSaltUsed(formData.saltUsed);
       if (formData.temperature) setTemperature(formData.temperature);
@@ -139,11 +145,15 @@ export default function ShovelDashboard() {
   // Reset form data flag when shift changes
   useEffect(() => {
     hasLoadedFormDataRef.current = false;
+    hasRestoredServiceTypeRef.current = false;
   }, [activeShift?.id]);
 
-  // Persist form changes (skip during restoration)
+  // Persist service type changes (skip during restoration and initial default)
   useEffect(() => {
-    if (!isRestoringRef.current && serviceType) {
+    // Skip if we're restoring or if this is just the initial default value
+    if (isRestoringRef.current) return;
+    // Only persist if user has interacted OR we previously restored a value
+    if (hasRestoredServiceTypeRef.current || serviceType !== 'shovel') {
       updateField('serviceType', serviceType);
     }
   }, [serviceType, updateField]);
