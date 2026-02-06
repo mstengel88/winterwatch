@@ -134,6 +134,15 @@ const AppRoutes = () => (
               />
 
               <Route
+                path="/trucker"
+                element={
+                  <ProtectedRoute allowedRoles={["trucker", "admin", "manager"]}>
+                    <TruckerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/work-logs"
                 element={
                   <ProtectedRoute allowedRoles={["admin", "manager", "work_log_viewer"]}>
