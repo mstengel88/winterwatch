@@ -87,6 +87,7 @@ export default function TruckerDashboard() {
     }
 
     setSubmitting(true);
+    const selectedTruckData = trucks.find(t => t.id === selectedTruck);
     const { error } = await (supabase as any)
       .from('maintenance_requests')
       .insert({
@@ -100,6 +101,18 @@ export default function TruckerDashboard() {
       toast({ title: 'Error', description: 'Failed to submit request.', variant: 'destructive' });
     } else {
       toast({ title: 'Submitted', description: 'Maintenance request submitted successfully.' });
+
+      // Send notification to admins/managers (fire and forget)
+      supabase.functions.invoke('notify-maintenance-request', {
+        body: {
+          equipment_name: selectedTruckData?.name || 'Unknown truck',
+          problem_description: problem.trim(),
+          driver_name: `${employee.first_name} ${employee.last_name}`,
+        },
+      }).then(({ error: notifError }) => {
+        if (notifError) console.error('Notification error:', notifError);
+      });
+
       setSelectedTruck('');
       setProblem('');
       setMileage('');
