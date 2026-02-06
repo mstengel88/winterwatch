@@ -245,8 +245,6 @@ export default function DriverDashboard() {
     })();
   }, [activeWorkLog, formData.photoPreviewRefs, previews.length, restorePreviews]);
 
-  const hasActiveCheckoutPersistence =
-    !!activeWorkLogIdForPersistence && activeWorkLogIdForPersistence !== '__no_active_worklog__';
 
   // Persist checkout fields (only while we have a stable active workLogId)
   // IMPORTANT: `activeWorkLog` can temporarily be null during refetch/app resume.
