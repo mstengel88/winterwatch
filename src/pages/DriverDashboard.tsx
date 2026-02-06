@@ -193,13 +193,15 @@ export default function DriverDashboard() {
     hasRestoredServiceTypeRef.current = false;
   }, [activeWorkLog?.id]);
 
-  // Restore persisted checkout state when we have an active work log
+  // Restore persisted checkout state from formData immediately (like shovel dashboard).
+  // We don't wait for activeWorkLog to be truthy because localStorage is already keyed
+  // to the stable activeWorkLogIdForPersistence.
   useEffect(() => {
-    if (!activeWorkLog) return;
+    if (!hasActiveCheckoutPersistence) return;
     if (hasRestoredFormRef.current) return;
+    if (Object.keys(formData).length === 0) return;
 
-    // Mark as restored even if there is no persisted data yet,
-    // so we don't immediately overwrite localStorage with initial empty state.
+    // Mark as restored so we don't immediately overwrite localStorage with empty state.
     hasRestoredFormRef.current = true;
     isRestoringCheckoutRef.current = true;
 
@@ -219,7 +221,7 @@ export default function DriverDashboard() {
     window.setTimeout(() => {
       isRestoringCheckoutRef.current = false;
     }, 100);
-  }, [activeWorkLog, formData]);
+  }, [hasActiveCheckoutPersistence, formData]);
 
 
   // Native iOS: restore photo previews from Filesystem refs
