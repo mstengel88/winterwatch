@@ -38,15 +38,9 @@ export function InstallPrompt() {
       setShowPrompt(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-
-    // Show iOS prompt after a delay if on iOS and not installed
-    if (ios && !standalone) {
-      const timer = setTimeout(() => setShowPrompt(true), 3000);
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-      };
+    // Only show install prompt on non-iOS web browsers
+    if (!ios) {
+      window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     }
 
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -7,6 +7,29 @@ interface UsePhotoUploadOptions {
   folder?: string;
   maxFiles?: number;
   maxSizeMB?: number;
+}
+
+// Convert base64 data URL to File object
+function base64ToFile(base64: string, filename: string): File | null {
+  try {
+    const arr = base64.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) return null;
+    
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    
+    return new File([u8arr], filename, { type: mime });
+  } catch (error) {
+    console.error('Error converting base64 to file:', error);
+    return null;
+  }
 }
 
 export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
@@ -22,10 +45,45 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const addPhotos = (files: FileList | File[]) => {
+  // Restore photos from persisted base64 previews - recreates File objects
+  const restorePhotosFromBase64 = useCallback((base64Previews: string[]) => {
+    const restoredFiles: File[] = [];
+    const validPreviews: string[] = [];
+    
+    base64Previews.forEach((base64, index) => {
+      const file = base64ToFile(base64, `restored-photo-${index}.jpg`);
+      if (file) {
+        restoredFiles.push(file);
+        validPreviews.push(base64);
+      }
+    });
+    
+    if (restoredFiles.length > 0) {
+      setPhotos(restoredFiles);
+      setPreviews(validPreviews);
+    }
+  }, []);
+
+  // Legacy restore for previews only (deprecated, use restorePhotosFromBase64)
+  const restorePreviews = useCallback((restoredPreviews: string[]) => {
+    restorePhotosFromBase64(restoredPreviews);
+  }, [restorePhotosFromBase64]);
+
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(String(e.target?.result ?? ''));
+      reader.onerror = () => reject(reader.error ?? new Error('FileReader error'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const addPhotos = useCallback(async (files: FileList | File[]) => {
     const newFiles = Array.from(files);
     const validFiles: File[] = [];
     const maxSize = maxSizeMB * 1024 * 1024;
+
+    const currentPhotoCount = photos.length;
 
     for (const file of newFiles) {
       if (!file.type.startsWith('image/')) {
@@ -36,26 +94,33 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
         toast.error(`${file.name} exceeds ${maxSizeMB}MB limit`);
         continue;
       }
-      if (photos.length + validFiles.length >= maxFiles) {
+      if (currentPhotoCount + validFiles.length >= maxFiles) {
         toast.error(`Maximum ${maxFiles} photos allowed`);
         break;
       }
       validFiles.push(file);
     }
 
-    if (validFiles.length > 0) {
-      setPhotos((prev) => [...prev, ...validFiles]);
-      
-      // Create previews
-      validFiles.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setPreviews((prev) => [...prev, e.target?.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
+    if (validFiles.length === 0) return previews;
+
+    // Read previews BEFORE updating state so callers can await and persist immediately
+    // (iOS can background/suspend quickly after returning from the photo picker).
+    let newPreviews: string[] = [];
+    try {
+      newPreviews = (await Promise.all(validFiles.map(readFileAsDataUrl))).filter(Boolean);
+    } catch (error) {
+      console.error('Error generating photo previews:', error);
+      toast.error('Could not generate photo previews');
+      return previews;
     }
-  };
+
+    const nextPreviews = [...previews, ...newPreviews];
+
+    setPhotos((prev) => [...prev, ...validFiles]);
+    setPreviews(nextPreviews);
+
+    return nextPreviews;
+  }, [maxFiles, maxSizeMB, photos.length, previews]);
 
   const removePhoto = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
@@ -150,6 +215,9 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
     clearPhotos,
     uploadPhotos,
     getSignedUrls,
+    restorePreviews,
+    restorePhotosFromBase64,
     canAddMore: photos.length < maxFiles,
+    hasRestoredPreviews: false, // No longer needed since we restore actual files
   };
 }
