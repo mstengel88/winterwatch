@@ -295,7 +295,10 @@ export function WorkLogDialog({
                               checked={employeeIds.includes(emp.id)}
                               onCheckedChange={() => toggleEmployee(emp.id)}
                             />
-                            <span className="text-sm">
+                            <span className="text-sm flex items-center gap-1.5">
+                              {onShiftEmployeeIds.has(emp.id) && (
+                                <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" title="On shift" />
+                              )}
                               {emp.first_name} {emp.last_name}
                             </span>
                           </div>
