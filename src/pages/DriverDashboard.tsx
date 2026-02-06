@@ -104,6 +104,7 @@ export default function DriverDashboard() {
   const [notes, setNotes] = useState('');
   const [allEquipment, setAllEquipment] = useState<any[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
+  const [onShiftEmployeeIds, setOnShiftEmployeeIds] = useState<Set<string>>(new Set());
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
