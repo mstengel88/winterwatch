@@ -172,6 +172,7 @@ export default function DriverDashboard() {
   const isRestoringCheckoutRef = useRef(false);
   const hasLoadedNativePreviewsRef = useRef(false);
   const hasRestoredServiceTypeRef = useRef(false);
+  const hasRestoredEquipmentRef = useRef(false);
   const hasRestoredFormRef = useRef(false);
 
   const hasActiveCheckoutPersistence =
@@ -207,6 +208,7 @@ export default function DriverDashboard() {
     hasLoadedNativePreviewsRef.current = false;
     hasRestoredFormRef.current = false;
     hasRestoredServiceTypeRef.current = false;
+    hasRestoredEquipmentRef.current = false;
   }, [activeWorkLog?.id]);
 
   // Restore persisted checkout state from formData immediately (like shovel dashboard).
@@ -227,7 +229,10 @@ export default function DriverDashboard() {
     if (persisted.saltUsed) setSaltUsed(persisted.saltUsed);
     if (persisted.notes) setNotes(persisted.notes);
     if (persisted.weather) setWeather(persisted.weather);
-    if (persisted.equipmentId) setSelectedEquipment(persisted.equipmentId);
+    if (persisted.equipmentId) {
+      setSelectedEquipment(persisted.equipmentId);
+      hasRestoredEquipmentRef.current = true;
+    }
 
     if (persisted.serviceType && ['plow', 'salt', 'both'].includes(persisted.serviceType)) {
       setServiceType(persisted.serviceType as 'plow' | 'salt' | 'both');
@@ -290,7 +295,10 @@ export default function DriverDashboard() {
   useEffect(() => {
     if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
-    updateField('equipmentId', selectedEquipment);
+    // Only persist if user has interacted OR we previously restored a value
+    if (hasRestoredEquipmentRef.current || selectedEquipment !== '') {
+      updateField('equipmentId', selectedEquipment);
+    }
   }, [hasActiveCheckoutPersistence, selectedEquipment, updateField]);
 
   // Persist service type selection
