@@ -388,7 +388,7 @@ export default function DriverDashboard() {
     if (!isValid) setSelectedEquipment('');
   }, [allEquipment.length, filteredEquipment, selectedEquipment]);
 
-  // Fetch equipment and plow employees
+  // Fetch equipment, plow employees, and on-shift status
   useEffect(() => {
     supabase.from('equipment').select('*').eq('is_active', true).eq('status', 'available').then(({ data }) => {
       if (data) setAllEquipment(data);
@@ -403,6 +403,15 @@ export default function DriverDashboard() {
       .order('first_name')
       .then(({ data }) => {
         if (data) setPlowEmployees(data as Employee[]);
+      });
+
+    // Fetch employees currently on shift
+    supabase
+      .from('time_clock')
+      .select('employee_id')
+      .is('clock_out_time', null)
+      .then(({ data }) => {
+        if (data) setOnShiftEmployeeIds(new Set(data.map(d => d.employee_id)));
       });
   }, []);
 
