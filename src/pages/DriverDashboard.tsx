@@ -172,6 +172,7 @@ export default function DriverDashboard() {
   const isRestoringCheckoutRef = useRef(false);
   const hasLoadedNativePreviewsRef = useRef(false);
   const hasRestoredServiceTypeRef = useRef(false);
+  const hasRestoredEquipmentRef = useRef(false);
   const hasRestoredFormRef = useRef(false);
 
   const hasActiveCheckoutPersistence =
