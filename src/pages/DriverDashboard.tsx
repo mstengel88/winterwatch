@@ -970,7 +970,12 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                       .filter((emp) => emp.id && emp.id.trim() !== '')
                       .map((emp) => (
                         <SelectItem key={emp.id} value={emp.id}>
-                          {emp.first_name} {emp.last_name}
+                          <span className="flex items-center gap-1.5">
+                            {onShiftEmployeeIds.has(emp.id) && (
+                              <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                            )}
+                            {emp.first_name} {emp.last_name}
+                          </span>
                         </SelectItem>
                       ))}
                   </SelectContent>
