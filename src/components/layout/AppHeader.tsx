@@ -41,11 +41,45 @@ const navItems: NavItem[] = [
 ];
 
 export function AppHeader() {
-  const { profile, signOut, hasRole, isAdminOrManager } = useAuth();
+  const { profile, signOut, hasRole, isAdminOrManager, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isNative } = useNativePlatform();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnread = async () => {
+      const { count } = await supabase
+        .from('notifications_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('read_at', null);
+      setUnreadCount(count || 0);
+    };
+
+    fetchUnread();
+
+    // Subscribe to new notifications
+    const channel = supabase
+      .channel('notifications-bell')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications_log', filter: `user_id=eq.${user.id}` },
+        () => fetchUnread()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications_log', filter: `user_id=eq.${user.id}` },
+        () => fetchUnread()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
