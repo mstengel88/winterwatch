@@ -14,7 +14,7 @@ interface UserWithRoles extends Profile {
   roles: AppRole[];
 }
 
-const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client', 'work_log_viewer'];
+const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'trucker', 'client', 'work_log_viewer'];
 
 const getRoleIcon = (role: string) => {
   switch (role) {
@@ -22,6 +22,7 @@ const getRoleIcon = (role: string) => {
     case 'manager': return <Users className="h-3 w-3" />;
     case 'driver': return <Truck className="h-3 w-3" />;
     case 'shovel_crew': return <Shovel className="h-3 w-3" />;
+    case 'trucker': return <Truck className="h-3 w-3" />;
     case 'work_log_viewer': return <FileText className="h-3 w-3" />;
     default: return <User className="h-3 w-3" />;
   }
@@ -33,6 +34,7 @@ const getRoleColor = (role: string) => {
     case 'manager': return 'bg-warning text-warning-foreground';
     case 'driver': return 'bg-plow text-plow-foreground';
     case 'shovel_crew': return 'bg-shovel text-shovel-foreground';
+    case 'trucker': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
     case 'work_log_viewer': return 'bg-primary text-primary-foreground';
     default: return 'bg-secondary text-secondary-foreground';
   }

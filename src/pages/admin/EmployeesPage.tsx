@@ -17,7 +17,7 @@ import { Profile } from '@/types/auth';
 import { employeeSchema, getValidationError } from '@/lib/validations';
 import { OvertimeNotificationSettings } from '@/components/admin/OvertimeNotificationSettings';
 
-const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both', 'manager'];
+const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both', 'manager', 'trucker'];
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -309,6 +309,12 @@ export default function EmployeesPage() {
                             <Badge className="bg-muted text-muted-foreground border-border gap-1">
                               <Users className="h-3 w-3" />
                               Manager
+                            </Badge>
+                          )}
+                          {employee.category === 'trucker' && (
+                            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 gap-1">
+                              <Truck className="h-3 w-3" />
+                              Trucker
                             </Badge>
                           )}
                         </td>
