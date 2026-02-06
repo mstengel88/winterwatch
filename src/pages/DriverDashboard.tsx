@@ -977,6 +977,8 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 </Label>
                 <Input 
                   type="number"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
@@ -989,6 +991,8 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 </Label>
                 <Input 
                   type="number"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   placeholder="e.g., 150"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
