@@ -295,7 +295,10 @@ export default function DriverDashboard() {
   useEffect(() => {
     if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
-    updateField('equipmentId', selectedEquipment);
+    // Only persist if user has interacted OR we previously restored a value
+    if (hasRestoredEquipmentRef.current || selectedEquipment !== '') {
+      updateField('equipmentId', selectedEquipment);
+    }
   }, [hasActiveCheckoutPersistence, selectedEquipment, updateField]);
 
   // Persist service type selection
