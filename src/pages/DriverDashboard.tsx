@@ -161,6 +161,9 @@ export default function DriverDashboard() {
   const hasRestoredServiceTypeRef = useRef(false);
   const hasRestoredFormRef = useRef(false);
 
+  const hasActiveCheckoutPersistence =
+    !!activeWorkLogIdForPersistence && activeWorkLogIdForPersistence !== '__no_active_worklog__';
+
   // iOS app switching can suspend the JS thread quickly after returning from the photo picker.
   // Persist previews immediately (instead of waiting for a later effect) so they restore reliably.
   const handleAddPhotos = useCallback(
