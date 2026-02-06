@@ -104,6 +104,7 @@ export default function DriverDashboard() {
   const [notes, setNotes] = useState('');
   const [allEquipment, setAllEquipment] = useState<any[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
+  const [onShiftEmployeeIds, setOnShiftEmployeeIds] = useState<Set<string>>(new Set());
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -387,7 +388,7 @@ export default function DriverDashboard() {
     if (!isValid) setSelectedEquipment('');
   }, [allEquipment.length, filteredEquipment, selectedEquipment]);
 
-  // Fetch equipment and plow employees
+  // Fetch equipment, plow employees, and on-shift status
   useEffect(() => {
     supabase.from('equipment').select('*').eq('is_active', true).eq('status', 'available').then(({ data }) => {
       if (data) setAllEquipment(data);
@@ -402,6 +403,15 @@ export default function DriverDashboard() {
       .order('first_name')
       .then(({ data }) => {
         if (data) setPlowEmployees(data as Employee[]);
+      });
+
+    // Fetch employees currently on shift
+    supabase
+      .from('time_clock')
+      .select('employee_id')
+      .is('clock_out_time', null)
+      .then(({ data }) => {
+        if (data) setOnShiftEmployeeIds(new Set(data.map(d => d.employee_id)));
       });
   }, []);
 
@@ -960,7 +970,12 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                       .filter((emp) => emp.id && emp.id.trim() !== '')
                       .map((emp) => (
                         <SelectItem key={emp.id} value={emp.id}>
-                          {emp.first_name} {emp.last_name}
+                          <span className="flex items-center gap-1.5">
+                            {onShiftEmployeeIds.has(emp.id) && (
+                              <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                            )}
+                            {emp.first_name} {emp.last_name}
+                          </span>
                         </SelectItem>
                       ))}
                   </SelectContent>
