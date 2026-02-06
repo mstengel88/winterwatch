@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Account {
   id: string;
@@ -95,6 +96,22 @@ export function WorkLogDialog({
   const [iceMeltUsed, setIceMeltUsed] = useState('');
   const [weather, setWeather] = useState('');
   const [notes, setNotes] = useState('');
+  const [onShiftEmployeeIds, setOnShiftEmployeeIds] = useState<Set<string>>(new Set());
+
+  // Fetch employees currently on shift
+  useEffect(() => {
+    if (!open) return;
+    const fetchOnShift = async () => {
+      const { data } = await supabase
+        .from('time_clock')
+        .select('employee_id')
+        .is('clock_out_time', null);
+      if (data) {
+        setOnShiftEmployeeIds(new Set(data.map(d => d.employee_id)));
+      }
+    };
+    fetchOnShift();
+  }, [open]);
 
   useEffect(() => {
     if (initialData) {
@@ -278,7 +295,10 @@ export function WorkLogDialog({
                               checked={employeeIds.includes(emp.id)}
                               onCheckedChange={() => toggleEmployee(emp.id)}
                             />
-                            <span className="text-sm">
+                            <span className="text-sm flex items-center gap-1.5">
+                              {onShiftEmployeeIds.has(emp.id) && (
+                                <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" title="On shift" />
+                              )}
                               {emp.first_name} {emp.last_name}
                             </span>
                           </div>
