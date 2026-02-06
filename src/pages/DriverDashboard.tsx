@@ -240,47 +240,52 @@ export default function DriverDashboard() {
     })();
   }, [activeWorkLog, formData.photoPreviewRefs, previews.length, restorePreviews]);
 
-  // Persist checkout fields (only while active)
+  const hasActiveCheckoutPersistence =
+    !!activeWorkLogIdForPersistence && activeWorkLogIdForPersistence !== '__no_active_worklog__';
+
+  // Persist checkout fields (only while we have a stable active workLogId)
+  // IMPORTANT: `activeWorkLog` can temporarily be null during refetch/app resume.
+  // We still want to persist against the stable ID so fields don’t “not save”.
   useEffect(() => {
-    if (!activeWorkLog) return;
+    if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
     updateField('snowDepth', snowDepth);
-  }, [activeWorkLog, snowDepth, updateField]);
+  }, [hasActiveCheckoutPersistence, snowDepth, updateField]);
 
   useEffect(() => {
-    if (!activeWorkLog) return;
+    if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
     updateField('saltUsed', saltUsed);
-  }, [activeWorkLog, saltUsed, updateField]);
+  }, [hasActiveCheckoutPersistence, saltUsed, updateField]);
 
   useEffect(() => {
-    if (!activeWorkLog) return;
+    if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
     updateField('weather', weather);
-  }, [activeWorkLog, weather, updateField]);
+  }, [hasActiveCheckoutPersistence, weather, updateField]);
 
   useEffect(() => {
-    if (!activeWorkLog) return;
+    if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
     updateField('notes', notes);
-  }, [activeWorkLog, notes, updateField]);
+  }, [hasActiveCheckoutPersistence, notes, updateField]);
 
   // Persist equipment selection
   useEffect(() => {
-    if (!activeWorkLog) return;
+    if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
-    if (selectedEquipment) updateField('equipmentId', selectedEquipment);
-  }, [activeWorkLog, selectedEquipment, updateField]);
+    updateField('equipmentId', selectedEquipment);
+  }, [hasActiveCheckoutPersistence, selectedEquipment, updateField]);
 
   // Persist service type selection
   useEffect(() => {
-    if (!activeWorkLog) return;
+    if (!hasActiveCheckoutPersistence) return;
     if (isRestoringCheckoutRef.current) return;
     // Only persist if user has interacted OR we previously restored a value
     if (hasRestoredServiceTypeRef.current || serviceType !== 'plow') {
       updateField('serviceType', serviceType);
     }
-  }, [activeWorkLog, serviceType, updateField]);
+  }, [hasActiveCheckoutPersistence, serviceType, updateField]);
 
   useEffect(() => {
     // Same reasoning as above: use the stable ID, not the live activeWorkLog reference.
