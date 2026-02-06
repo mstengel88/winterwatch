@@ -229,7 +229,10 @@ export default function DriverDashboard() {
     if (persisted.saltUsed) setSaltUsed(persisted.saltUsed);
     if (persisted.notes) setNotes(persisted.notes);
     if (persisted.weather) setWeather(persisted.weather);
-    if (persisted.equipmentId) setSelectedEquipment(persisted.equipmentId);
+    if (persisted.equipmentId) {
+      setSelectedEquipment(persisted.equipmentId);
+      hasRestoredEquipmentRef.current = true;
+    }
 
     if (persisted.serviceType && ['plow', 'salt', 'both'].includes(persisted.serviceType)) {
       setServiceType(persisted.serviceType as 'plow' | 'salt' | 'both');
