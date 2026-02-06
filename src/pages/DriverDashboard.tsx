@@ -138,17 +138,30 @@ export default function DriverDashboard() {
   } = useWorkLogs({ employeeId: employee?.id });
 
   // Plow checkout persistence (for the active work checkout section on this page)
-  // NOTE: On iOS app-switch, `activeWorkLog` can be temporarily undefined while data refetches.
-  // Using a placeholder like "inactive" causes the hook to initialize against the wrong key
-  // and the UI restores blank. Keep a stable last-known workLogId instead.
-  const [persistedActiveWorkLogId, setPersistedActiveWorkLogId] = useState<string>('');
+  // When navigating away (e.g., to /shovel) and back, the component remounts and `activeWorkLog`
+  // may be null for a moment while refetching. If we don't have a stable id during that window,
+  // the form appears to "clear".
+  const LAST_ACTIVE_PLOW_WORKLOG_ID_KEY = 'winterwatch_last_active_plow_worklog_id';
+
+  const [persistedActiveWorkLogId, setPersistedActiveWorkLogId] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem(LAST_ACTIVE_PLOW_WORKLOG_ID_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
 
   useEffect(() => {
-    if (activeWorkLog?.id && activeWorkLog.id !== persistedActiveWorkLogId) {
-      setPersistedActiveWorkLogId(activeWorkLog.id);
+    if (!activeWorkLog?.id) return;
+    if (activeWorkLog.id === persistedActiveWorkLogId) return;
+
+    setPersistedActiveWorkLogId(activeWorkLog.id);
+    try {
+      sessionStorage.setItem(LAST_ACTIVE_PLOW_WORKLOG_ID_KEY, activeWorkLog.id);
+    } catch {
+      // ignore
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWorkLog?.id]);
+  }, [activeWorkLog?.id, activeWorkLog?.id, persistedActiveWorkLogId]);
 
   const activeWorkLogIdForPersistence = persistedActiveWorkLogId || activeWorkLog?.id || '__no_active_worklog__';
   const storageKey = `winterwatch_checkout_form_plow_${activeWorkLogIdForPersistence}`;
