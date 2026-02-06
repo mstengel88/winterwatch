@@ -215,82 +215,95 @@ export default function EquipmentPage() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold">{stats.total}</p>
-            <p className="text-xs text-muted-foreground">Total Equipment</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold text-green-400">{stats.active}</p>
-            <p className="text-xs text-muted-foreground">Active</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold text-orange-400">{stats.maintenance}</p>
-            <p className="text-xs text-muted-foreground">In Maintenance</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-2xl font-bold text-destructive">{stats.overdue}</p>
-            <p className="text-xs text-muted-foreground">Out of Service</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs defaultValue="equipment" className="w-full">
+        <TabsList>
+          <TabsTrigger value="equipment">Equipment</TabsTrigger>
+          <TabsTrigger value="requests">Maintenance Requests</TabsTrigger>
+        </TabsList>
 
-      {/* Search and Add */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search equipment..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-muted/30 border-border/50"
-          />
-        </div>
-        <Button onClick={() => openDialog()} className="gap-2 bg-primary hover:bg-primary/90">
-          <Plus className="h-4 w-4" />
-          Add Equipment
-        </Button>
-      </div>
+        <TabsContent value="equipment" className="space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="bg-card/50 border-border/50">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total Equipment</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 border-border/50">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-2xl font-bold text-green-400">{stats.active}</p>
+                <p className="text-xs text-muted-foreground">Active</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 border-border/50">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-2xl font-bold text-orange-400">{stats.maintenance}</p>
+                <p className="text-xs text-muted-foreground">In Maintenance</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/50 border-border/50">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-2xl font-bold text-destructive">{stats.overdue}</p>
+                <p className="text-xs text-muted-foreground">Out of Service</p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Equipment Grid */}
-      {filteredEquipment.length === 0 ? (
-        <Card className="bg-card/50 border-border/50">
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Truck className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No equipment found</p>
-            <Button onClick={() => openDialog()} variant="outline" className="mt-4 gap-2">
+          {/* Search and Add */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search equipment..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 bg-muted/30 border-border/50"
+              />
+            </div>
+            <Button onClick={() => openDialog()} className="gap-2 bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4" />
               Add Equipment
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredEquipment.map((equip) => (
-            <EquipmentCard
-              key={equip.id}
-              equipment={equip}
-              onEdit={openDialog}
-              onDelete={handleDelete}
-              onLogService={handleLogService}
-              onViewHistory={handleViewHistory}
-            />
-          ))}
-        </div>
-      )}
+          </div>
 
-      {/* Footer */}
-      <p className="text-sm text-muted-foreground">
-        Showing {filteredEquipment.length} of {equipment.length} equipment
-      </p>
+          {/* Equipment Grid */}
+          {filteredEquipment.length === 0 ? (
+            <Card className="bg-card/50 border-border/50">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <Truck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No equipment found</p>
+                <Button onClick={() => openDialog()} variant="outline" className="mt-4 gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Equipment
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredEquipment.map((equip) => (
+                <EquipmentCard
+                  key={equip.id}
+                  equipment={equip}
+                  onEdit={openDialog}
+                  onDelete={handleDelete}
+                  onLogService={handleLogService}
+                  onViewHistory={handleViewHistory}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Footer */}
+          <p className="text-sm text-muted-foreground">
+            Showing {filteredEquipment.length} of {equipment.length} equipment
+          </p>
+        </TabsContent>
+
+        <TabsContent value="requests">
+          <MaintenanceRequestsTab />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
       <EquipmentDialog
