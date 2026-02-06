@@ -22,6 +22,7 @@ const getRoleIcon = (role: string) => {
     case 'manager': return <Users className="h-3 w-3" />;
     case 'driver': return <Truck className="h-3 w-3" />;
     case 'shovel_crew': return <Shovel className="h-3 w-3" />;
+    case 'trucker': return <Truck className="h-3 w-3" />;
     case 'work_log_viewer': return <FileText className="h-3 w-3" />;
     default: return <User className="h-3 w-3" />;
   }
