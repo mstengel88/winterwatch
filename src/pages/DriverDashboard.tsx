@@ -196,19 +196,23 @@ export default function DriverDashboard() {
   // Restore persisted checkout state when we have an active work log
   useEffect(() => {
     if (!activeWorkLog) return;
-    if (!formData || Object.keys(formData).length === 0) return;
     if (hasRestoredFormRef.current) return;
 
+    // Mark as restored even if there is no persisted data yet,
+    // so we don't immediately overwrite localStorage with initial empty state.
     hasRestoredFormRef.current = true;
     isRestoringCheckoutRef.current = true;
-    
-    if (formData.snowDepth) setSnowDepth(formData.snowDepth);
-    if (formData.saltUsed) setSaltUsed(formData.saltUsed);
-    if (formData.notes) setNotes(formData.notes);
-    if (formData.weather) setWeather(formData.weather);
-    if (formData.equipmentId) setSelectedEquipment(formData.equipmentId);
-    if (formData.serviceType) {
-      setServiceType(formData.serviceType as 'plow' | 'salt' | 'both');
+
+    const persisted = formData ?? {};
+
+    if (persisted.snowDepth) setSnowDepth(persisted.snowDepth);
+    if (persisted.saltUsed) setSaltUsed(persisted.saltUsed);
+    if (persisted.notes) setNotes(persisted.notes);
+    if (persisted.weather) setWeather(persisted.weather);
+    if (persisted.equipmentId) setSelectedEquipment(persisted.equipmentId);
+
+    if (persisted.serviceType && ['plow', 'salt', 'both'].includes(persisted.serviceType)) {
+      setServiceType(persisted.serviceType as 'plow' | 'salt' | 'both');
       hasRestoredServiceTypeRef.current = true;
     }
 
@@ -216,6 +220,7 @@ export default function DriverDashboard() {
       isRestoringCheckoutRef.current = false;
     }, 100);
   }, [activeWorkLog, formData]);
+
 
   // Native iOS: restore photo previews from Filesystem refs
   useEffect(() => {
