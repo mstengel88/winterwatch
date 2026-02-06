@@ -698,7 +698,7 @@ export default function ShovelDashboard() {
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-green-400">Currently working at location</p>
+                      <p className="text-sm font-medium text-green-400">Currently working at "{activeWorkLog.account?.name || 'Unknown'}"</p>
                       <p className="text-xs text-muted-foreground">
                         Started {activeWorkLog.check_in_time ? format(new Date(activeWorkLog.check_in_time), 'h:mm a') : 'Unknown'}
                       </p>
