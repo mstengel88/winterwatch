@@ -1,6 +1,6 @@
 export type ServiceType = 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt';
 export type WorkStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
-export type EmployeeCategory = 'plow' | 'shovel' | 'both' | 'manager';
+export type EmployeeCategory = 'plow' | 'shovel' | 'both' | 'manager' | 'trucker';
 
 export interface Account {
   id: string;

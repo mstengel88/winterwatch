@@ -33,6 +33,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
+  { href: '/trucker', label: 'Trucker', icon: Wrench, roles: ['trucker', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
   { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
@@ -75,6 +76,7 @@ export function AppHeader() {
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
     if (href === '/shovel') return location.pathname === href;
+    if (href === '/trucker') return location.pathname === href;
     return location.pathname.startsWith(href);
   };
 
@@ -85,6 +87,9 @@ export function AppHeader() {
     }
     if (hasRole('shovel_crew')) {
       return '/shovel';
+    }
+    if (hasRole('trucker')) {
+      return '/trucker';
     }
     return '/';
   };

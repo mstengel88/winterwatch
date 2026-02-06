@@ -281,6 +281,57 @@ export type Database = {
           },
         ]
       }
+      maintenance_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          employee_id: string | null
+          equipment_id: string
+          id: string
+          mileage: number | null
+          problem_description: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          employee_id?: string | null
+          equipment_id: string
+          id?: string
+          mileage?: number | null
+          problem_description: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          employee_id?: string | null
+          equipment_id?: string
+          id?: string
+          mileage?: number | null
+          problem_description?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           admin_announcements_enabled: boolean
@@ -876,7 +927,8 @@ export type Database = {
         | "shovel_crew"
         | "client"
         | "work_log_viewer"
-      employee_category: "plow" | "shovel" | "both" | "manager"
+        | "trucker"
+      employee_category: "plow" | "shovel" | "both" | "manager" | "trucker"
       notification_sound: "default" | "chime" | "bell" | "alert" | "none"
       notification_type:
         | "shift_status"
@@ -1018,8 +1070,9 @@ export const Constants = {
         "shovel_crew",
         "client",
         "work_log_viewer",
+        "trucker",
       ],
-      employee_category: ["plow", "shovel", "both", "manager"],
+      employee_category: ["plow", "shovel", "both", "manager", "trucker"],
       notification_sound: ["default", "chime", "bell", "alert", "none"],
       notification_type: [
         "shift_status",

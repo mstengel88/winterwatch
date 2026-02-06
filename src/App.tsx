@@ -23,6 +23,7 @@ import { NotificationActionHandler } from "@/components/notifications/Notificati
 // DriverDashboard is the most common landing page - preload after initial render
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
+const TruckerDashboard = lazy(() => import("./pages/TruckerDashboard"));
 const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
 const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
 const Pending = lazy(() => import("./pages/Pending"));
@@ -128,6 +129,15 @@ const AppRoutes = () => (
                 element={
                   <ProtectedRoute allowedRoles={["shovel_crew", "admin", "manager"]}>
                     <ShovelDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/trucker"
+                element={
+                  <ProtectedRoute allowedRoles={["trucker", "admin", "manager"]}>
+                    <TruckerDashboard />
                   </ProtectedRoute>
                 }
               />
