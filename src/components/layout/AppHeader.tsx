@@ -76,6 +76,7 @@ export function AppHeader() {
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
     if (href === '/shovel') return location.pathname === href;
+    if (href === '/trucker') return location.pathname === href;
     return location.pathname.startsWith(href);
   };
 
