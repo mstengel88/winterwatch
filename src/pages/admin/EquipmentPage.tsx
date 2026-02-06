@@ -11,6 +11,8 @@ import { EquipmentCard } from '@/components/equipment/EquipmentCard';
 import { EquipmentDialog } from '@/components/equipment/EquipmentDialog';
 import { LogMaintenanceDialog } from '@/components/equipment/LogMaintenanceDialog';
 import { MaintenanceHistoryDialog } from '@/components/equipment/MaintenanceHistoryDialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MaintenanceRequestsTab } from '@/components/equipment/MaintenanceRequestsTab';
 
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
