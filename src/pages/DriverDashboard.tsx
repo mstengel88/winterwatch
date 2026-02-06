@@ -161,7 +161,7 @@ export default function DriverDashboard() {
     } catch {
       // ignore
     }
-  }, [activeWorkLog?.id, activeWorkLog?.id, persistedActiveWorkLogId]);
+  }, [activeWorkLog?.id, persistedActiveWorkLogId]);
 
   const activeWorkLogIdForPersistence = persistedActiveWorkLogId || activeWorkLog?.id || '__no_active_worklog__';
   const storageKey = `winterwatch_checkout_form_plow_${activeWorkLogIdForPersistence}`;
