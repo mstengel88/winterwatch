@@ -208,6 +208,7 @@ export default function DriverDashboard() {
     hasLoadedNativePreviewsRef.current = false;
     hasRestoredFormRef.current = false;
     hasRestoredServiceTypeRef.current = false;
+    hasRestoredEquipmentRef.current = false;
   }, [activeWorkLog?.id]);
 
   // Restore persisted checkout state from formData immediately (like shovel dashboard).
