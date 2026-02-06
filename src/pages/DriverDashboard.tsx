@@ -376,15 +376,16 @@ export default function DriverDashboard() {
     });
   }, [allEquipment, serviceType]);
 
-  // Clear equipment selection when service type changes if current selection doesn't match
+  // Clear equipment selection when service type changes if current selection doesn't match.
+  // IMPORTANT: On remount/restore, `selectedEquipment` can be set before equipment finishes loading.
+  // If we validate against an empty `filteredEquipment` list, we incorrectly clear the persisted value.
   useEffect(() => {
-    if (selectedEquipment) {
-      const isValid = filteredEquipment.some(eq => eq.id === selectedEquipment);
-      if (!isValid) {
-        setSelectedEquipment('');
-      }
-    }
-  }, [serviceType, filteredEquipment, selectedEquipment]);
+    if (allEquipment.length === 0) return;
+    if (!selectedEquipment) return;
+
+    const isValid = filteredEquipment.some((eq) => eq.id === selectedEquipment);
+    if (!isValid) setSelectedEquipment('');
+  }, [allEquipment.length, filteredEquipment, selectedEquipment]);
 
   // Fetch equipment and plow employees
   useEffect(() => {
