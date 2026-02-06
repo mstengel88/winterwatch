@@ -87,6 +87,9 @@ export function AppHeader() {
     if (hasRole('shovel_crew')) {
       return '/shovel';
     }
+    if (hasRole('trucker')) {
+      return '/trucker';
+    }
     return '/';
   };
 
