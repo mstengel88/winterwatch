@@ -34,6 +34,7 @@ const getRoleColor = (role: string) => {
     case 'manager': return 'bg-warning text-warning-foreground';
     case 'driver': return 'bg-plow text-plow-foreground';
     case 'shovel_crew': return 'bg-shovel text-shovel-foreground';
+    case 'trucker': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
     case 'work_log_viewer': return 'bg-primary text-primary-foreground';
     default: return 'bg-secondary text-secondary-foreground';
   }

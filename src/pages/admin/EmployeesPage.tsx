@@ -311,6 +311,12 @@ export default function EmployeesPage() {
                               Manager
                             </Badge>
                           )}
+                          {employee.category === 'trucker' && (
+                            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 gap-1">
+                              <Truck className="h-3 w-3" />
+                              Trucker
+                            </Badge>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {employee.is_active ? (
