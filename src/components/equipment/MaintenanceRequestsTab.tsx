@@ -72,6 +72,39 @@ export function MaintenanceRequestsTab() {
         .update({ status })
         .eq('id', id);
       if (error) throw error;
+
+      // When completed, auto-create a maintenance_logs entry for the equipment
+      if (status === 'completed') {
+        const req = requests.find(r => r.id === id);
+        if (req) {
+          const driverName = req.employee
+            ? `${req.employee.first_name} ${req.employee.last_name}`
+            : null;
+
+          const { error: logError } = await supabase
+            .from('maintenance_logs')
+            .insert({
+              equipment_id: req.equipment_id,
+              maintenance_type: 'Repair',
+              description: req.problem_description,
+              performed_by_name: driverName,
+              performed_by_employee_id: req.employee_id || null,
+              service_date: new Date().toISOString(),
+            });
+
+          if (logError) {
+            console.error('Error creating maintenance log:', logError);
+            toast.error('Request completed but failed to log to equipment history');
+          }
+
+          // Update equipment last_maintenance_date
+          await supabase
+            .from('equipment')
+            .update({ last_maintenance_date: new Date().toISOString().split('T')[0] })
+            .eq('id', req.equipment_id);
+        }
+      }
+
       toast.success(`Request marked as ${status.replace('_', ' ')}`);
       fetchRequests();
     } catch (error) {
