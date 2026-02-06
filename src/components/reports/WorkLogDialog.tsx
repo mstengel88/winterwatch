@@ -96,6 +96,22 @@ export function WorkLogDialog({
   const [iceMeltUsed, setIceMeltUsed] = useState('');
   const [weather, setWeather] = useState('');
   const [notes, setNotes] = useState('');
+  const [onShiftEmployeeIds, setOnShiftEmployeeIds] = useState<Set<string>>(new Set());
+
+  // Fetch employees currently on shift
+  useEffect(() => {
+    if (!open) return;
+    const fetchOnShift = async () => {
+      const { data } = await supabase
+        .from('time_clock')
+        .select('employee_id')
+        .is('clock_out_time', null);
+      if (data) {
+        setOnShiftEmployeeIds(new Set(data.map(d => d.employee_id)));
+      }
+    };
+    fetchOnShift();
+  }, [open]);
 
   useEffect(() => {
     if (initialData) {
