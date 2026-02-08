@@ -198,7 +198,7 @@ const AppRoutes = () => (
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="/admin/users" replace />} />
+                <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
