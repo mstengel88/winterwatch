@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type MouseEvent, type TouchEvent } from 'react';
-import { ForceCheckoutPanel } from '@/components/admin/ForceCheckoutPanel';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
