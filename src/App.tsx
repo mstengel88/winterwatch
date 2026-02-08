@@ -18,6 +18,7 @@ import { Capacitor } from "@capacitor/core";
 import AuthCallback from "./pages/AuthCallback";
 import { PostLoginNotificationPrompt } from "@/components/notifications/PostLoginNotificationPrompt";
 import { NotificationActionHandler } from "@/components/notifications/NotificationActionHandler";
+import { AppVersionCheck } from "@/components/ios/AppVersionCheck";
 
 // Lazy load ALL pages for faster initial bundle
 // DriverDashboard is the most common landing page - preload after initial render
