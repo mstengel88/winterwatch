@@ -168,7 +168,6 @@ export default function UsersPage() {
           Manage user accounts and assign roles
         </p>
       </div>
-      <ForceCheckoutPanel />
 
       <div className="overflow-x-auto">
         <Table>
