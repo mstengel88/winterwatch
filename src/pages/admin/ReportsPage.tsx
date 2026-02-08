@@ -1465,13 +1465,13 @@ export default function ReportsPage() {
           {/* Shift Tabs */}
           <Tabs value={activeShiftTab} onValueChange={(v) => { setActiveShiftTab(v); setSelectedShifts(new Set()); }} className="mb-4">
             <TabsList className="grid grid-cols-3 w-full max-w-md">
-              <TabsTrigger value="current" className="text-sm">
+              <TabsTrigger value="current" className="text-base">
                 Current ({shiftCurrentCount})
               </TabsTrigger>
-              <TabsTrigger value="billable" className="text-sm">
+              <TabsTrigger value="billable" className="text-base data-[state=active]:bg-red-500/20 data-[state=active]:text-red-500">
                 Billable ({shiftBillableCount})
               </TabsTrigger>
-              <TabsTrigger value="completed" className="text-sm">
+              <TabsTrigger value="completed" className="text-base data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-500">
                 Completed ({shiftCompletedCount})
               </TabsTrigger>
             </TabsList>
