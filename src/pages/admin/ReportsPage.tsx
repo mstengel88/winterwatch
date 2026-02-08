@@ -65,6 +65,7 @@ interface WorkLogEntry {
   equipment_id: string | null;
   equipment_name: string | null;
   employee_name: string;
+  team_member_ids: string[];
   team_member_names: string[];
   photo_urls: string[] | null;
   notes: string | null;
