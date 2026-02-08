@@ -33,6 +33,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
 const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
 const AccountsPage = lazy(() => import("./pages/admin/AccountsPage"));
