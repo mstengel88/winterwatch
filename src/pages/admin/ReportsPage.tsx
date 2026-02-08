@@ -1465,13 +1465,13 @@ export default function ReportsPage() {
           {/* Shift Tabs */}
           <Tabs value={activeShiftTab} onValueChange={(v) => { setActiveShiftTab(v); setSelectedShifts(new Set()); }} className="mb-4">
             <TabsList className="grid grid-cols-3 w-full max-w-md">
-              <TabsTrigger value="current" className="text-sm">
+              <TabsTrigger value="current" className="text-base">
                 Current ({shiftCurrentCount})
               </TabsTrigger>
-              <TabsTrigger value="billable" className="text-sm">
+              <TabsTrigger value="billable" className="text-base data-[state=active]:bg-red-500/20 data-[state=active]:text-red-500">
                 Billable ({shiftBillableCount})
               </TabsTrigger>
-              <TabsTrigger value="completed" className="text-sm">
+              <TabsTrigger value="completed" className="text-base data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-500">
                 Completed ({shiftCompletedCount})
               </TabsTrigger>
             </TabsList>
@@ -1596,17 +1596,17 @@ export default function ReportsPage() {
           <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); setSelectedWorkLogs(new Set()); }}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <TabsList className="flex-wrap">
-                <TabsTrigger value="current" className="gap-1.5 text-xs sm:text-sm">
+                <TabsTrigger value="current" className="gap-1.5 text-sm sm:text-base">
                   <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Current</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{currentCount}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="billable" className="gap-1.5 text-xs sm:text-sm">
+                <TabsTrigger value="billable" className="gap-1.5 text-sm sm:text-base data-[state=active]:bg-red-500/20 data-[state=active]:text-red-500">
                   <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Billable</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{billableCount}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="gap-1.5 text-xs sm:text-sm">
+                <TabsTrigger value="completed" className="gap-1.5 text-sm sm:text-base data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-500">
                   <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Completed</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{completedCount}</Badge>
