@@ -24,6 +24,8 @@ import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import logo from '@/assets/logo.png';
 
+const APP_VERSION = '1.0.0';
+
 interface NavItem {
   href: string;
   label: string;
