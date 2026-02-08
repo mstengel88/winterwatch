@@ -1053,13 +1053,13 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             </div>
 
             {/* Notes */}
-            <div className="mb-4">
+            <div className="mb-4 w-[85%]">
               <Label className="text-sm text-muted-foreground">Notes (Optional)</Label>
               <Textarea
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20 min-h-[80px]"
+                className="mt-1 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20 min-h-[60px]"
               />
             </div>
 

@@ -863,13 +863,13 @@ export default function ShovelDashboard() {
             </div>
 
             {/* Notes */}
-            <div className="space-y-2">
+            <div className="space-y-1 w-[85%]">
               <Label className="text-sm">Notes (Optional)</Label>
               <Textarea 
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[80px]"
+                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[60px] text-sm"
               />
             </div>
 
