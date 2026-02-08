@@ -21,6 +21,12 @@ interface Equipment {
   license_plate: string | null;
 }
 
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
 interface MaintenanceRequest {
   id: string;
   problem_description: string;
@@ -30,23 +36,39 @@ interface MaintenanceRequest {
   equipment: { name: string } | null;
 }
 
+const MAINTENANCE_TYPES = [
+  'Inspection',
+  'Oil Change',
+  'Tire Rotation',
+  'Brake Service',
+  'Repair',
+  'Preventive Maintenance',
+  'Other',
+];
+
 export default function TruckerDashboard() {
   const { user } = useAuth();
   const { employee, isLoading: employeeLoading } = useEmployee();
   const { toast } = useToast();
 
   const [trucks, setTrucks] = useState<Equipment[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
   const [selectedTruck, setSelectedTruck] = useState('');
-  const [problem, setProblem] = useState('');
-  const [mileage, setMileage] = useState('');
+  const [maintenanceType, setMaintenanceType] = useState('');
+  const [description, setDescription] = useState('');
+  const [cost, setCost] = useState('');
+  const [performedByEmployee, setPerformedByEmployee] = useState('');
+  const [performedByName, setPerformedByName] = useState('');
+  const [nextServiceDate, setNextServiceDate] = useState('');
 
   useEffect(() => {
     fetchTrucks();
+    fetchEmployees();
   }, []);
 
   useEffect(() => {
@@ -62,6 +84,15 @@ export default function TruckerDashboard() {
     setTrucks((data as Equipment[]) ?? []);
   };
 
+  const fetchEmployees = async () => {
+    const { data } = await supabase
+      .from('employees')
+      .select('id, first_name, last_name')
+      .eq('is_active', true)
+      .order('first_name');
+    setEmployees((data as Employee[]) ?? []);
+  };
+
   const fetchRequests = async () => {
     if (!employee) return;
     setLoading(true);
@@ -75,47 +106,73 @@ export default function TruckerDashboard() {
     setLoading(false);
   };
 
+  const resetForm = () => {
+    setSelectedTruck('');
+    setMaintenanceType('');
+    setDescription('');
+    setCost('');
+    setPerformedByEmployee('');
+    setPerformedByName('');
+    setNextServiceDate('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!employee) {
       toast({ title: 'Error', description: 'No employee record linked to your account.', variant: 'destructive' });
       return;
     }
-    if (!selectedTruck || !problem.trim()) {
-      toast({ title: 'Missing fields', description: 'Please select a truck and describe the problem.', variant: 'destructive' });
+    if (!selectedTruck || !maintenanceType || !description.trim()) {
+      toast({ title: 'Missing fields', description: 'Please fill in Truck, Maintenance Type, and Description.', variant: 'destructive' });
       return;
     }
 
     setSubmitting(true);
     const selectedTruckData = trucks.find(t => t.id === selectedTruck);
-    const { error } = await (supabase as any)
-      .from('maintenance_requests')
+
+    // Resolve performer name
+    let resolvedPerformerName = performedByName.trim() || null;
+    if (performedByEmployee) {
+      const emp = employees.find(e => e.id === performedByEmployee);
+      if (emp) resolvedPerformerName = `${emp.first_name} ${emp.last_name}`;
+    }
+
+    const { error } = await supabase
+      .from('maintenance_logs')
       .insert({
-        employee_id: employee.id,
         equipment_id: selectedTruck,
-        problem_description: problem.trim(),
-        mileage: mileage ? parseFloat(mileage) : null,
+        maintenance_type: maintenanceType,
+        description: description.trim(),
+        cost: cost ? parseFloat(cost) : null,
+        performed_by_employee_id: performedByEmployee || null,
+        performed_by_name: resolvedPerformerName,
+        service_date: new Date().toISOString(),
+        next_service_date: nextServiceDate || null,
       });
 
     if (error) {
-      toast({ title: 'Error', description: 'Failed to submit request.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to log maintenance.', variant: 'destructive' });
     } else {
-      toast({ title: 'Submitted', description: 'Maintenance request submitted successfully.' });
+      // Update equipment last_maintenance_date
+      await supabase
+        .from('equipment')
+        .update({ last_maintenance_date: new Date().toISOString().split('T')[0] })
+        .eq('id', selectedTruck);
 
-      // Send notification to admins/managers (fire and forget)
+      toast({ title: 'Logged', description: 'Maintenance logged successfully.' });
+
+      // Notify admins (fire and forget)
       supabase.functions.invoke('notify-maintenance-request', {
         body: {
           equipment_name: selectedTruckData?.name || 'Unknown truck',
-          problem_description: problem.trim(),
+          problem_description: `${maintenanceType}: ${description.trim()}`,
           driver_name: `${employee.first_name} ${employee.last_name}`,
         },
       }).then(({ error: notifError }) => {
         if (notifError) console.error('Notification error:', notifError);
       });
 
-      setSelectedTruck('');
-      setProblem('');
-      setMileage('');
+      resetForm();
       fetchRequests();
     }
     setSubmitting(false);
@@ -129,6 +186,8 @@ export default function TruckerDashboard() {
       default: return 'bg-muted text-muted-foreground';
     }
   };
+
+  const selectedTruckName = trucks.find(t => t.id === selectedTruck)?.name;
 
   if (employeeLoading) {
     return (
@@ -146,32 +205,23 @@ export default function TruckerDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Trucker Dashboard</h1>
           <p className="text-muted-foreground text-sm">
-            {employee ? `${employee.first_name} ${employee.last_name}` : 'Submit maintenance requests for your truck'}
+            {employee ? `${employee.first_name} ${employee.last_name}` : 'Log maintenance for your truck'}
           </p>
         </div>
 
-        {/* Maintenance Request Form */}
+        {/* Log Maintenance Form */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              New Maintenance Request
+              <Wrench className="h-5 w-5" />
+              Log Maintenance{selectedTruckName ? ` - ${selectedTruckName}` : ''}
             </CardTitle>
-            <CardDescription>Report a truck issue that needs attention</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Truck Selection */}
               <div className="space-y-2">
-                <Label>Driver Name</Label>
-                <Input
-                  value={employee ? `${employee.first_name} ${employee.last_name}` : 'No employee record found'}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="truck">Truck Number *</Label>
+                <Label>Truck *</Label>
                 <Select value={selectedTruck} onValueChange={setSelectedTruck}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a truck" />
@@ -186,33 +236,88 @@ export default function TruckerDashboard() {
                 </Select>
               </div>
 
+              {/* Maintenance Type */}
               <div className="space-y-2">
-                <Label htmlFor="mileage">Mileage</Label>
-                <Input
-                  id="mileage"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="Current mileage"
-                  value={mileage}
-                  onChange={(e) => setMileage(e.target.value.replace(/[^0-9.]/g, ''))}
-                />
+                <Label>Maintenance Type *</Label>
+                <Select value={maintenanceType} onValueChange={setMaintenanceType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MAINTENANCE_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
+              {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="problem">Problem Description *</Label>
+                <Label>Description *</Label>
                 <Textarea
-                  id="problem"
-                  placeholder="Describe the issue in detail..."
-                  value={problem}
-                  onChange={(e) => setProblem(e.target.value)}
+                  placeholder="Details about maintenance performed..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   rows={4}
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={submitting || !employee}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wrench className="h-4 w-4 mr-2" />}
-                Submit Request
-              </Button>
+              {/* Cost */}
+              <div className="space-y-2">
+                <Label>Cost ($)</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value.replace(/[^0-9.]/g, ''))}
+                />
+              </div>
+
+              {/* Performed By */}
+              <div className="space-y-2">
+                <Label>Performed By</Label>
+                <Select value={performedByEmployee} onValueChange={setPerformedByEmployee}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select employee..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.first_name} {emp.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Or enter name manually"
+                  value={performedByName}
+                  onChange={(e) => setPerformedByName(e.target.value)}
+                />
+              </div>
+
+              {/* Next Service Date */}
+              <div className="space-y-2">
+                <Label>Next Service Date</Label>
+                <Input
+                  type="date"
+                  value={nextServiceDate}
+                  onChange={(e) => setNextServiceDate(e.target.value)}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button type="button" variant="ghost" onClick={resetForm}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting || !employee}>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wrench className="h-4 w-4 mr-2" />}
+                  Log Maintenance
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
