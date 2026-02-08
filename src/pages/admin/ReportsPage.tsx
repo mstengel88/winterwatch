@@ -1468,10 +1468,10 @@ export default function ReportsPage() {
               <TabsTrigger value="current" className="text-base">
                 Current ({shiftCurrentCount})
               </TabsTrigger>
-              <TabsTrigger value="billable" className="text-base data-[state=active]:text-red-500">
+              <TabsTrigger value="billable" className="text-base text-red-500">
                 Billable ({shiftBillableCount})
               </TabsTrigger>
-              <TabsTrigger value="completed" className="text-base data-[state=active]:text-blue-500">
+              <TabsTrigger value="completed" className="text-base text-blue-500">
                 Completed ({shiftCompletedCount})
               </TabsTrigger>
             </TabsList>
@@ -1601,12 +1601,12 @@ export default function ReportsPage() {
                   <span>Current</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{currentCount}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="billable" className="gap-1.5 text-sm sm:text-base data-[state=active]:text-red-500">
+                <TabsTrigger value="billable" className="gap-1.5 text-sm sm:text-base text-red-500">
                   <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Billable</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{billableCount}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="gap-1.5 text-sm sm:text-base data-[state=active]:text-blue-500">
+                <TabsTrigger value="completed" className="gap-1.5 text-sm sm:text-base text-blue-500">
                   <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Completed</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{completedCount}</Badge>
