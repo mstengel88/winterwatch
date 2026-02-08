@@ -170,104 +170,92 @@ export default function UsersPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCog className="h-5 w-5" />
-            All Users
-          </CardTitle>
-          <CardDescription>
-            {users.length} registered user{users.length !== 1 ? 's' : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Current Roles</TableHead>
-                  <TableHead>Add Role</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{user.full_name || 'No name'}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {user.roles.length > 0 ? (
-                          user.roles.map((role) => {
-                            // Managers can't remove admin role
-                            const canRemove = isAdmin || role !== 'admin';
-                            return (
-                              <Badge
-                                key={role}
-                                className={`${getRoleColor(role)} ${canRemove ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}
-                                onClick={() => canRemove && removeRole(user.id, role)}
-                                title={!canRemove ? 'Only admins can remove admin role' : undefined}
-                              >
-                                {getRoleIcon(role)}
-                                <span className="ml-1 capitalize">{role.replace('_', ' ')}</span>
-                                {canRemove && (
-                                  removingRole === `${user.id}-${role}` ? (
-                                    <Loader2 className="ml-1 h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="ml-1 h-3 w-3" />
-                                  )
-                                )}
-                              </Badge>
-                            );
-                          })
-                        ) : (
-                          <span className="text-sm text-muted-foreground">No roles</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={selectedRole[user.id] || ''}
-                          onValueChange={(value) =>
-                            setSelectedRole((prev) => ({ ...prev, [user.id]: value as AppRole }))
-                          }
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableRoles.filter((r) => !user.roles.includes(r)).map((role) => (
-                              <SelectItem key={role} value={role}>
-                                <span className="capitalize">{role.replace('_', ' ')}</span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          onClick={() => addRole(user.id)}
-                          disabled={!selectedRole[user.id] || addingRole?.userId === user.id}
-                        >
-                          {addingRole?.userId === user.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Plus className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <ForceCheckoutPanel />
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Current Roles</TableHead>
+              <TableHead>Add Role</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div>
+                    <div className="font-medium">{user.full_name || 'No name'}</div>
+                    <div className="text-sm text-muted-foreground">{user.email}</div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {user.roles.length > 0 ? (
+                      user.roles.map((role) => {
+                        const canRemove = isAdmin || role !== 'admin';
+                        return (
+                          <Badge
+                            key={role}
+                            className={`${getRoleColor(role)} ${canRemove ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}
+                            onClick={() => canRemove && removeRole(user.id, role)}
+                            title={!canRemove ? 'Only admins can remove admin role' : undefined}
+                          >
+                            {getRoleIcon(role)}
+                            <span className="ml-1 capitalize">{role.replace('_', ' ')}</span>
+                            {canRemove && (
+                              removingRole === `${user.id}-${role}` ? (
+                                <Loader2 className="ml-1 h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="ml-1 h-3 w-3" />
+                              )
+                            )}
+                          </Badge>
+                        );
+                      })
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No roles</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={selectedRole[user.id] || ''}
+                      onValueChange={(value) =>
+                        setSelectedRole((prev) => ({ ...prev, [user.id]: value as AppRole }))
+                      }
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableRoles.filter((r) => !user.roles.includes(r)).map((role) => (
+                          <SelectItem key={role} value={role}>
+                            <span className="capitalize">{role.replace('_', ' ')}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={() => addRole(user.id)}
+                      disabled={!selectedRole[user.id] || addingRole?.userId === user.id}
+                    >
+                      {addingRole?.userId === user.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

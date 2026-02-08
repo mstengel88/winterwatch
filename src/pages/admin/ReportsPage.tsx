@@ -1248,9 +1248,6 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Force Checkout Panel */}
-      <ForceCheckoutPanel />
-
       {/* Filters Card */}
       <Card className="bg-[hsl(var(--card))]/80 border-border/50">
         <CardContent className="pt-6">
