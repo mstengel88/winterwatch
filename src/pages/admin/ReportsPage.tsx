@@ -2087,6 +2087,7 @@ export default function ReportsPage() {
           type: editingWorkLog.type,
           account_id: editingWorkLog.account_id,
           employee_id: editingWorkLog.employee_id,
+          team_member_ids: editingWorkLog.team_member_ids,
           equipment_id: editingWorkLog.equipment_id || undefined,
           service_type: editingWorkLog.service_type,
           check_in_time: editingWorkLog.check_in_time,

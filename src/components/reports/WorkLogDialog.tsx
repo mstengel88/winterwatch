@@ -282,9 +282,10 @@ export function WorkLogDialog({
                   <PopoverContent className="w-[250px] p-0 z-[200] bg-popover" align="start">
                     <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
                       {employees
-                        .filter((emp) => {
+                      .filter((emp) => {
                           if (!emp.id || emp.id.trim() === '' || emp.is_active === false) return false;
-                          // Filter by category based on log type
+                          // Exclude manager and trucker categories from work log assignments
+                          if (emp.category === 'manager' || emp.category === 'trucker') return false;
                           // 'both' category employees should always show
                           // 'plow' category for plow logs, 'shovel' category for shovel logs
                           if (!emp.category || emp.category === 'both') return true;
