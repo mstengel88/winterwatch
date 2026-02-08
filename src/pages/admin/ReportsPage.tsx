@@ -1606,7 +1606,7 @@ export default function ReportsPage() {
                   <span>Billable</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{billableCount}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="gap-1.5 text-sm sm:text-base data-[state=active]:text-blue-500">
+                <TabsTrigger value="completed" className="gap-1.5 text-sm sm:text-base text-blue-500">
                   <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Completed</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{completedCount}</Badge>
