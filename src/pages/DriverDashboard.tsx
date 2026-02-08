@@ -1017,7 +1017,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             </div>
 
             {/* Weather */}
-            <div className="mb-4 grid grid-cols-3 gap-3">
+            <div className="mb-4 grid grid-cols-3 gap-3 w-[85%]">
               <div>
                 <Label className="text-sm text-muted-foreground flex items-center gap-1">
                   Temp (°F) <span className="text-red-400">*</span>
@@ -1026,7 +1026,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   type="number"
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -1036,7 +1036,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -1047,7 +1047,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   type="number"
                   value={windSpeed}
                   onChange={(e) => setWindSpeed(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
