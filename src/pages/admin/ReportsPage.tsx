@@ -1471,7 +1471,7 @@ export default function ReportsPage() {
               <TabsTrigger value="billable" className="text-base data-[state=active]:text-red-500">
                 Billable ({shiftBillableCount})
               </TabsTrigger>
-              <TabsTrigger value="completed" className="text-base data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-500">
+              <TabsTrigger value="completed" className="text-base data-[state=active]:text-blue-500">
                 Completed ({shiftCompletedCount})
               </TabsTrigger>
             </TabsList>
