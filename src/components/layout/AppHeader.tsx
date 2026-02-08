@@ -204,6 +204,7 @@ export function AppHeader() {
             <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
             <span className="font-semibold text-foreground hidden sm:inline">WinterWatch-Pro</span>
             <span className="text-[10px] text-muted-foreground hidden sm:inline">v{APP_VERSION}</span>
+          </div>
         </div>
 
         {/* Desktop Navigation */}
