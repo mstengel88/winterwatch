@@ -809,8 +809,8 @@ export default function ShovelDashboard() {
               </Card>
             </div>
             {/* Snow Depth and Salt Used */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-4 w-[85%]">
+              <div className="space-y-1">
                 <Label className="text-sm">
                   Snow Depth (inches) {serviceType !== 'salt' && <span className="text-red-400">*</span>}
                 </Label>
@@ -818,10 +818,10 @@ export default function ShovelDashboard() {
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label className="text-sm">
                   Salt Used (lbs) {serviceType !== 'shovel' && <span className="text-red-400">*</span>}
                 </Label>
@@ -829,47 +829,47 @@ export default function ShovelDashboard() {
                   placeholder="e.g., 50"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
             </div>
 
             {/* Temp, Weather, Wind */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-3 w-[85%]">
+              <div className="space-y-1">
                 <Label className="text-sm">Temp (°F) <span className="text-red-400">*</span></Label>
                 <Input 
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label className="text-sm">Weather <span className="text-red-400">*</span></Label>
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label className="text-sm">Wind (mph) <span className="text-red-400">*</span></Label>
                 <Input 
                   value={wind}
                   onChange={(e) => setWind(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
             </div>
 
             {/* Notes */}
-            <div className="space-y-2">
+            <div className="space-y-1 w-[85%]">
               <Label className="text-sm">Notes (Optional)</Label>
               <Textarea 
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[80px]"
+                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[60px] text-sm"
               />
             </div>
 
