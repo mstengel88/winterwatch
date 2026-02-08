@@ -58,6 +58,7 @@ interface WorkLogDialogProps {
     type: 'plow' | 'shovel';
     account_id: string;
     employee_id: string;
+    team_member_ids?: string[];
     equipment_id?: string;
     service_type: string;
     check_in_time: string | null;
