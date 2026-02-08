@@ -273,6 +273,7 @@ export default function ReportsPage() {
         equipment_id: log.equipment_id,
         equipment_name: log.equipment?.name || null,
         employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+        team_member_ids: [],
         team_member_names: [],
         photo_urls: log.photo_urls,
         notes: log.notes,
