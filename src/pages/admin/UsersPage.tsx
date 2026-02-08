@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { UserCog, Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User, FileText } from 'lucide-react';
+import { Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User, FileText } from 'lucide-react';
 import { AppRole, Profile } from '@/types/auth';
 import { useAuth } from '@/contexts/AuthContext';
+import { ForceCheckoutPanel } from '@/components/admin/ForceCheckoutPanel';
 
 interface UserWithRoles extends Profile {
   roles: AppRole[];
