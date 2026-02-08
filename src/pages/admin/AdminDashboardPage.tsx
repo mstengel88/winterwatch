@@ -1,4 +1,5 @@
 import { ForceCheckoutPanel } from '@/components/admin/ForceCheckoutPanel';
+import { EmployeeShiftStatusPanel } from '@/components/admin/EmployeeShiftStatusPanel';
 
 export default function AdminDashboardPage() {
   return (
@@ -7,6 +8,7 @@ export default function AdminDashboardPage() {
         <h1 className="text-2xl font-bold">Admin</h1>
         <p className="text-muted-foreground">Overview and quick actions</p>
       </div>
+      <EmployeeShiftStatusPanel />
       <ForceCheckoutPanel />
     </div>
   );
