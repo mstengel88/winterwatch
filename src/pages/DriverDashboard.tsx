@@ -985,7 +985,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
 
 
             {/* Snow & Salt */}
-            <div className="mb-4 grid grid-cols-2 gap-3">
+            <div className="mb-4 grid grid-cols-2 gap-3 w-[85%]">
               <div>
                 <Label className="text-sm text-muted-foreground">
                   Snow Depth (inches) {(serviceType === 'plow' || serviceType === 'both') && <span className="text-red-400">*</span>}
@@ -997,7 +997,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -1011,7 +1011,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   placeholder="e.g., 150"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
