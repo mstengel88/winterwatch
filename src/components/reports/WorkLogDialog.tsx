@@ -58,6 +58,7 @@ interface WorkLogDialogProps {
     type: 'plow' | 'shovel';
     account_id: string;
     employee_id: string;
+    team_member_ids?: string[];
     equipment_id?: string;
     service_type: string;
     check_in_time: string | null;
@@ -117,8 +118,12 @@ export function WorkLogDialog({
     if (initialData) {
       setType(initialData.type);
       setAccountId(initialData.account_id);
-      // Support both single employee_id and loading as array
-      setEmployeeIds(initialData.employee_id ? [initialData.employee_id] : []);
+      // For shovel logs, use team_member_ids if available; otherwise fall back to employee_id
+      if (initialData.type === 'shovel' && initialData.team_member_ids && initialData.team_member_ids.length > 0) {
+        setEmployeeIds(initialData.team_member_ids);
+      } else {
+        setEmployeeIds(initialData.employee_id ? [initialData.employee_id] : []);
+      }
       setEquipmentId(initialData.equipment_id || '');
       setServiceType(initialData.service_type);
       if (initialData.check_in_time) {
@@ -277,9 +282,10 @@ export function WorkLogDialog({
                   <PopoverContent className="w-[250px] p-0 z-[200] bg-popover" align="start">
                     <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
                       {employees
-                        .filter((emp) => {
+                      .filter((emp) => {
                           if (!emp.id || emp.id.trim() === '' || emp.is_active === false) return false;
-                          // Filter by category based on log type
+                          // Exclude manager and trucker categories from work log assignments
+                          if (emp.category === 'manager' || emp.category === 'trucker') return false;
                           // 'both' category employees should always show
                           // 'plow' category for plow logs, 'shovel' category for shovel logs
                           if (!emp.category || emp.category === 'both') return true;

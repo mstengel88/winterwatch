@@ -65,6 +65,7 @@ interface WorkLogEntry {
   equipment_id: string | null;
   equipment_name: string | null;
   employee_name: string;
+  team_member_ids: string[];
   team_member_names: string[];
   photo_urls: string[] | null;
   notes: string | null;
@@ -272,6 +273,7 @@ export default function ReportsPage() {
         equipment_id: log.equipment_id,
         equipment_name: log.equipment?.name || null,
         employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+        team_member_ids: [],
         team_member_names: [],
         photo_urls: log.photo_urls,
         notes: log.notes,
@@ -308,6 +310,7 @@ export default function ReportsPage() {
             equipment_id: null,
             equipment_name: null,
             employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+            team_member_ids: log.team_member_ids || [],
             team_member_names: teamMemberNames,
             photo_urls: log.photo_urls,
             notes: log.notes,
@@ -2084,6 +2087,7 @@ export default function ReportsPage() {
           type: editingWorkLog.type,
           account_id: editingWorkLog.account_id,
           employee_id: editingWorkLog.employee_id,
+          team_member_ids: editingWorkLog.team_member_ids,
           equipment_id: editingWorkLog.equipment_id || undefined,
           service_type: editingWorkLog.service_type,
           check_in_time: editingWorkLog.check_in_time,
