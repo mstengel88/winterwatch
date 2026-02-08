@@ -100,6 +100,7 @@ const AppRoutes = () => (
           <InstallPrompt />
           <PostLoginNotificationPrompt />
           <NotificationActionHandler />
+          <AppVersionCheck />
 
           <Suspense fallback={<PageLoader />}>
             <Routes>
