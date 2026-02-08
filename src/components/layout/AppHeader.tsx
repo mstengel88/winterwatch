@@ -282,6 +282,10 @@ export function AppHeader() {
               {isAdminOrManager() && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/admin')}>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Admin
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/admin/users')}>
                     <UserCog className="mr-2 h-4 w-4" />
                     Users & Roles

@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User, FileText } from 'lucide-react';
 import { AppRole, Profile } from '@/types/auth';
 import { useAuth } from '@/contexts/AuthContext';
-import { ForceCheckoutPanel } from '@/components/admin/ForceCheckoutPanel';
 
 interface UserWithRoles extends Profile {
   roles: AppRole[];
@@ -169,8 +168,6 @@ export default function UsersPage() {
           Manage user accounts and assign roles
         </p>
       </div>
-
-      <ForceCheckoutPanel />
 
       <div className="overflow-x-auto">
         <Table>
