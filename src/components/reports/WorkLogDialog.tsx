@@ -118,8 +118,12 @@ export function WorkLogDialog({
     if (initialData) {
       setType(initialData.type);
       setAccountId(initialData.account_id);
-      // Support both single employee_id and loading as array
-      setEmployeeIds(initialData.employee_id ? [initialData.employee_id] : []);
+      // For shovel logs, use team_member_ids if available; otherwise fall back to employee_id
+      if (initialData.type === 'shovel' && initialData.team_member_ids && initialData.team_member_ids.length > 0) {
+        setEmployeeIds(initialData.team_member_ids);
+      } else {
+        setEmployeeIds(initialData.employee_id ? [initialData.employee_id] : []);
+      }
       setEquipmentId(initialData.equipment_id || '');
       setServiceType(initialData.service_type);
       if (initialData.check_in_time) {
