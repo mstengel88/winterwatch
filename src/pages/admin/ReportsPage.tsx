@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type MouseEvent, type TouchEvent } from 'react';
+import { ForceCheckoutPanel } from '@/components/admin/ForceCheckoutPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1246,6 +1247,9 @@ export default function ReportsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Force Checkout Panel */}
+      <ForceCheckoutPanel />
 
       {/* Filters Card */}
       <Card className="bg-[hsl(var(--card))]/80 border-border/50">
