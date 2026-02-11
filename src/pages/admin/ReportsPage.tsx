@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, type MouseEvent, type TouchEvent } from 'react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Loader2, FileDown, Filter, Clock, Plus, Eye, Pencil, Trash2, 
-  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown, Archive, CheckCircle
+  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown, Archive, CheckCircle, Cloud
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -21,12 +22,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
-import { generateWorkLogsPDF } from '@/lib/pdfExport';
+import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF } from '@/lib/pdfExport';
 import { toast } from 'sonner';
 import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
+import { BulkEditWorkLogDialog, BulkEditFormData } from '@/components/reports/BulkEditWorkLogDialog';
 import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
 import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
+import { useNativePlatform } from '@/hooks/useNativePlatform';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useGoogleDriveExport } from '@/hooks/useGoogleDriveExport';
+import { cn } from '@/lib/utils';
 
 interface TimeClockEntry {
   id: string;
@@ -35,6 +41,7 @@ interface TimeClockEntry {
   clock_out_time: string | null;
   clock_in_latitude: number | null;
   clock_in_longitude: number | null;
+  billing_status: 'current' | 'billable' | 'completed';
   employee?: {
     first_name: string;
     last_name: string;
@@ -58,10 +65,12 @@ interface WorkLogEntry {
   equipment_id: string | null;
   equipment_name: string | null;
   employee_name: string;
+  team_member_ids: string[];
   team_member_names: string[];
   photo_urls: string[] | null;
   notes: string | null;
   billed: boolean;
+  billing_status: 'current' | 'billable' | 'completed';
 }
 
 interface Account {
@@ -74,6 +83,7 @@ interface Employee {
   first_name: string;
   last_name: string;
   category: string;
+  is_active?: boolean;
 }
 
 interface Equipment {
@@ -82,12 +92,42 @@ interface Equipment {
 }
 
 export default function ReportsPage() {
+  const { isNative } = useNativePlatform();
+  const isMobile = useIsMobile();
+  const { isExporting, exportPdfToDrive } = useGoogleDriveExport();
+
   const [isLoading, setIsLoading] = useState(true);
   const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+
+  // iOS/Native + mobile web: ensure table action buttons are large enough to tap reliably.
+  const tableIconButtonClass = cn("h-7 w-7", (isNative || isMobile) && "h-11 w-11");
+
+  // iOS Safari can occasionally miss `click` on small icon buttons inside tables.
+  // Using `touchend` + preventing the subsequent synthetic click improves reliability.
+  const lastTouchAtRef = useRef(0);
+
+  const tapHandlers = (action: () => void) => ({
+    onClick: (e: MouseEvent) => {
+      // Native iOS may fire touchend + a synthetic click. Ignore the click if a touch just happened.
+      if (Date.now() - lastTouchAtRef.current < 750) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      e.stopPropagation();
+      action();
+    },
+    onTouchEnd: (e: TouchEvent) => {
+      lastTouchAtRef.current = Date.now();
+      e.preventDefault();
+      e.stopPropagation();
+      action();
+    },
+  });
 
   // Filter state
   const [fromDate, setFromDate] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -101,6 +141,7 @@ export default function ReportsPage() {
   const [minSnow, setMinSnow] = useState('');
   const [minSalt, setMinSalt] = useState('');
   const [activeTab, setActiveTab] = useState('current');
+  const [activeShiftTab, setActiveShiftTab] = useState('current');
 
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
@@ -109,6 +150,7 @@ export default function ReportsPage() {
   // Dialog state
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
   const [workLogDialogOpen, setWorkLogDialogOpen] = useState(false);
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [bulkDeleteType, setBulkDeleteType] = useState<'shifts' | 'worklogs'>('shifts');
@@ -231,10 +273,12 @@ export default function ReportsPage() {
         equipment_id: log.equipment_id,
         equipment_name: log.equipment?.name || null,
         employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+        team_member_ids: [],
         team_member_names: [],
         photo_urls: log.photo_urls,
         notes: log.notes,
         billed: log.billed || false,
+        billing_status: (log.billing_status || 'current') as 'current' | 'billable' | 'completed',
       }));
 
       // For shovel logs, fetch team member names if available
@@ -266,10 +310,12 @@ export default function ReportsPage() {
             equipment_id: null,
             equipment_name: null,
             employee_name: log.employee ? `${log.employee.first_name} ${log.employee.last_name}` : 'Unknown',
+            team_member_ids: log.team_member_ids || [],
             team_member_names: teamMemberNames,
             photo_urls: log.photo_urls,
             notes: log.notes,
             billed: log.billed || false,
+            billing_status: (log.billing_status || 'current') as 'current' | 'billable' | 'completed',
           };
         })
       );
@@ -292,16 +338,26 @@ export default function ReportsPage() {
   // Filtered data
   const filteredShifts = useMemo(() => {
     return timeClockEntries.filter(entry => {
+      // Filter by billing_status based on active shift tab
+      if (activeShiftTab === 'current' && entry.billing_status !== 'current') return false;
+      if (activeShiftTab === 'billable' && entry.billing_status !== 'billable') return false;
+      if (activeShiftTab === 'completed' && entry.billing_status !== 'completed') return false;
       if (selectedEmployee !== 'all' && entry.employee_id !== selectedEmployee) return false;
       return true;
     });
-  }, [timeClockEntries, selectedEmployee]);
+  }, [timeClockEntries, selectedEmployee, activeShiftTab]);
+
+  // Counts for shift tabs based on billing_status
+  const shiftCurrentCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'current').length, [timeClockEntries]);
+  const shiftBillableCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'billable').length, [timeClockEntries]);
+  const shiftCompletedCount = useMemo(() => timeClockEntries.filter(e => e.billing_status === 'completed').length, [timeClockEntries]);
 
   const filteredWorkLogs = useMemo(() => {
     return workLogs.filter(log => {
-      // Filter by billed status based on active tab
-      if (activeTab === 'current' && log.billed) return false;
-      if (activeTab === 'archived' && !log.billed) return false;
+      // Filter by billing_status based on active tab
+      if (activeTab === 'current' && log.billing_status !== 'current') return false;
+      if (activeTab === 'billable' && log.billing_status !== 'billable') return false;
+      if (activeTab === 'completed' && log.billing_status !== 'completed') return false;
       
       if (logType !== 'all' && log.type !== logType) return false;
       if (selectedServiceType !== 'all' && log.service_type !== selectedServiceType) return false;
@@ -330,9 +386,11 @@ export default function ReportsPage() {
     });
   }, [workLogs, logType, selectedPlowAccount, selectedShovelLocation, selectedEmployee, selectedServiceType, selectedEquipment, minSnow, minSalt, accounts, employees, equipment, activeTab]);
 
-  // Counts for tabs
-  const currentCount = useMemo(() => workLogs.filter(l => !l.billed).length, [workLogs]);
-  const archivedCount = useMemo(() => workLogs.filter(l => l.billed).length, [workLogs]);
+  // Counts for tabs based on billing_status
+  const currentCount = useMemo(() => workLogs.filter(l => l.billing_status === 'current').length, [workLogs]);
+  const billableCount = useMemo(() => workLogs.filter(l => l.billing_status === 'billable').length, [workLogs]);
+  // Completed = billed/archived
+  const completedCount = useMemo(() => workLogs.filter(l => l.billed).length, [workLogs]);
 
   // Stats
   const stats = useMemo(() => {
@@ -440,32 +498,109 @@ export default function ReportsPage() {
     toast.success('PDF exported successfully');
   };
 
+  const handleExportToDrive = async () => {
+    const rawLogs = filteredWorkLogs.map((log) => {
+      const employeeDisplay =
+        log.type === 'shovel' && log.team_member_names && log.team_member_names.length > 0
+          ? log.team_member_names.join(', ')
+          : log.employee_name;
+
+      return {
+        id: log.id,
+        type: log.type,
+        date: format(new Date(log.date), 'MM/dd/yy'),
+        checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
+        checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
+        duration: formatDuration(log.check_in_time, log.check_out_time),
+        account: log.account_name,
+        serviceType: log.service_type,
+        snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
+        saltLbs: log.salt_used_lbs
+          ? `${log.salt_used_lbs}lb`
+          : log.ice_melt_used_lbs
+            ? `${log.ice_melt_used_lbs}lb`
+            : '-',
+        equipment: log.equipment_name || '-',
+        employee: employeeDisplay,
+        conditions: log.weather_conditions || '-',
+        notes: log.notes || undefined,
+      };
+    });
+
+    const totalHours = filteredWorkLogs.reduce((sum, log) => {
+      if (log.check_in_time && log.check_out_time) {
+        return sum + differenceInMinutes(new Date(log.check_out_time), new Date(log.check_in_time)) / 60;
+      }
+      return sum;
+    }, 0);
+
+    const uniqueAccounts = new Set(filteredWorkLogs.map(log => log.account_name)).size;
+    const plowCount = filteredWorkLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
+    const saltCount = filteredWorkLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
+
+    // Generate PDF blob
+    const pdfBlob = generateWorkLogsPDF(rawLogs, {
+      totalJobs: stats.total,
+      totalHours,
+      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
+      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
+      plowCount,
+      saltCount,
+      propertyCount: uniqueAccounts,
+      dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
+    }, 'Work Logs Report', { returnBlob: true });
+
+    if (!pdfBlob) {
+      toast.error('Failed to generate PDF');
+      return;
+    }
+
+    const fileName = `work-logs-report-${format(new Date(fromDate), 'yyyy-MM-dd')}-to-${format(new Date(toDate), 'yyyy-MM-dd')}.pdf`;
+    
+    toast.loading('Uploading to Google Drive...', { id: 'drive-export' });
+    
+    const result = await exportPdfToDrive(pdfBlob, fileName, 'WinterWatch Reports');
+    
+    if (result.success) {
+      toast.success('Exported to Google Drive!', { id: 'drive-export' });
+      if (result.webViewLink) {
+        toast.info('Click to open in Drive', {
+          action: {
+            label: 'Open',
+            onClick: () => window.open(result.webViewLink, '_blank'),
+          },
+        });
+      }
+    } else {
+      toast.error(result.error || 'Failed to export to Google Drive', { id: 'drive-export' });
+      
+      if (result.code === 'NO_PROVIDER_TOKEN' || result.code === 'TOKEN_EXPIRED' || result.code === 'ACCESS_DENIED') {
+        toast.info('Please sign out and sign back in with Google to grant Drive permissions.');
+      }
+    }
+  };
+
   const handleExportTimeSheets = () => {
-    // Generate CSV for time sheets
-    const headers = ['Employee', 'Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Location'];
-    const rows = filteredShifts.map(shift => {
+    // Generate PDF for time sheets
+    const entries = filteredShifts.map(shift => {
       const employeeName = shift.employee ? `${shift.employee.first_name} ${shift.employee.last_name}` : 'Unknown';
       const hours = formatHours(shift.clock_in_time, shift.clock_out_time);
       const location = shift.clock_in_latitude && shift.clock_in_longitude 
         ? `${shift.clock_in_latitude.toFixed(4)}, ${shift.clock_in_longitude.toFixed(4)}` 
         : '-';
-      return [
+      return {
         employeeName,
-        format(new Date(shift.clock_in_time), 'MM/dd/yyyy'),
-        format(new Date(shift.clock_in_time), 'HH:mm'),
-        shift.clock_out_time ? format(new Date(shift.clock_out_time), 'HH:mm') : '-',
-        hours,
+        date: format(new Date(shift.clock_in_time), 'MM/dd/yyyy'),
+        clockIn: format(new Date(shift.clock_in_time), 'HH:mm'),
+        clockOut: shift.clock_out_time ? format(new Date(shift.clock_out_time), 'HH:mm') : '-',
+        hoursWorked: hours,
         location
-      ];
+      };
     });
 
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `timesheets_${format(new Date(fromDate), 'yyyy-MM-dd')}_to_${format(new Date(toDate), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    toast.success('Time sheets exported successfully');
+    const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
+    generateTimesheetsPDF(entries, dateRange);
+    toast.success('Time sheets PDF exported successfully');
   };
 
   const handleExportSummary = () => {
@@ -489,36 +624,23 @@ export default function ReportsPage() {
       ...filteredWorkLogs.map(l => l.employee_id)
     ].filter(Boolean)).size;
 
-    const summaryData = [
-      ['WinterWatch-Pro Summary Report'],
-      [`Period: ${format(new Date(fromDate), 'MM/dd/yyyy')} to ${format(new Date(toDate), 'MM/dd/yyyy')}`],
-      [`Generated: ${format(new Date(), 'MM/dd/yyyy HH:mm')}`],
-      [''],
-      ['TIME CLOCK SUMMARY'],
-      ['Total Shifts', filteredShifts.length.toString()],
-      ['Total Hours', totalShiftHours.toFixed(1)],
-      [''],
-      ['WORK LOG SUMMARY'],
-      ['Total Jobs', stats.total.toString()],
-      ['Plow Jobs', stats.plow.toString()],
-      ['Shovel Jobs', stats.shovel.toString()],
-      ['Salt Applications', stats.salt.toString()],
-      ['Total Work Hours', totalWorkLogHours.toFixed(1)],
-      ['Unique Locations', stats.locations.toString()],
-      [''],
-      ['OVERALL'],
-      ['Active Employees', uniqueEmployees.toString()],
-      ['Total Salt Used (lbs)', filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0).toString()],
-      ['Total Ice Melt Used (lbs)', filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0).toString()],
-    ];
+    const summaryStats = {
+      totalShifts: filteredShifts.length,
+      totalShiftHours,
+      totalJobs: stats.total,
+      plowJobs: stats.plow,
+      shovelJobs: stats.shovel,
+      saltApplications: stats.salt,
+      totalWorkHours: totalWorkLogHours,
+      uniqueLocations: stats.locations,
+      activeEmployees: uniqueEmployees,
+      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
+      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
+    };
 
-    const csvContent = summaryData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `summary_${format(new Date(fromDate), 'yyyy-MM-dd')}_to_${format(new Date(toDate), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    toast.success('Summary report exported successfully');
+    const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
+    generateSummaryPDF(summaryStats, dateRange);
+    toast.success('Summary PDF exported successfully');
   };
 
   const toggleAllShifts = () => {
@@ -598,10 +720,15 @@ export default function ReportsPage() {
         ? new Date(`${data.date}T${data.check_out_time}`)
         : null;
 
+      // Persist multi-select employees:
+      // - plow logs only store a single employee_id (legacy) -> use the first selected
+      // - shovel logs store full crew in team_member_ids
+      const primaryEmployeeId = (data.employee_ids?.[0] || data.employee_id || '').trim();
+
       if (data.type === 'plow') {
         const payload = {
           account_id: data.account_id,
-          employee_id: data.employee_id,
+          employee_id: primaryEmployeeId,
           equipment_id: data.equipment_id || null,
           service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
           status: 'completed' as const,
@@ -625,7 +752,8 @@ export default function ReportsPage() {
       } else {
         const payload = {
           account_id: data.account_id,
-          employee_id: data.employee_id,
+          employee_id: primaryEmployeeId,
+          team_member_ids: (data.employee_ids || []).filter(Boolean),
           service_type: data.service_type as 'plow' | 'salt' | 'both' | 'shovel' | 'ice_melt',
           status: 'completed' as const,
           check_in_time: checkInDateTime?.toISOString() || null,
@@ -737,23 +865,26 @@ export default function ReportsPage() {
     setBulkDeleteDialogOpen(true);
   };
 
-  // Bulk mark as billed/unbilled
+  // Bulk mark as billed/unbilled (also updates billing_status)
   const handleBulkMarkBilled = async (billed: boolean) => {
     const ids = Array.from(selectedWorkLogs);
     if (ids.length === 0) return;
     
     setIsSaving(true);
     try {
-      // Separate plow and shovel logs
       const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
       const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
       
+      const updateData = billed 
+        ? { billed: true, billing_status: 'completed' }
+        : { billed: false, billing_status: 'billable' };
+      
       if (plowIds.length > 0) {
-        const { error } = await supabase.from('work_logs').update({ billed }).in('id', plowIds);
+        const { error } = await supabase.from('work_logs').update(updateData).in('id', plowIds);
         if (error) throw error;
       }
       if (shovelIds.length > 0) {
-        const { error } = await supabase.from('shovel_work_logs').update({ billed }).in('id', shovelIds);
+        const { error } = await supabase.from('shovel_work_logs').update(updateData).in('id', shovelIds);
         if (error) throw error;
       }
       
@@ -768,15 +899,20 @@ export default function ReportsPage() {
     }
   };
 
-  // Mark single work log as billed/unbilled
+  // Mark single work log as billed/unbilled (also updates billing_status)
   const handleToggleBilled = async (log: WorkLogEntry) => {
     setIsSaving(true);
     try {
       const table = log.type === 'plow' ? 'work_logs' : 'shovel_work_logs';
-      const { error } = await supabase.from(table).update({ billed: !log.billed }).eq('id', log.id);
+      const newBilled = !log.billed;
+      const updateData = newBilled 
+        ? { billed: true, billing_status: 'completed' }
+        : { billed: false, billing_status: 'billable' };
+      
+      const { error } = await supabase.from(table).update(updateData).eq('id', log.id);
       if (error) throw error;
       
-      toast.success(`Work log marked as ${!log.billed ? 'billed' : 'unbilled'}`);
+      toast.success(`Work log marked as ${newBilled ? 'billed' : 'unbilled'}`);
       await fetchData();
     } catch (error) {
       console.error('Error toggling billed status:', error);
@@ -786,7 +922,129 @@ export default function ReportsPage() {
     }
   };
 
-  // Open dialog handlers
+  // Move logs back to current (only updates billing_status, no data changes)
+  const handleBulkMoveToCurrent = async () => {
+    const ids = Array.from(selectedWorkLogs);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
+      const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
+      
+      if (plowIds.length > 0) {
+        const { error } = await supabase.from('work_logs').update({ billing_status: 'current' }).in('id', plowIds);
+        if (error) throw error;
+      }
+      if (shovelIds.length > 0) {
+        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'current' }).in('id', shovelIds);
+        if (error) throw error;
+      }
+      
+      toast.success(`${ids.length} work log(s) moved to current`);
+      setSelectedWorkLogs(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving logs to current:', error);
+      toast.error('Failed to move logs to current');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move logs to billable (only updates billing_status, no data changes)
+  const handleBulkMoveToBillable = async () => {
+    const ids = Array.from(selectedWorkLogs);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const plowIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow').map(l => l.id);
+      const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
+      
+      if (plowIds.length > 0) {
+        const { error } = await supabase.from('work_logs').update({ billing_status: 'billable' }).in('id', plowIds);
+        if (error) throw error;
+      }
+      if (shovelIds.length > 0) {
+        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'billable' }).in('id', shovelIds);
+        if (error) throw error;
+      }
+      
+      toast.success(`${ids.length} work log(s) moved to billable`);
+      setSelectedWorkLogs(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving logs to billable:', error);
+      toast.error('Failed to move logs to billable');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move shifts to current
+  const handleBulkMoveShiftsToCurrent = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'current' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) moved to current`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving shifts to current:', error);
+      toast.error('Failed to move shifts to current');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move shifts to billable
+  const handleBulkMoveShiftsToBillable = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'billable' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) moved to billable`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error moving shifts to billable:', error);
+      toast.error('Failed to move shifts to billable');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Move shifts to completed
+  const handleBulkMoveShiftsToCompleted = async () => {
+    const ids = Array.from(selectedShifts);
+    if (ids.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'completed' }).in('id', ids);
+      if (error) throw error;
+      
+      toast.success(`${ids.length} shift(s) marked as completed`);
+      setSelectedShifts(new Set());
+      await fetchData();
+    } catch (error) {
+      console.error('Error marking shifts as completed:', error);
+      toast.error('Failed to mark shifts as completed');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const openAddShift = () => {
     setEditingShift(null);
     setShiftDialogOpen(true);
@@ -816,6 +1074,122 @@ export default function ReportsPage() {
   const openDeleteWorkLog = (log: WorkLogEntry) => {
     setDeleteTarget({ type: 'worklog', id: log.id, name: log.account_name });
     setDeleteDialogOpen(true);
+  };
+
+  // Bulk edit handler for work logs
+  const handleBulkEditWorkLogs = async (data: BulkEditFormData) => {
+    const ids = Array.from(selectedWorkLogs);
+    if (ids.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      const plowLogs = workLogs.filter(l => ids.includes(l.id) && l.type === 'plow');
+      const shovelLogs = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel');
+      const plowIds = plowLogs.map(l => l.id);
+      const shovelIds = shovelLogs.map(l => l.id);
+
+      // Build update payloads based on what fields were toggled
+      const buildPlowPayload = () => {
+        const payload: Record<string, any> = {};
+        if (data.account_id) payload.account_id = data.account_id;
+        if (data.employee_ids && data.employee_ids.length > 0) payload.employee_id = data.employee_ids[0];
+        if (data.equipment_id !== undefined) payload.equipment_id = data.equipment_id || null;
+        if (data.service_type) payload.service_type = data.service_type;
+        if (data.snow_depth_inches !== undefined) payload.snow_depth_inches = data.snow_depth_inches ?? null;
+        if (data.salt_used_lbs !== undefined) payload.salt_used_lbs = data.salt_used_lbs ?? null;
+        if (data.weather_conditions !== undefined) payload.weather_conditions = data.weather_conditions || null;
+        if (data.notes !== undefined) payload.notes = data.notes || null;
+        if (data.billing_status) payload.billing_status = data.billing_status;
+        if (data.billing_status === 'completed') payload.billed = true;
+        if (data.billing_status === 'billable' || data.billing_status === 'current') payload.billed = false;
+        return payload;
+      };
+
+      const buildShovelPayload = () => {
+        const payload: Record<string, any> = {};
+        if (data.account_id) payload.account_id = data.account_id;
+        if (data.employee_ids && data.employee_ids.length > 0) {
+          payload.employee_id = data.employee_ids[0];
+          payload.team_member_ids = data.employee_ids;
+        }
+        if (data.service_type) payload.service_type = data.service_type;
+        if (data.snow_depth_inches !== undefined) payload.snow_depth_inches = data.snow_depth_inches ?? null;
+        if (data.salt_used_lbs !== undefined) payload.ice_melt_used_lbs = data.salt_used_lbs ?? null;
+        if (data.weather_conditions !== undefined) payload.weather_conditions = data.weather_conditions || null;
+        if (data.notes !== undefined) payload.notes = data.notes || null;
+        if (data.billing_status) payload.billing_status = data.billing_status;
+        if (data.billing_status === 'completed') payload.billed = true;
+        if (data.billing_status === 'billable' || data.billing_status === 'current') payload.billed = false;
+        return payload;
+      };
+
+      // Handle date/time updates - need to update each log individually if dates are involved
+      if (data.date || data.check_in_time !== undefined || data.check_out_time !== undefined) {
+        // Update each log individually to handle date/time correctly
+        for (const logId of plowIds) {
+          const log = plowLogs.find(l => l.id === logId);
+          if (!log) continue;
+          
+          const payload = buildPlowPayload();
+          const baseDate = data.date || (log.check_in_time ? new Date(log.check_in_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+          
+          if (data.check_in_time !== undefined) {
+            payload.check_in_time = data.check_in_time ? new Date(`${baseDate}T${data.check_in_time}`).toISOString() : null;
+          }
+          if (data.check_out_time !== undefined) {
+            payload.check_out_time = data.check_out_time ? new Date(`${baseDate}T${data.check_out_time}`).toISOString() : null;
+          }
+          
+          if (Object.keys(payload).length > 0) {
+            const { error } = await supabase.from('work_logs').update(payload).eq('id', logId);
+            if (error) throw error;
+          }
+        }
+
+        for (const logId of shovelIds) {
+          const log = shovelLogs.find(l => l.id === logId);
+          if (!log) continue;
+          
+          const payload = buildShovelPayload();
+          const baseDate = data.date || (log.check_in_time ? new Date(log.check_in_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+          
+          if (data.check_in_time !== undefined) {
+            payload.check_in_time = data.check_in_time ? new Date(`${baseDate}T${data.check_in_time}`).toISOString() : null;
+          }
+          if (data.check_out_time !== undefined) {
+            payload.check_out_time = data.check_out_time ? new Date(`${baseDate}T${data.check_out_time}`).toISOString() : null;
+          }
+          
+          if (Object.keys(payload).length > 0) {
+            const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', logId);
+            if (error) throw error;
+          }
+        }
+      } else {
+        // No date/time updates - can use bulk update
+        const plowPayload = buildPlowPayload();
+        const shovelPayload = buildShovelPayload();
+
+        if (plowIds.length > 0 && Object.keys(plowPayload).length > 0) {
+          const { error } = await supabase.from('work_logs').update(plowPayload).in('id', plowIds);
+          if (error) throw error;
+        }
+        if (shovelIds.length > 0 && Object.keys(shovelPayload).length > 0) {
+          const { error } = await supabase.from('shovel_work_logs').update(shovelPayload).in('id', shovelIds);
+          if (error) throw error;
+        }
+      }
+
+      toast.success(`${ids.length} work log(s) updated successfully`);
+      setSelectedWorkLogs(new Set());
+      setBulkEditDialogOpen(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Error bulk editing work logs:', error);
+      toast.error('Failed to update work logs');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isLoading) {
@@ -864,6 +1238,10 @@ export default function ReportsPage() {
               <DropdownMenuItem onClick={handleExportSummary}>
                 <FileDown className="h-4 w-4 mr-2" />
                 Export Summary Report
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportToDrive} disabled={isExporting}>
+                <Cloud className="h-4 w-4 mr-2" />
+                {isExporting ? 'Uploading...' : 'Export to Google Drive'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1050,10 +1428,36 @@ export default function ReportsPage() {
             </div>
             <div className="flex items-center gap-2">
               {selectedShifts.size > 0 && (
-                <Button size="sm" variant="destructive" onClick={openBulkDeleteShifts}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete ({selectedShifts.size})
-                </Button>
+                <>
+                  {activeShiftTab === 'billable' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToCurrent} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Current
+                    </Button>
+                  )}
+                  {activeShiftTab === 'current' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToBillable} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Billable
+                    </Button>
+                  )}
+                  {activeShiftTab === 'billable' && (
+                    <Button size="sm" variant="default" onClick={handleBulkMoveShiftsToCompleted} disabled={isSaving}>
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Mark Completed
+                    </Button>
+                  )}
+                  {activeShiftTab === 'completed' && (
+                    <Button size="sm" variant="outline" onClick={handleBulkMoveShiftsToBillable} disabled={isSaving}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Move to Billable
+                    </Button>
+                  )}
+                  <Button size="sm" variant="destructive" onClick={openBulkDeleteShifts}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete ({selectedShifts.size})
+                  </Button>
+                </>
               )}
               <Button size="sm" variant="outline" onClick={openAddShift}>
                 <Plus className="h-4 w-4 mr-1" />
@@ -1061,6 +1465,21 @@ export default function ReportsPage() {
               </Button>
             </div>
           </div>
+
+          {/* Shift Tabs */}
+          <Tabs value={activeShiftTab} onValueChange={(v) => { setActiveShiftTab(v); setSelectedShifts(new Set()); }} className="mb-4">
+            <TabsList className="grid grid-cols-3 w-full max-w-md">
+              <TabsTrigger value="current" className="text-base">
+                Current ({shiftCurrentCount})
+              </TabsTrigger>
+              <TabsTrigger value="billable" className="text-base text-red-500">
+                Billable ({shiftBillableCount})
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="text-base text-blue-500">
+                Completed ({shiftCompletedCount})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div className="overflow-x-auto">
             <Table>
@@ -1118,10 +1537,10 @@ export default function ReportsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditShift(entry)}>
+                        <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openEditShift(entry))}>
                           <Pencil className="h-3 w-3 text-muted-foreground" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteShift(entry)}>
+                        <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openDeleteShift(entry))}>
                           <Trash2 className="h-3 w-3 text-red-400" />
                         </Button>
                       </div>
@@ -1179,31 +1598,61 @@ export default function ReportsPage() {
       <Card className="bg-[hsl(var(--card))]/80 border-border/50">
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); setSelectedWorkLogs(new Set()); }}>
-            <div className="flex items-center justify-between mb-4">
-              <TabsList>
-                <TabsTrigger value="current" className="gap-2">
-                  <FileText className="h-4 w-4" />
-                  Current ({currentCount})
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <TabsList className="flex-wrap">
+                <TabsTrigger value="current" className="gap-1.5 text-sm sm:text-base">
+                  <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Current</span>
+                  <Badge variant="secondary" className="ml-1 text-xs">{currentCount}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="archived" className="gap-2">
-                  <Archive className="h-4 w-4" />
-                  Archived ({archivedCount})
+                <TabsTrigger value="billable" className="gap-1.5 text-sm sm:text-base text-red-500">
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Billable</span>
+                  <Badge variant="secondary" className="ml-1 text-xs">{billableCount}</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="gap-1.5 text-sm sm:text-base text-blue-500">
+                  <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Completed</span>
+                  <Badge variant="secondary" className="ml-1 text-xs">{completedCount}</Badge>
                 </TabsTrigger>
               </TabsList>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {selectedWorkLogs.size > 0 && (
                   <>
-                    {activeTab === 'current' ? (
+                    {activeTab === 'current' && (
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        onClick={() => handleBulkMarkBilled(true)}
+                        onClick={handleBulkMoveToBillable}
                         disabled={isSaving}
                       >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Mark Billed ({selectedWorkLogs.size})
+                        <FileText className="h-4 w-4 mr-1" />
+                        Move to Billable ({selectedWorkLogs.size})
                       </Button>
-                    ) : (
+                    )}
+                    {activeTab === 'billable' && (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={handleBulkMoveToCurrent}
+                          disabled={isSaving}
+                        >
+                          <Clock className="h-4 w-4 mr-1" />
+                          Move to Current ({selectedWorkLogs.size})
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleBulkMarkBilled(true)}
+                          disabled={isSaving}
+                        >
+                          <Archive className="h-4 w-4 mr-1" />
+                          Mark Billed ({selectedWorkLogs.size})
+                        </Button>
+                      </>
+                    )}
+                    {activeTab === 'completed' && (
                       <Button 
                         size="sm" 
                         variant="outline" 
@@ -1214,6 +1663,15 @@ export default function ReportsPage() {
                         Unarchive ({selectedWorkLogs.size})
                       </Button>
                     )}
+                    <Button 
+                      size="sm" 
+                      variant="secondary" 
+                      onClick={() => setBulkEditDialogOpen(true)} 
+                      disabled={isSaving}
+                    >
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Edit ({selectedWorkLogs.size})
+                    </Button>
                     <Button size="sm" variant="destructive" onClick={openBulkDeleteWorkLogs} disabled={isSaving}>
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete ({selectedWorkLogs.size})
@@ -1280,7 +1738,7 @@ export default function ReportsPage() {
                           {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
                         </TableCell>
                         <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
-                        <TableCell className="max-w-[100px] truncate" title={log.account_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.account_name}
                         </TableCell>
                         <TableCell>
@@ -1307,13 +1765,132 @@ export default function ReportsPage() {
                           {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
                            log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.weather_conditions || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.equipment_name || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
+                          {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
+                        </TableCell>
+                        <TableCell>
+                          <PhotoThumbnails 
+                            photoPaths={log.photo_urls || []} 
+                            onViewPhotos={openPhotoViewer}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openEditWorkLog(log))}>
+                              <Pencil className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openDeleteWorkLog(log))}>
+                              <Trash2 className="h-3 w-3 text-red-400" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredWorkLogs.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                          No in-progress work logs found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="billable" className="mt-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/50">
+                      <TableHead className="w-10">
+                        <Checkbox 
+                          checked={selectedWorkLogs.size === filteredWorkLogs.length && filteredWorkLogs.length > 0}
+                          onCheckedChange={toggleAllWorkLogs}
+                        />
+                      </TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>In</TableHead>
+                      <TableHead>Out</TableHead>
+                      <TableHead>Dur.</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Snow/Salt</TableHead>
+                      <TableHead>Weather</TableHead>
+                      <TableHead>Equipment</TableHead>
+                      <TableHead>Crew</TableHead>
+                      <TableHead>Photo</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredWorkLogs.slice(0, 50).map(log => (
+                      <TableRow key={log.id} className="border-border/30">
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedWorkLogs.has(log.id)}
+                            onCheckedChange={(checked) => {
+                              const newSet = new Set(selectedWorkLogs);
+                              if (checked) newSet.add(log.id);
+                              else newSet.delete(log.id);
+                              setSelectedWorkLogs(newSet);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={log.type === 'plow' ? 'bg-blue-600' : 'bg-purple-600'}>
+                            {log.type === 'plow' ? 'Plow' : 'Shov'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{format(new Date(log.date), 'MM/dd')}</TableCell>
+                        <TableCell>
+                          {log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
+                          {log.account_name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline"
+                            className={
+                              log.service_type === 'plow' ? 'border-blue-500 text-blue-400' :
+                              log.service_type === 'salt' || log.service_type === 'ice_melt' ? 'border-green-500 text-green-400' :
+                              log.service_type === 'shovel' ? 'border-purple-500 text-purple-400' :
+                              'border-cyan-500 text-cyan-400'
+                            }
+                          >
+                            {log.type === 'plow' 
+                              ? (log.service_type === 'both' ? 'Plow/Salt' : 
+                                 log.service_type === 'plow' ? 'Plow' : 
+                                 log.service_type === 'salt' ? 'Salt' : log.service_type)
+                              : (log.service_type === 'both' ? 'Shovel/Salt' : 
+                                 log.service_type === 'ice_melt' ? 'Salt' : 
+                                 log.service_type === 'shovel' ? 'Shovel' : log.service_type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.snow_depth_inches !== null ? `${log.snow_depth_inches}"` : '-'} / {' '}
+                          {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
+                           log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
+                          {log.weather_conditions || '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
+                          {log.equipment_name || '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                         </TableCell>
                         <TableCell>
@@ -1327,17 +1904,17 @@ export default function ReportsPage() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-7 w-7" 
+                              className={tableIconButtonClass} 
                               onClick={() => handleToggleBilled(log)}
                               title="Mark as billed"
                               disabled={isSaving}
                             >
                               <CheckCircle className="h-3 w-3 text-green-500" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openEditWorkLog(log))}>
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openDeleteWorkLog(log))}>
                               <Trash2 className="h-3 w-3 text-red-400" />
                             </Button>
                           </div>
@@ -1347,7 +1924,7 @@ export default function ReportsPage() {
                     {filteredWorkLogs.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
-                          No unbilled work logs found
+                          No billable work logs found
                         </TableCell>
                       </TableRow>
                     )}
@@ -1356,7 +1933,7 @@ export default function ReportsPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="archived" className="mt-0">
+            <TabsContent value="completed" className="mt-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -1409,7 +1986,7 @@ export default function ReportsPage() {
                           {log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-'}
                         </TableCell>
                         <TableCell>{formatDuration(log.check_in_time, log.check_out_time)}</TableCell>
-                        <TableCell className="max-w-[100px] truncate" title={log.account_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.account_name}
                         </TableCell>
                         <TableCell>
@@ -1436,13 +2013,13 @@ export default function ReportsPage() {
                           {log.salt_used_lbs !== null ? `${log.salt_used_lbs}lb` : 
                            log.ice_melt_used_lbs !== null ? `${log.ice_melt_used_lbs}lb` : '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.weather_conditions || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.weather_conditions || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={log.equipment_name || '-'}>
+                        <TableCell className="max-w-[120px] whitespace-normal text-sm">
                           {log.equipment_name || '-'}
                         </TableCell>
-                        <TableCell className="max-w-[100px] truncate text-sm" title={log.team_member_names.join(', ') || log.employee_name}>
+                        <TableCell className="max-w-[150px] whitespace-normal text-sm">
                           {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                         </TableCell>
                         <TableCell>
@@ -1456,17 +2033,17 @@ export default function ReportsPage() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-7 w-7" 
+                              className={tableIconButtonClass} 
                               onClick={() => handleToggleBilled(log)}
-                              title="Mark as unbilled"
+                              title="Unarchive"
                               disabled={isSaving}
                             >
                               <Archive className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openEditWorkLog(log))}>
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteWorkLog(log)}>
+                            <Button variant="ghost" size="icon" className={tableIconButtonClass} {...tapHandlers(() => openDeleteWorkLog(log))}>
                               <Trash2 className="h-3 w-3 text-red-400" />
                             </Button>
                           </div>
@@ -1476,7 +2053,7 @@ export default function ReportsPage() {
                     {filteredWorkLogs.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
-                          No archived work logs found
+                          No completed/billed work logs found
                         </TableCell>
                       </TableRow>
                     )}
@@ -1510,6 +2087,7 @@ export default function ReportsPage() {
           type: editingWorkLog.type,
           account_id: editingWorkLog.account_id,
           employee_id: editingWorkLog.employee_id,
+          team_member_ids: editingWorkLog.team_member_ids,
           equipment_id: editingWorkLog.equipment_id || undefined,
           service_type: editingWorkLog.service_type,
           check_in_time: editingWorkLog.check_in_time,
@@ -1544,7 +2122,18 @@ export default function ReportsPage() {
         isLoading={isSaving}
       />
 
-      {/* Photo Viewer Dialog */}
+      {/* Bulk Edit Work Logs Dialog */}
+      <BulkEditWorkLogDialog
+        open={bulkEditDialogOpen}
+        onOpenChange={setBulkEditDialogOpen}
+        accounts={accounts}
+        employees={employees}
+        equipment={equipment}
+        selectedCount={selectedWorkLogs.size}
+        onSave={handleBulkEditWorkLogs}
+        isLoading={isSaving}
+      />
+
       <Dialog open={photoViewerOpen} onOpenChange={setPhotoViewerOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>

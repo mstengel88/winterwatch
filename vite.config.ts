@@ -60,4 +60,56 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // Optimize for iOS performance
+    target: "es2020",
+    minify: "esbuild",
+    cssMinify: true,
+    // Better code splitting for faster initial load
+    rollupOptions: {
+      external: ["onesignal-cordova-plugin"],
+      output: {
+        // Manual chunks for better caching
+        manualChunks: {
+          // Core React dependencies
+          "react-vendor": ["react", "react-dom"],
+          // Router
+          "router": ["react-router-dom"],
+          // UI components (loaded together)
+          "ui": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-tooltip",
+          ],
+          // Data fetching
+          "query": ["@tanstack/react-query"],
+          // Supabase client
+          "supabase": ["@supabase/supabase-js"],
+          // Date utilities
+          "date": ["date-fns"],
+        },
+      },
+    },
+    // Generate source maps for debugging but keep them separate
+    sourcemap: mode === "development",
+    // Chunk size warnings
+    chunkSizeWarningLimit: 500,
+  },
+  // Optimize dependencies for faster dev startup
+  optimizeDeps: {
+    include: [
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "@tanstack/react-query",
+      "@supabase/supabase-js",
+      "date-fns",
+    ],
+  },
 }));
+
+
+

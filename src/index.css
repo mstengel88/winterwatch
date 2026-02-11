@@ -123,6 +123,10 @@
 
   html {
     color-scheme: dark;
+    /* Optimize rendering performance */
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
@@ -131,6 +135,12 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     overscroll-behavior-y: contain;
+    /*
+      IMPORTANT (iOS/native):
+      Avoid applying `transform` on `body`.
+      A transformed ancestor can break `position: fixed` descendants on iOS/WKWebView,
+      causing dialogs to render at the top of the document when the page is scrolled.
+    */
   }
 
   /* Safe area support for notched devices */
@@ -146,21 +156,32 @@
     overscroll-behavior: none;
   }
 
-  /* Smooth scrolling for mobile */
-  * {
+  /* iOS note: applying `-webkit-overflow-scrolling: touch` globally (on `*`)
+     can break tap-to-focus in WKWebView on newer iOS versions.
+     Only apply it to the main page scroller. */
+  body {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Better touch targets for mobile */
+  /* Better touch targets for mobile - HIG compliant 44pt minimum */
   button, a, [role="button"] {
     min-height: 44px;
-    min-width: 44px;
   }
 
   /* Prevent text selection on interactive elements */
   button, [role="button"] {
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* iOS-optimized form controls */
+  input, textarea, select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  /* Improve card readability on mobile */
+  .card {
+    border-radius: 1rem;
   }
 }
 
@@ -186,5 +207,65 @@
   /* Extra bottom padding for home indicator */
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* iOS-specific layout improvements */
+@layer utilities {
+  /* Consistent page container with safe area awareness */
+  .ios-page {
+    min-height: 100vh;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  /* Larger, more tappable form elements */
+  .ios-input {
+    @apply h-12 text-base rounded-xl;
+  }
+
+  /* iOS-style cards with better shadows */
+  .ios-card {
+    @apply rounded-2xl shadow-lg border-0 bg-card;
+  }
+
+  /* Improved button sizing for iOS */
+  .ios-button {
+    @apply h-12 px-6 text-base font-medium rounded-xl;
+  }
+
+  /* Larger section headers */
+  .ios-section-header {
+    @apply text-lg font-semibold mb-4;
+  }
+
+  /* Better spacing for list items */
+  .ios-list-item {
+    @apply py-4 px-4 min-h-[56px];
+  }
+}
+
+/* iOS WKWebView input fix - prevents gesture recognizer conflicts */
+@supports (-webkit-touch-callout: none) {
+  /* Allow text interaction on iOS; blocking callouts can cause activationDenied in WKWebView */
+  body {
+    -webkit-touch-callout: default;
+  }
+
+  input,
+  textarea,
+  select {
+    /* Ensure inputs are tappable on iOS 18.2+ */
+    -webkit-user-select: text;
+    user-select: text;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Force focus state on iOS */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    -webkit-appearance: none;
   }
 }

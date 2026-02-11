@@ -40,6 +40,9 @@ export function ProtectedRoute({
       if (roles.includes('driver')) {
         return <Navigate to="/dashboard" replace />;
       }
+      if (roles.includes('trucker')) {
+        return <Navigate to="/trucker" replace />;
+      }
       // Default fallback for users without specific dashboard roles
       return <Navigate to="/pending" replace />;
     }

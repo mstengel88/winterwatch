@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.xcworkspacedata
+*.resolved
+*.xcworkspace/
+**/xcshareddata/swiftpm/Package.resolved
+

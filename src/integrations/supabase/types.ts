@@ -80,6 +80,45 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          changed_fields: string[] | null
+          created_at: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           category: Database["public"]["Enums"]["employee_category"]
@@ -185,6 +224,302 @@ export type Database = {
         }
         Relationships: []
       }
+      maintenance_logs: {
+        Row: {
+          cost: number | null
+          created_at: string
+          description: string | null
+          equipment_id: string
+          id: string
+          maintenance_type: string
+          next_service_date: string | null
+          performed_by_employee_id: string | null
+          performed_by_name: string | null
+          service_date: string
+          updated_at: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          equipment_id: string
+          id?: string
+          maintenance_type: string
+          next_service_date?: string | null
+          performed_by_employee_id?: string | null
+          performed_by_name?: string | null
+          service_date?: string
+          updated_at?: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          equipment_id?: string
+          id?: string
+          maintenance_type?: string
+          next_service_date?: string | null
+          performed_by_employee_id?: string | null
+          performed_by_name?: string | null
+          service_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_logs_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_performed_by_employee_id_fkey"
+            columns: ["performed_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          employee_id: string | null
+          equipment_id: string
+          id: string
+          mileage: number | null
+          problem_description: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          employee_id?: string | null
+          equipment_id: string
+          id?: string
+          mileage?: number | null
+          problem_description: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          employee_id?: string | null
+          equipment_id?: string
+          id?: string
+          mileage?: number | null
+          problem_description?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          admin_announcements_enabled: boolean
+          created_at: string
+          geofence_alerts_enabled: boolean
+          id: string
+          mandatory_admin_announcements: boolean | null
+          mandatory_geofence_alerts: boolean | null
+          mandatory_shift_status: boolean | null
+          notification_sound: Database["public"]["Enums"]["notification_sound"]
+          shift_status_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_announcements_enabled?: boolean
+          created_at?: string
+          geofence_alerts_enabled?: boolean
+          id?: string
+          mandatory_admin_announcements?: boolean | null
+          mandatory_geofence_alerts?: boolean | null
+          mandatory_shift_status?: boolean | null
+          notification_sound?: Database["public"]["Enums"]["notification_sound"]
+          shift_status_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_announcements_enabled?: boolean
+          created_at?: string
+          geofence_alerts_enabled?: boolean
+          id?: string
+          mandatory_admin_announcements?: boolean | null
+          mandatory_geofence_alerts?: boolean | null
+          mandatory_shift_status?: boolean | null
+          notification_sound?: Database["public"]["Enums"]["notification_sound"]
+          shift_status_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_types: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_mandatory: boolean
+          is_system: boolean
+          label: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          is_system?: boolean
+          label: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          is_system?: boolean
+          label?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notifications_log: {
+        Row: {
+          body: string
+          data: Json | null
+          delivery_status: string | null
+          id: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          onesignal_id: string | null
+          read_at: string | null
+          sent_at: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          data?: Json | null
+          delivery_status?: string | null
+          id?: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          onesignal_id?: string | null
+          read_at?: string | null
+          sent_at?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          data?: Json | null
+          delivery_status?: string | null
+          id?: string
+          notification_type?: Database["public"]["Enums"]["notification_type"]
+          onesignal_id?: string | null
+          read_at?: string | null
+          sent_at?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      overtime_notification_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string | null
+          id: string
+          is_enabled: boolean
+          notify_admins: boolean
+          notify_employee: boolean
+          threshold_hours: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          is_enabled?: boolean
+          notify_admins?: boolean
+          notify_employee?: boolean
+          threshold_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          is_enabled?: boolean
+          notify_admins?: boolean
+          notify_employee?: boolean
+          threshold_hours?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      overtime_notifications_sent: {
+        Row: {
+          employee_id: string
+          id: string
+          sent_at: string
+          threshold_hours: number
+          time_clock_id: string
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          sent_at?: string
+          threshold_hours: number
+          time_clock_id: string
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          sent_at?: string
+          threshold_hours?: number
+          time_clock_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overtime_notifications_sent_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -224,11 +559,90 @@ export type Database = {
         }
         Relationships: []
       }
+      push_device_tokens: {
+        Row: {
+          created_at: string
+          device_name: string | null
+          id: string
+          is_active: boolean
+          platform: string
+          player_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean
+          platform: string
+          player_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_name?: string | null
+          id?: string
+          is_active?: boolean
+          platform?: string
+          player_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scheduled_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string
+          data: Json | null
+          employee_id: string | null
+          id: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          send_at: string | null
+          sent_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by: string
+          data?: Json | null
+          employee_id?: string | null
+          id?: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          send_at?: string | null
+          sent_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string
+          data?: Json | null
+          employee_id?: string | null
+          id?: string
+          notification_type?: Database["public"]["Enums"]["notification_type"]
+          send_at?: string | null
+          sent_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shovel_work_logs: {
         Row: {
           account_id: string
           areas_cleared: string[] | null
           billed: boolean
+          billing_status: string
           check_in_latitude: number | null
           check_in_longitude: number | null
           check_in_time: string | null
@@ -252,6 +666,7 @@ export type Database = {
           account_id: string
           areas_cleared?: string[] | null
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -275,6 +690,7 @@ export type Database = {
           account_id?: string
           areas_cleared?: string[] | null
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -313,6 +729,7 @@ export type Database = {
       }
       time_clock: {
         Row: {
+          billing_status: string
           clock_in_latitude: number | null
           clock_in_longitude: number | null
           clock_in_time: string
@@ -326,6 +743,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_status?: string
           clock_in_latitude?: number | null
           clock_in_longitude?: number | null
           clock_in_time: string
@@ -339,6 +757,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_status?: string
           clock_in_latitude?: number | null
           clock_in_longitude?: number | null
           clock_in_time?: string
@@ -389,6 +808,7 @@ export type Database = {
         Row: {
           account_id: string
           billed: boolean
+          billing_status: string
           check_in_latitude: number | null
           check_in_longitude: number | null
           check_in_time: string | null
@@ -411,6 +831,7 @@ export type Database = {
         Insert: {
           account_id: string
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -433,6 +854,7 @@ export type Database = {
         Update: {
           account_id?: string
           billed?: boolean
+          billing_status?: string
           check_in_latitude?: number | null
           check_in_longitude?: number | null
           check_in_time?: string | null
@@ -489,6 +911,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_admin_or_manager: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       is_user_employee: {
@@ -497,8 +920,20 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "driver" | "shovel_crew" | "client"
-      employee_category: "plow" | "shovel" | "both"
+      app_role:
+        | "admin"
+        | "manager"
+        | "driver"
+        | "shovel_crew"
+        | "client"
+        | "work_log_viewer"
+        | "trucker"
+      employee_category: "plow" | "shovel" | "both" | "manager" | "trucker"
+      notification_sound: "default" | "chime" | "bell" | "alert" | "none"
+      notification_type:
+        | "shift_status"
+        | "geofence_alert"
+        | "admin_announcement"
       service_type: "plow" | "salt" | "both" | "shovel" | "ice_melt"
       work_status: "pending" | "in_progress" | "completed" | "cancelled"
     }
@@ -628,8 +1063,22 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "driver", "shovel_crew", "client"],
-      employee_category: ["plow", "shovel", "both"],
+      app_role: [
+        "admin",
+        "manager",
+        "driver",
+        "shovel_crew",
+        "client",
+        "work_log_viewer",
+        "trucker",
+      ],
+      employee_category: ["plow", "shovel", "both", "manager", "trucker"],
+      notification_sound: ["default", "chime", "bell", "alert", "none"],
+      notification_type: [
+        "shift_status",
+        "geofence_alert",
+        "admin_announcement",
+      ],
       service_type: ["plow", "salt", "both", "shovel", "ice_melt"],
       work_status: ["pending", "in_progress", "completed", "cancelled"],
     },

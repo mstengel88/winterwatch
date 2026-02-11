@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -82,9 +82,15 @@ export function ShiftDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Shift' : 'Add New Shift'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Edit shift details and save changes.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
@@ -94,7 +100,7 @@ export function ShiftDialog({
                 <SelectTrigger>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
                   {employees
                     .filter((emp) => emp.id && emp.id.trim() !== '')
                     .map((emp) => (
@@ -134,11 +140,20 @@ export function ShiftDialog({
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="min-h-[44px]"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !employeeId || !clockInDate || !clockInTime}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || !employeeId || !clockInDate || !clockInTime}
+              className="min-h-[44px]"
+            >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isEdit ? 'Update' : 'Create'}
             </Button>

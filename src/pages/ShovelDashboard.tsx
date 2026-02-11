@@ -4,8 +4,12 @@ import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useWeather } from '@/hooks/useWeather';
+import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
+import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
+import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +63,13 @@ export default function ShovelDashboard() {
     updateActiveWorkLog,
   } = useShovelWorkLogs();
   const { location: geoLocation, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
+  
+  // Fetch weather based on geolocation
+  const { weather: weatherData, isLoading: weatherLoading } = useWeather(
+    geoLocation?.latitude ?? null,
+    geoLocation?.longitude ?? null
+  );
+
   const {
     photos,
     previews,
@@ -69,21 +80,135 @@ export default function ShovelDashboard() {
     clearPhotos,
     uploadPhotos,
     canAddMore,
+    restorePreviews,
+    hasRestoredPreviews,
   } = usePhotoUpload({ folder: 'shovel-logs' });
   const { toast } = useToast();
+
+  // Storage key for form persistence - tied to current shift
+  const persistenceWorkLogId = activeShift?.id || 'no-shift';
+  
+  // Use persistence hook for form fields
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData, saveStatus } = useCheckoutFormPersistence({
+    workLogId: persistenceWorkLogId,
+    variant: 'shovel',
+  });
+
+  const isRestoringRef = useRef(false);
+  const hasLoadedFormDataRef = useRef(false);
 
   const [selectedAccount, setSelectedAccount] = useState('');
   const [serviceType, setServiceType] = useState<'shovel' | 'salt' | 'both'>('shovel');
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>([]);
   const [snowDepth, setSnowDepth] = useState('');
   const [saltUsed, setSaltUsed] = useState('');
-  const [temperature, setTemperature] = useState('31');
-  const [weather, setWeather] = useState('Cloudy');
-  const [wind, setWind] = useState('11');
+  const [temperature, setTemperature] = useState('');
+  const [weather, setWeather] = useState('');
+  const [wind, setWind] = useState('');
   const [notes, setNotes] = useState('');
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
+
+  // Track if we've restored the service type to avoid overwriting
+  const hasRestoredServiceTypeRef = useRef(false);
+
+  // Restore form state from persisted data
+  useEffect(() => {
+    if (Object.keys(formData).length > 0 && !hasLoadedFormDataRef.current) {
+      hasLoadedFormDataRef.current = true;
+      isRestoringRef.current = true;
+      
+      if (formData.serviceType && ['shovel', 'salt', 'both'].includes(formData.serviceType)) {
+        setServiceType(formData.serviceType as 'shovel' | 'salt' | 'both');
+        hasRestoredServiceTypeRef.current = true;
+      }
+      if (formData.snowDepth) setSnowDepth(formData.snowDepth);
+      if (formData.saltUsed) setSaltUsed(formData.saltUsed);
+      if (formData.temperature) setTemperature(formData.temperature);
+      if (formData.weather) setWeather(formData.weather);
+      if (formData.wind) setWind(formData.wind);
+      if (formData.notes) setNotes(formData.notes);
+      
+      // Restore photos if available
+      if (formData.photoPreviews && formData.photoPreviews.length > 0 && previews.length === 0) {
+        restorePreviews(formData.photoPreviews);
+      }
+      
+      setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 100);
+    }
+  }, [formData, previews.length, restorePreviews]);
+
+  // Reset form data flag when shift changes
+  useEffect(() => {
+    hasLoadedFormDataRef.current = false;
+    hasRestoredServiceTypeRef.current = false;
+  }, [activeShift?.id]);
+
+  // Persist service type changes (skip during restoration and initial default)
+  useEffect(() => {
+    // Skip if we're restoring or if this is just the initial default value
+    if (isRestoringRef.current) return;
+    // Only persist if user has interacted OR we previously restored a value
+    if (hasRestoredServiceTypeRef.current || serviceType !== 'shovel') {
+      updateField('serviceType', serviceType);
+    }
+  }, [serviceType, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && snowDepth) {
+      updateField('snowDepth', snowDepth);
+    }
+  }, [snowDepth, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && saltUsed) {
+      updateField('saltUsed', saltUsed);
+    }
+  }, [saltUsed, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && temperature) {
+      updateField('temperature', temperature);
+    }
+  }, [temperature, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && weather) {
+      updateField('weather', weather);
+    }
+  }, [weather, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && wind) {
+      updateField('wind', wind);
+    }
+  }, [wind, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && notes) {
+      updateField('notes', notes);
+    }
+  }, [notes, updateField]);
+
+  // Persist photo previews when they change
+  useEffect(() => {
+    if (!isRestoringRef.current && previews.length > 0) {
+      updatePhotoPreviews(previews);
+    }
+  }, [previews, updatePhotoPreviews]);
+
+  // Auto-populate weather fields when weather data is fetched (only if not restored)
+  useEffect(() => {
+    if (weatherData && !formData.temperature && !formData.weather && !formData.wind) {
+      setTemperature(String(weatherData.temperature));
+      setWeather(weatherData.conditions);
+      setWind(String(weatherData.windSpeed));
+    }
+  }, [weatherData, formData.temperature, formData.weather, formData.wind]);
 
   // Key for storing team members per shift in localStorage
   const shiftTeamStorageKey = activeShift ? `shovel-team-${activeShift.id}` : null;
@@ -261,13 +386,18 @@ export default function ShovelDashboard() {
     }
   };
 
-  const handleClockOut = async () => {
+  const handleClockOutClick = () => {
+    setShowClockOutConfirm(true);
+  };
+
+  const handleClockOutConfirm = async () => {
     const success = await clockOut();
     if (success) {
       toast({ title: 'Shift ended successfully!' });
     } else {
       toast({ variant: 'destructive', title: 'Failed to end shift' });
     }
+    return success;
   };
 
   const handleCheckIn = async () => {
@@ -306,10 +436,13 @@ export default function ShovelDashboard() {
         localStorage.setItem(shiftTeamStorageKey, JSON.stringify(selectedTeamMembers));
       }
       toast({ title: 'Work completed!' });
+      // Clear form fields but keep team members and service type
       setNotes('');
       setSaltUsed('');
       setSnowDepth('');
       clearPhotos();
+      // Clear persisted form data (except team selection which has its own storage)
+      clearPersistedData();
     } else {
       toast({ variant: 'destructive', title: 'Failed to check out' });
     }
@@ -405,7 +538,7 @@ export default function ShovelDashboard() {
             </div>
             <h1 className="text-2xl font-bold">Shovel Crew</h1>
             <Badge variant="outline" className="bg-[hsl(var(--card))]/50 border-border/50 text-muted-foreground">
-              {temperature}°F
+              {weatherLoading ? '...' : temperature ? `${temperature}°F` : '--°F'}
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1">
@@ -437,7 +570,7 @@ export default function ShovelDashboard() {
               </div>
               {activeShift ? (
                 <Button 
-                  onClick={handleClockOut}
+                  onClick={handleClockOutClick}
                   variant="outline"
                   className="border-red-500/50 text-red-400 hover:bg-red-500/20"
                 >
@@ -453,6 +586,12 @@ export default function ShovelDashboard() {
                   Start Shift
                 </Button>
               )}
+              
+              <ClockOutConfirmDialog
+                open={showClockOutConfirm}
+                onOpenChange={setShowClockOutConfirm}
+                onConfirm={handleClockOutConfirm}
+              />
             </div>
           </CardContent>
         </Card>
@@ -559,7 +698,7 @@ export default function ShovelDashboard() {
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-green-400">Currently working at location</p>
+                      <p className="text-sm font-medium text-green-400">Currently working at "{activeWorkLog.account?.name || 'Unknown'}"</p>
                       <p className="text-xs text-muted-foreground">
                         Started {activeWorkLog.check_in_time ? format(new Date(activeWorkLog.check_in_time), 'h:mm a') : 'Unknown'}
                       </p>
@@ -617,7 +756,7 @@ export default function ShovelDashboard() {
 
             {/* Team Members - editable before and after check-in */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <Label className="text-sm flex items-center gap-2">
                   <Footprints className="h-4 w-4" />
                   Team Members <span className="text-red-400">*</span>
@@ -626,7 +765,7 @@ export default function ShovelDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/20"
+                    className="h-8 text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/20 self-start sm:self-auto"
                     onClick={async () => {
                       const dbServiceType = serviceType === 'salt' ? 'ice_melt' : serviceType;
                       const success = await updateActiveWorkLog({ 
@@ -670,8 +809,8 @@ export default function ShovelDashboard() {
               </Card>
             </div>
             {/* Snow Depth and Salt Used */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-4 w-[85%]">
+              <div className="space-y-1">
                 <Label className="text-sm">
                   Snow Depth (inches) {serviceType !== 'salt' && <span className="text-red-400">*</span>}
                 </Label>
@@ -679,10 +818,10 @@ export default function ShovelDashboard() {
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label className="text-sm">
                   Salt Used (lbs) {serviceType !== 'shovel' && <span className="text-red-400">*</span>}
                 </Label>
@@ -690,47 +829,47 @@ export default function ShovelDashboard() {
                   placeholder="e.g., 50"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
             </div>
 
             {/* Temp, Weather, Wind */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-3 w-[85%]">
+              <div className="space-y-1">
                 <Label className="text-sm">Temp (°F) <span className="text-red-400">*</span></Label>
                 <Input 
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label className="text-sm">Weather <span className="text-red-400">*</span></Label>
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label className="text-sm">Wind (mph) <span className="text-red-400">*</span></Label>
                 <Input 
                   value={wind}
                   onChange={(e) => setWind(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30"
+                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
                 />
               </div>
             </div>
 
             {/* Notes */}
-            <div className="space-y-2">
+            <div className="space-y-1 w-[85%]">
               <Label className="text-sm">Notes (Optional)</Label>
               <Textarea 
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[80px]"
+                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[60px] text-sm"
               />
             </div>
 
@@ -745,14 +884,23 @@ export default function ShovelDashboard() {
                 canAddMore={canAddMore}
                 onAddPhotos={addPhotos}
                 onRemovePhoto={removePhoto}
+                hasRestoredPreviews={hasRestoredPreviews}
               />
             </div>
+            
+            {/* Save Status */}
+            <SaveStatusIndicator status={saveStatus} />
 
             {/* Log Service Button */}
             <Button
-              onClick={handleLogService}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleLogService();
+              }}
               disabled={!activeShift || !isFormValid || isUploading}
-              className={`w-full py-6 text-lg font-semibold transition-colors ${
+              className={`w-full py-6 text-lg font-semibold transition-colors min-h-[48px] ${
                 !activeShift || !isFormValid || isUploading
                   ? 'bg-muted text-muted-foreground cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'

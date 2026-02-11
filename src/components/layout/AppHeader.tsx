@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -18,9 +19,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
+import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNativePlatform } from '@/hooks/useNativePlatform';
 import logo from '@/assets/logo.png';
+
+const APP_VERSION = '2.2';
 
 interface NavItem {
   href: string;
@@ -32,16 +36,52 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
-  { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager'] },
+  { href: '/trucker', label: 'Trucker', icon: Wrench, roles: ['trucker', 'admin', 'manager'] },
+  { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
   { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
 ];
 
 export function AppHeader() {
-  const { profile, signOut, hasRole, isAdminOrManager } = useAuth();
+  const { profile, signOut, hasRole, isAdminOrManager, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isNative } = useNativePlatform();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnread = async () => {
+      const { count } = await supabase
+        .from('notifications_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('read_at', null);
+      setUnreadCount(count || 0);
+    };
+
+    fetchUnread();
+
+    // Subscribe to new notifications
+    const channel = supabase
+      .channel('notifications-bell')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications_log', filter: `user_id=eq.${user.id}` },
+        () => fetchUnread()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications_log', filter: `user_id=eq.${user.id}` },
+        () => fetchUnread()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -73,6 +113,7 @@ export function AppHeader() {
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
     if (href === '/shovel') return location.pathname === href;
+    if (href === '/trucker') return location.pathname === href;
     return location.pathname.startsWith(href);
   };
 
@@ -84,12 +125,18 @@ export function AppHeader() {
     if (hasRole('shovel_crew')) {
       return '/shovel';
     }
+    if (hasRole('trucker')) {
+      return '/trucker';
+    }
     return '/';
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-      <div className="container flex h-14 items-center justify-between px-4">
+    <header className={cn(
+      "sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60",
+      isNative && "pt-[env(safe-area-inset-top)]"
+    )}>
+      <div className="container flex h-14 items-center justify-between px-4 max-w-6xl mx-auto">
         {/* Left: Mobile Menu + Logo */}
         <div className="flex items-center gap-3">
           {/* Mobile Hamburger Menu */}
@@ -156,6 +203,7 @@ export function AppHeader() {
           >
             <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
             <span className="font-semibold text-foreground hidden sm:inline">WinterWatch-Pro</span>
+            <span className="text-[10px] text-muted-foreground">v{APP_VERSION}</span>
           </div>
         </div>
 
@@ -183,8 +231,29 @@ export function AppHeader() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground relative"
+            onClick={() => {
+              // Mark all as read when opening
+              if (user && unreadCount > 0) {
+                supabase
+                  .from('notifications_log')
+                  .update({ read_at: new Date().toISOString() })
+                  .eq('user_id', user.id)
+                  .is('read_at', null)
+                  .then(() => setUnreadCount(0));
+              }
+              navigate('/admin/notifications');
+            }}
+          >
             <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-4 min-w-[16px] flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </Button>
 
           <DropdownMenu>
@@ -213,6 +282,10 @@ export function AppHeader() {
               {isAdminOrManager() && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/admin')}>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Admin
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/admin/users')}>
                     <UserCog className="mr-2 h-4 w-4" />
                     Users & Roles
@@ -228,6 +301,14 @@ export function AppHeader() {
                   <DropdownMenuItem onClick={() => navigate('/admin/equipment')}>
                     <Wrench className="mr-2 h-4 w-4" />
                     Equipment
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/notifications')}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Notifications
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/audit-log')}>
+                    <History className="mr-2 h-4 w-4" />
+                    Audit Log
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/time-clock')}>
                     <Clock className="mr-2 h-4 w-4" />

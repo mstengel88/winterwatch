@@ -94,7 +94,7 @@ export const employeeSchema = z.object({
     .regex(/^([+]?[\d\s\-().]{10,20})?$/, 'Invalid phone number format')
     .optional()
     .or(z.literal('')),
-  category: z.enum(['plow', 'shovel', 'both']),
+  category: z.enum(['plow', 'shovel', 'both', 'manager', 'trucker']),
   hourly_rate: z.string()
     .optional()
     .or(z.literal(''))
