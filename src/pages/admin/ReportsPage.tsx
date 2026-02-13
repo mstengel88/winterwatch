@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Loader2, FileDown, Filter, Clock, Plus, Eye, Pencil, Trash2, 
-  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown, Archive, CheckCircle, Cloud
+  Image as ImageIcon, RefreshCw, FileText, ChevronLeft, ChevronRight, Printer, ChevronDown, Archive, CheckCircle, Cloud, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -140,6 +140,7 @@ export default function ReportsPage() {
   const [selectedEquipment, setSelectedEquipment] = useState('all');
   const [minSnow, setMinSnow] = useState('');
   const [minSalt, setMinSalt] = useState('');
+  const [accountSortOrder, setAccountSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
   const [activeTab, setActiveTab] = useState('current');
   const [activeShiftTab, setActiveShiftTab] = useState('current');
 
@@ -383,8 +384,12 @@ export default function ReportsPage() {
         if (saltAmount !== null && saltAmount < parseFloat(minSalt)) return false;
       }
       return true;
+    }).sort((a, b) => {
+      if (accountSortOrder === 'asc') return a.account_name.localeCompare(b.account_name);
+      if (accountSortOrder === 'desc') return b.account_name.localeCompare(a.account_name);
+      return 0;
     });
-  }, [workLogs, logType, selectedPlowAccount, selectedShovelLocation, selectedEmployee, selectedServiceType, selectedEquipment, minSnow, minSalt, accounts, employees, equipment, activeTab]);
+  }, [workLogs, logType, selectedPlowAccount, selectedShovelLocation, selectedEmployee, selectedServiceType, selectedEquipment, minSnow, minSalt, accounts, employees, equipment, activeTab, accountSortOrder]);
 
   // Counts for tabs based on billing_status
   const currentCount = useMemo(() => workLogs.filter(l => l.billing_status === 'current').length, [workLogs]);
@@ -1678,6 +1683,19 @@ export default function ReportsPage() {
                     </Button>
                   </>
                 )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      {accountSortOrder === 'asc' ? <ArrowUp className="h-4 w-4 mr-1" /> : accountSortOrder === 'desc' ? <ArrowDown className="h-4 w-4 mr-1" /> : <ArrowUpDown className="h-4 w-4 mr-1" />}
+                      Sort Account
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-popover border z-50">
+                    <DropdownMenuItem onClick={() => setAccountSortOrder('none')}>Default (Date)</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAccountSortOrder('asc')}>A → Z</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAccountSortOrder('desc')}>Z → A</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button size="sm" variant="outline" onClick={openAddWorkLog}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Entry
