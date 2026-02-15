@@ -106,21 +106,31 @@ Deno.serve(async (req) => {
     if (endpoint === "work_logs" || endpoint === "all") {
       const { data: plowLogs } = await supabase
         .from("work_logs")
-        .select("id, status, service_type, billing_status")
+        .select("id, status, service_type, billing_status, check_in_time, account:accounts(name), employee:employees(first_name, last_name)")
         .gte("created_at", todayISO);
 
       const { data: shovelLogs } = await supabase
         .from("shovel_work_logs")
-        .select("id, status, service_type, billing_status")
+        .select("id, status, service_type, billing_status, check_in_time, account:accounts(name), employee:employees(first_name, last_name)")
         .gte("created_at", todayISO);
 
       const allLogs = [...(plowLogs || []), ...(shovelLogs || [])];
+      const inProgressLogs = allLogs.filter((l) => l.status === "in_progress");
 
       responseData.work_logs = {
         total_today: allLogs.length,
         plow_today: (plowLogs || []).length,
         shovel_today: (shovelLogs || []).length,
-        in_progress: allLogs.filter((l) => l.status === "in_progress").length,
+        in_progress: inProgressLogs.length,
+        in_progress_details: inProgressLogs.map((l) => ({
+          id: l.id,
+          service_type: l.service_type,
+          account: (l.account as any)?.name || "Unknown",
+          employee: l.employee
+            ? `${(l.employee as any).first_name} ${(l.employee as any).last_name}`
+            : "Unassigned",
+          started: l.check_in_time,
+        })),
         completed: allLogs.filter((l) => l.status === "completed").length,
         pending: allLogs.filter((l) => l.status === "pending").length,
         current: allLogs.filter((l) => l.billing_status === "current").length,
