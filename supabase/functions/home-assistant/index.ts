@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate via Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -23,43 +22,58 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } =
-      await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+    // Check if the token is the service_role key (for Home Assistant polling)
+    // Otherwise validate as a user JWT
+    let supabase;
+    if (token === serviceRoleKey) {
+      // Service role: full access, used by Home Assistant
+      supabase = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
       });
+    } else {
+      // User JWT: validate claims
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: claimsData, error: claimsError } =
+        await supabase.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const url = new URL(req.url);
     const endpoint = url.searchParams.get("endpoint") || "summary";
 
-    let responseData: Record<string, unknown> = {};
+    const responseData: Record<string, unknown> = {};
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
 
     if (endpoint === "summary" || endpoint === "all") {
       // Active shifts (clocked in, not out)
       const { data: activeShifts } = await supabase
         .from("time_clock")
-        .select("id, employee_id, clock_in_time, employee:employees(first_name, last_name)")
+        .select(
+          "id, employee_id, clock_in_time, employee:employees(first_name, last_name)"
+        )
         .is("clock_out_time", null);
 
-      // Today's completed shifts
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
+      // Today's shifts
       const { data: todayShifts } = await supabase
         .from("time_clock")
         .select("id, clock_in_time, clock_out_time")
-        .gte("clock_in_time", todayStart.toISOString());
+        .gte("clock_in_time", todayISO);
 
-      // Calculate today's total hours
       let totalHoursToday = 0;
       (todayShifts || []).forEach((s) => {
         const start = new Date(s.clock_in_time).getTime();
@@ -75,6 +89,7 @@ Deno.serve(async (req) => {
           name: s.employee
             ? `${(s.employee as any).first_name} ${(s.employee as any).last_name}`
             : "Unknown",
+          employee_id: s.employee_id,
           clock_in_time: s.clock_in_time,
           hours_elapsed: parseFloat(
             (
@@ -89,18 +104,15 @@ Deno.serve(async (req) => {
     }
 
     if (endpoint === "work_logs" || endpoint === "all") {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
       const { data: plowLogs } = await supabase
         .from("work_logs")
         .select("id, status, service_type, billing_status")
-        .gte("created_at", todayStart.toISOString());
+        .gte("created_at", todayISO);
 
       const { data: shovelLogs } = await supabase
         .from("shovel_work_logs")
         .select("id, status, service_type, billing_status")
-        .gte("created_at", todayStart.toISOString());
+        .gte("created_at", todayISO);
 
       const allLogs = [...(plowLogs || []), ...(shovelLogs || [])];
 
@@ -117,19 +129,15 @@ Deno.serve(async (req) => {
     }
 
     if (endpoint === "summary") {
-      // Include a compact work_logs count too
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
       const { count: plowCount } = await supabase
         .from("work_logs")
         .select("id", { count: "exact", head: true })
-        .gte("created_at", todayStart.toISOString());
+        .gte("created_at", todayISO);
 
       const { count: shovelCount } = await supabase
         .from("shovel_work_logs")
         .select("id", { count: "exact", head: true })
-        .gte("created_at", todayStart.toISOString());
+        .gte("created_at", todayISO);
 
       responseData.work_logs_today = (plowCount || 0) + (shovelCount || 0);
     }
