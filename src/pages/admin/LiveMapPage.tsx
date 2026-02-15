@@ -20,16 +20,20 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-interface EmployeeLocation {
-  employee_id: string;
-  first_name: string;
-  last_name: string;
-  category: string;
+interface LocationPing {
   latitude: number;
   longitude: number;
   accuracy: number | null;
   recorded_at: string;
+}
+
+interface EmployeeRoute {
+  employee_id: string;
+  first_name: string;
+  last_name: string;
+  category: string;
   clock_in_time: string;
+  pings: LocationPing[];
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -59,7 +63,7 @@ function createColoredIcon(color: string) {
 }
 
 export default function LiveMapPage() {
-  const [locations, setLocations] = useState<EmployeeLocation[]>([]);
+  const [routes, setRoutes] = useState<EmployeeRoute[]>([]);
   const [noLocationEmployees, setNoLocationEmployees] = useState<{ employee_id: string; first_name: string; last_name: string; category: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalOnShift, setTotalOnShift] = useState(0);
@@ -70,7 +74,6 @@ export default function LiveMapPage() {
   const fetchLocations = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Get all active shifts
       const { data: activeShifts, error: shiftErr } = await supabase
         .from("time_clock")
         .select("id, employee_id, clock_in_time")
@@ -78,14 +81,15 @@ export default function LiveMapPage() {
 
       if (shiftErr) throw shiftErr;
       if (!activeShifts || activeShifts.length === 0) {
-        setLocations([]);
+        setRoutes([]);
+        setNoLocationEmployees([]);
+        setTotalOnShift(0);
         setIsLoading(false);
         return;
       }
 
       const employeeIds = activeShifts.map((s) => s.employee_id);
 
-      // Get employee info
       const { data: employees, error: empErr } = await supabase
         .from("employees")
         .select("id, first_name, last_name, category")
@@ -97,8 +101,7 @@ export default function LiveMapPage() {
         (employees || []).map((e) => [e.id, e])
       );
 
-      // Get latest location for each employee on shift
-      const results: EmployeeLocation[] = [];
+      const results: EmployeeRoute[] = [];
       const noLoc: typeof noLocationEmployees = [];
 
       for (const shift of activeShifts) {
@@ -109,21 +112,21 @@ export default function LiveMapPage() {
           .from("employee_locations")
           .select("latitude, longitude, accuracy, recorded_at")
           .eq("time_clock_id", shift.id)
-          .order("recorded_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order("recorded_at", { ascending: true });
 
-        if (locData) {
+        if (locData && locData.length > 0) {
           results.push({
             employee_id: shift.employee_id,
             first_name: emp.first_name,
             last_name: emp.last_name,
             category: emp.category,
-            latitude: Number(locData.latitude),
-            longitude: Number(locData.longitude),
-            accuracy: locData.accuracy ? Number(locData.accuracy) : null,
-            recorded_at: locData.recorded_at,
             clock_in_time: shift.clock_in_time,
+            pings: locData.map((l) => ({
+              latitude: Number(l.latitude),
+              longitude: Number(l.longitude),
+              accuracy: l.accuracy ? Number(l.accuracy) : null,
+              recorded_at: l.recorded_at,
+            })),
           });
         } else {
           noLoc.push({
@@ -135,7 +138,7 @@ export default function LiveMapPage() {
         }
       }
 
-      setLocations(results);
+      setRoutes(results);
       setNoLocationEmployees(noLoc);
       setTotalOnShift(activeShifts.length);
     } catch (err) {
@@ -165,42 +168,58 @@ export default function LiveMapPage() {
     };
   }, []);
 
-  // Update markers when locations change
+  // Update markers and routes when data changes
   useEffect(() => {
     if (!mapRef.current || !markersRef.current) return;
 
     markersRef.current.clearLayers();
 
-    if (locations.length === 0) return;
+    if (routes.length === 0) return;
 
     const bounds = L.latLngBounds([]);
 
-    locations.forEach((loc) => {
-      const color = CATEGORY_COLORS[loc.category] || "#6b7280";
+    routes.forEach((route) => {
+      const color = CATEGORY_COLORS[route.category] || "#6b7280";
+      const latLngs: L.LatLngExpression[] = route.pings.map((p) => [p.latitude, p.longitude]);
+
+      // Draw route polyline
+      if (latLngs.length > 1) {
+        const polyline = L.polyline(latLngs, {
+          color,
+          weight: 3,
+          opacity: 0.7,
+          dashArray: "6 4",
+        });
+        markersRef.current!.addLayer(polyline);
+      }
+
+      // Place marker at the latest ping (last in array)
+      const latest = route.pings[route.pings.length - 1];
       const icon = createColoredIcon(color);
+      const marker = L.marker([latest.latitude, latest.longitude], { icon });
 
-      const marker = L.marker([loc.latitude, loc.longitude], { icon });
-
-      const timeSince = format(new Date(loc.recorded_at), "h:mm:ss a");
-      const clockedIn = format(new Date(loc.clock_in_time), "h:mm a");
+      const timeSince = format(new Date(latest.recorded_at), "h:mm:ss a");
+      const clockedIn = format(new Date(route.clock_in_time), "h:mm a");
 
       marker.bindPopup(`
         <div style="min-width: 160px;">
-          <strong>${loc.first_name} ${loc.last_name}</strong><br/>
-          <span style="text-transform: capitalize; color: ${color}; font-weight: 600;">${loc.category}</span><br/>
+          <strong>${route.first_name} ${route.last_name}</strong><br/>
+          <span style="text-transform: capitalize; color: ${color}; font-weight: 600;">${route.category}</span><br/>
           <hr style="margin: 4px 0;"/>
           <small>📍 Last ping: ${timeSince}</small><br/>
-          <small>🕐 Clocked in: ${clockedIn}</small>
-          ${loc.accuracy ? `<br/><small>🎯 Accuracy: ${Math.round(loc.accuracy)}m</small>` : ""}
+          <small>🕐 Clocked in: ${clockedIn}</small><br/>
+          <small>📊 ${route.pings.length} ping${route.pings.length !== 1 ? "s" : ""}</small>
+          ${latest.accuracy ? `<br/><small>🎯 Accuracy: ${Math.round(latest.accuracy)}m</small>` : ""}
         </div>
       `);
 
       markersRef.current!.addLayer(marker);
-      bounds.extend([loc.latitude, loc.longitude]);
+
+      latLngs.forEach((ll) => bounds.extend(ll));
     });
 
     mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-  }, [locations]);
+  }, [routes]);
 
   // Fetch on mount + auto-refresh every 2 min
   useEffect(() => {
@@ -247,7 +266,7 @@ export default function LiveMapPage() {
       {/* Map */}
       <Card>
         <CardContent className="p-0 overflow-hidden rounded-lg relative">
-          {isLoading && locations.length === 0 && (
+          {isLoading && routes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center z-10 bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
@@ -256,7 +275,7 @@ export default function LiveMapPage() {
         </CardContent>
       </Card>
 
-      {!isLoading && locations.length === 0 && (
+      {!isLoading && routes.length === 0 && (
         <p className="text-center text-muted-foreground py-4">
           No employees are currently on shift with location data.
         </p>
