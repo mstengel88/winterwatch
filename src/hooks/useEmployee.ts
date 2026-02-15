@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Employee, TimeClockEntry } from '@/types/database';
 import { useGeolocation } from './useGeolocation';
+import { useLocationTracking } from './useLocationTracking';
 
 interface UseEmployeeReturn {
   employee: Employee | null;
@@ -21,6 +22,9 @@ export function useEmployee(): UseEmployeeReturn {
   const [activeShift, setActiveShift] = useState<TimeClockEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Send GPS pings while on shift
+  useLocationTracking(employee?.id, activeShift?.id);
 
   const fetchEmployee = async () => {
     if (!user) {

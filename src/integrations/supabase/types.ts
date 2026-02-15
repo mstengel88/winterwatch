@@ -119,6 +119,54 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_locations: {
+        Row: {
+          accuracy: number | null
+          created_at: string
+          employee_id: string
+          id: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+          time_clock_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          latitude: number
+          longitude: number
+          recorded_at?: string
+          time_clock_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+          time_clock_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_locations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_locations_time_clock_id_fkey"
+            columns: ["time_clock_id"]
+            isOneToOne: false
+            referencedRelation: "time_clock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           category: Database["public"]["Enums"]["employee_category"]

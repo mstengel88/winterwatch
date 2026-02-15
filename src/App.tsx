@@ -42,6 +42,7 @@ const ReportsPage = lazy(() => import("./pages/admin/ReportsPage"));
 const NotificationsPage = lazy(() => import("./pages/admin/NotificationsPage"));
 const NotificationTypesPage = lazy(() => import("./pages/admin/NotificationTypesPage"));
 const AuditLogPage = lazy(() => import("./pages/admin/AuditLogPage"));
+const LiveMapPage = lazy(() => import("./pages/admin/LiveMapPage"));
 const DocsPage = lazy(() => import("./pages/DocsPage"));
 
 // Preload common routes after initial render for smoother navigation
@@ -207,6 +208,7 @@ const AppRoutes = () => (
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="notification-types" element={<NotificationTypesPage />} />
                 <Route path="audit-log" element={<AuditLogPage />} />
+                <Route path="map" element={<LiveMapPage />} />
               </Route>
 
               <Route path="/docs" element={<DocsPage />} />
