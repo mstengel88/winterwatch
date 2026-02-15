@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.notify-maintenance-request]
 verify_jwt = false
+
+[functions.home-assistant]
+verify_jwt = false
