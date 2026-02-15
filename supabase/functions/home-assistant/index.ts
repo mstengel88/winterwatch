@@ -13,11 +13,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    console.log("[HA] Auth header present:", !!authHeader);
-    console.log("[HA] Auth header starts with Bearer:", authHeader?.startsWith("Bearer "));
-    
     if (!authHeader?.startsWith("Bearer ")) {
-      console.log("[HA] Rejected: no Bearer token");
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -26,37 +22,32 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
     const token = authHeader.replace("Bearer ", "").trim();
-    
-    console.log("[HA] Token length:", token.length);
-    console.log("[HA] Service role key length:", serviceRoleKey?.length);
-    console.log("[HA] Token first 10 chars:", token.substring(0, 10));
-    console.log("[HA] SRK first 10 chars:", serviceRoleKey?.substring(0, 10));
-    console.log("[HA] Token matches service role:", token === serviceRoleKey);
+
+    // Try to validate as user JWT first
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: userData, error: userError } = await anonClient.auth.getUser(token);
 
     let supabase;
-    if (token === serviceRoleKey) {
-      console.log("[HA] Using service role client");
-      supabase = createClient(supabaseUrl, serviceRoleKey, {
+    if (userData?.user) {
+      // Valid user JWT
+      console.log("[HA] Authenticated as user:", userData.user.email);
+      supabase = anonClient;
+    } else if (userError?.message?.includes("missing sub claim")) {
+      // This is a service_role key (no sub claim in JWT) — use it directly
+      console.log("[HA] Service role key detected, using as client key");
+      supabase = createClient(supabaseUrl, token, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
     } else {
-      console.log("[HA] Using user JWT client, validating...");
-      supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
+      console.log("[HA] Auth failed:", userError?.message);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser(token);
-      if (userError || !userData?.user) {
-        console.log("[HA] User validation failed:", userError?.message);
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
     }
 
     const url = new URL(req.url);
@@ -72,9 +63,7 @@ Deno.serve(async (req) => {
     if (endpoint === "summary" || endpoint === "all") {
       const { data: activeShifts } = await supabase
         .from("time_clock")
-        .select(
-          "id, employee_id, clock_in_time, employee:employees(first_name, last_name)"
-        )
+        .select("id, employee_id, clock_in_time, employee:employees(first_name, last_name)")
         .is("clock_out_time", null);
 
       const { data: todayShifts } = await supabase
@@ -85,9 +74,7 @@ Deno.serve(async (req) => {
       let totalHoursToday = 0;
       (todayShifts || []).forEach((s) => {
         const start = new Date(s.clock_in_time).getTime();
-        const end = s.clock_out_time
-          ? new Date(s.clock_out_time).getTime()
-          : Date.now();
+        const end = s.clock_out_time ? new Date(s.clock_out_time).getTime() : Date.now();
         totalHoursToday += (end - start) / (1000 * 60 * 60);
       });
 
@@ -100,10 +87,7 @@ Deno.serve(async (req) => {
           employee_id: s.employee_id,
           clock_in_time: s.clock_in_time,
           hours_elapsed: parseFloat(
-            (
-              (Date.now() - new Date(s.clock_in_time).getTime()) /
-              (1000 * 60 * 60)
-            ).toFixed(2)
+            ((Date.now() - new Date(s.clock_in_time).getTime()) / (1000 * 60 * 60)).toFixed(2)
           ),
         })),
         total_shifts_today: (todayShifts || []).length,
@@ -167,10 +151,7 @@ Deno.serve(async (req) => {
     console.error("[HA] Error:", (err as Error).message);
     return new Response(
       JSON.stringify({ error: (err as Error).message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
