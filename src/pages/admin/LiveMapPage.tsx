@@ -60,7 +60,9 @@ function createColoredIcon(color: string) {
 
 export default function LiveMapPage() {
   const [locations, setLocations] = useState<EmployeeLocation[]>([]);
+  const [noLocationEmployees, setNoLocationEmployees] = useState<{ employee_id: string; first_name: string; last_name: string; category: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalOnShift, setTotalOnShift] = useState(0);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
@@ -97,8 +99,12 @@ export default function LiveMapPage() {
 
       // Get latest location for each employee on shift
       const results: EmployeeLocation[] = [];
+      const noLoc: typeof noLocationEmployees = [];
 
       for (const shift of activeShifts) {
+        const emp = empMap.get(shift.employee_id);
+        if (!emp) continue;
+
         const { data: locData } = await supabase
           .from("employee_locations")
           .select("latitude, longitude, accuracy, recorded_at")
@@ -108,24 +114,30 @@ export default function LiveMapPage() {
           .maybeSingle();
 
         if (locData) {
-          const emp = empMap.get(shift.employee_id);
-          if (emp) {
-            results.push({
-              employee_id: shift.employee_id,
-              first_name: emp.first_name,
-              last_name: emp.last_name,
-              category: emp.category,
-              latitude: Number(locData.latitude),
-              longitude: Number(locData.longitude),
-              accuracy: locData.accuracy ? Number(locData.accuracy) : null,
-              recorded_at: locData.recorded_at,
-              clock_in_time: shift.clock_in_time,
-            });
-          }
+          results.push({
+            employee_id: shift.employee_id,
+            first_name: emp.first_name,
+            last_name: emp.last_name,
+            category: emp.category,
+            latitude: Number(locData.latitude),
+            longitude: Number(locData.longitude),
+            accuracy: locData.accuracy ? Number(locData.accuracy) : null,
+            recorded_at: locData.recorded_at,
+            clock_in_time: shift.clock_in_time,
+          });
+        } else {
+          noLoc.push({
+            employee_id: shift.employee_id,
+            first_name: emp.first_name,
+            last_name: emp.last_name,
+            category: emp.category,
+          });
         }
       }
 
       setLocations(results);
+      setNoLocationEmployees(noLoc);
+      setTotalOnShift(activeShifts.length);
     } catch (err) {
       console.error("[LiveMap] Error fetching locations:", err);
     } finally {
@@ -228,7 +240,7 @@ export default function LiveMapPage() {
         ))}
         <Badge variant="secondary" className="ml-auto gap-1.5">
           <Users className="h-3 w-3" />
-          {locations.length} on shift
+          {totalOnShift} on shift
         </Badge>
       </div>
 
@@ -248,6 +260,29 @@ export default function LiveMapPage() {
         <p className="text-center text-muted-foreground py-4">
           No employees are currently on shift with location data.
         </p>
+      )}
+
+      {!isLoading && noLocationEmployees.length > 0 && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              On shift without location data ({noLocationEmployees.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 pt-0">
+            <div className="flex flex-wrap gap-2">
+              {noLocationEmployees.map((emp) => (
+                <Badge key={emp.employee_id} variant="outline" className="capitalize gap-1.5">
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ background: CATEGORY_COLORS[emp.category] || "#6b7280" }}
+                  />
+                  {emp.first_name} {emp.last_name}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
