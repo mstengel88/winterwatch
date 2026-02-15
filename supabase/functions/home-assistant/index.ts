@@ -144,6 +144,20 @@ Deno.serve(async (req) => {
       responseData.work_logs_today = (plowCount || 0) + (shovelCount || 0);
     }
 
+    if (endpoint === "summary" || endpoint === "all") {
+      const { count: allTimePlowCompleted } = await supabase
+        .from("work_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "completed");
+
+      const { count: allTimeShovelCompleted } = await supabase
+        .from("shovel_work_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "completed");
+
+      responseData.all_time_completed = (allTimePlowCompleted || 0) + (allTimeShovelCompleted || 0);
+    }
+
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
