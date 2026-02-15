@@ -951,6 +951,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_employee_locations: { Args: never; Returns: undefined }
       get_employee_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
