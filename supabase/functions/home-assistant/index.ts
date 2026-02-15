@@ -35,14 +35,14 @@ Deno.serve(async (req) => {
         auth: { persistSession: false, autoRefreshToken: false },
       });
     } else {
-      // User JWT: validate claims
+      // User JWT: validate via getUser
       supabase = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: authHeader } },
       });
 
-      const { data: claimsData, error: claimsError } =
-        await supabase.auth.getClaims(token);
-      if (claimsError || !claimsData?.claims) {
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser(token);
+      if (userError || !userData?.user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
