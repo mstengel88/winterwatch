@@ -13,7 +13,11 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    console.log("[HA] Auth header present:", !!authHeader);
+    console.log("[HA] Auth header starts with Bearer:", authHeader?.startsWith("Bearer "));
+    
     if (!authHeader?.startsWith("Bearer ")) {
+      console.log("[HA] Rejected: no Bearer token");
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -24,18 +28,22 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace("Bearer ", "").trim();
+    
+    console.log("[HA] Token length:", token.length);
+    console.log("[HA] Service role key length:", serviceRoleKey?.length);
+    console.log("[HA] Token first 10 chars:", token.substring(0, 10));
+    console.log("[HA] SRK first 10 chars:", serviceRoleKey?.substring(0, 10));
+    console.log("[HA] Token matches service role:", token === serviceRoleKey);
 
-    // Check if the token is the service_role key (for Home Assistant polling)
-    // Otherwise validate as a user JWT
     let supabase;
     if (token === serviceRoleKey) {
-      // Service role: full access, used by Home Assistant
+      console.log("[HA] Using service role client");
       supabase = createClient(supabaseUrl, serviceRoleKey, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
     } else {
-      // User JWT: validate via getUser
+      console.log("[HA] Using user JWT client, validating...");
       supabase = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: authHeader } },
       });
@@ -43,6 +51,7 @@ Deno.serve(async (req) => {
       const { data: userData, error: userError } =
         await supabase.auth.getUser(token);
       if (userError || !userData?.user) {
+        console.log("[HA] User validation failed:", userError?.message);
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -52,6 +61,7 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const endpoint = url.searchParams.get("endpoint") || "summary";
+    console.log("[HA] Endpoint:", endpoint);
 
     const responseData: Record<string, unknown> = {};
 
@@ -60,7 +70,6 @@ Deno.serve(async (req) => {
     const todayISO = todayStart.toISOString();
 
     if (endpoint === "summary" || endpoint === "all") {
-      // Active shifts (clocked in, not out)
       const { data: activeShifts } = await supabase
         .from("time_clock")
         .select(
@@ -68,7 +77,6 @@ Deno.serve(async (req) => {
         )
         .is("clock_out_time", null);
 
-      // Today's shifts
       const { data: todayShifts } = await supabase
         .from("time_clock")
         .select("id, clock_in_time, clock_out_time")
@@ -156,6 +164,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    console.error("[HA] Error:", (err as Error).message);
     return new Response(
       JSON.stringify({ error: (err as Error).message }),
       {
