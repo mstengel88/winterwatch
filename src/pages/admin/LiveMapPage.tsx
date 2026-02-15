@@ -234,14 +234,13 @@ export default function LiveMapPage() {
 
       {/* Map */}
       <Card>
-        <CardContent className="p-0 overflow-hidden rounded-lg">
-          {isLoading && locations.length === 0 ? (
-            <div className="flex items-center justify-center h-[500px]">
+        <CardContent className="p-0 overflow-hidden rounded-lg relative">
+          {isLoading && locations.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : (
-            <div ref={mapContainerRef} className="h-[500px] md:h-[600px] w-full" />
           )}
+          <div ref={mapContainerRef} className="h-[500px] md:h-[600px] w-full" />
         </CardContent>
       </Card>
 
