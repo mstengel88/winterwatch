@@ -48,8 +48,19 @@ Deno.serve(async (req) => {
       .select("user_id")
       .in("role", ["admin", "manager"]);
 
-    const adminUserIds = [...new Set(adminRoles?.map((r) => r.user_id) || [])];
-    console.log(`Found ${adminUserIds.length} admin/manager users to notify`);
+    const allAdminUserIds = [...new Set(adminRoles?.map((r) => r.user_id) || [])];
+    console.log(`Found ${allAdminUserIds.length} admin/manager users total`);
+
+    // Filter out users who have notifications disabled
+    const { data: disabledSettings } = await supabase
+      .from("maintenance_notification_settings")
+      .select("user_id")
+      .in("user_id", allAdminUserIds)
+      .eq("enabled", false);
+
+    const disabledUserIds = new Set(disabledSettings?.map((s) => s.user_id) || []);
+    const adminUserIds = allAdminUserIds.filter((id) => !disabledUserIds.has(id));
+    console.log(`After filtering disabled: ${adminUserIds.length} users to notify`);
 
     if (adminUserIds.length === 0) {
       return new Response(
