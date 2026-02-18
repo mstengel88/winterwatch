@@ -13,6 +13,7 @@ import { LogMaintenanceDialog } from '@/components/equipment/LogMaintenanceDialo
 import { MaintenanceHistoryDialog } from '@/components/equipment/MaintenanceHistoryDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MaintenanceRequestsTab } from '@/components/equipment/MaintenanceRequestsTab';
+import { MaintenanceNotificationSettings } from '@/components/equipment/MaintenanceNotificationSettings';
 
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -300,8 +301,9 @@ export default function EquipmentPage() {
           </p>
         </TabsContent>
 
-        <TabsContent value="requests">
+        <TabsContent value="requests" className="space-y-6">
           <MaintenanceRequestsTab />
+          <MaintenanceNotificationSettings />
         </TabsContent>
       </Tabs>
 
