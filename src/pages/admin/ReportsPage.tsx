@@ -215,10 +215,11 @@ export default function ReportsPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const startDate = new Date(fromDate);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(toDate);
-      endDate.setHours(23, 59, 59, 999);
+      // Parse as local time (not UTC) by splitting the date string
+      const [sy, sm, sd] = fromDate.split('-').map(Number);
+      const startDate = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+      const [ey, em, ed] = toDate.split('-').map(Number);
+      const endDate = new Date(ey, em - 1, ed, 23, 59, 59, 999);
 
       const [
         timeClockRes,
