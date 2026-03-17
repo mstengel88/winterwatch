@@ -33,8 +33,31 @@ interface ReportSummary {
   dateRange: string;
 }
 
+// Column keys for work logs PDF
+export type WorkLogColumn = 'type' | 'date' | 'checkIn' | 'checkOut' | 'duration' | 'account' | 'serviceType' | 'snowDepth' | 'saltLbs' | 'equipment' | 'employee' | 'conditions' | 'notes';
+
+export const WORK_LOG_COLUMNS: { key: WorkLogColumn; label: string }[] = [
+  { key: 'type', label: 'Type' },
+  { key: 'date', label: 'Date' },
+  { key: 'checkIn', label: 'Check In' },
+  { key: 'checkOut', label: 'Check Out' },
+  { key: 'duration', label: 'Duration' },
+  { key: 'account', label: 'Account' },
+  { key: 'serviceType', label: 'Service' },
+  { key: 'snowDepth', label: 'Snow' },
+  { key: 'saltLbs', label: 'Salt' },
+  { key: 'equipment', label: 'Equipment' },
+  { key: 'employee', label: 'Employee' },
+  { key: 'conditions', label: 'Conditions' },
+  { key: 'notes', label: 'Notes' },
+];
+
+export const DEFAULT_VISIBLE_COLUMNS: WorkLogColumn[] = WORK_LOG_COLUMNS.map(c => c.key);
+
 interface GeneratePdfOptions {
   returnBlob?: boolean;
+  fontSize?: number; // 5-12, default 6
+  visibleColumns?: WorkLogColumn[];
 }
 
 export function generateWorkLogsPDF(
@@ -95,29 +118,46 @@ export function generateWorkLogsPDF(
     return [100, 100, 100];
   };
 
-  // Work logs table
+  const fontSize = options?.fontSize ?? 6;
+  const visibleCols = options?.visibleColumns ?? DEFAULT_VISIBLE_COLUMNS;
+
+  const allColumnDefs: { key: WorkLogColumn; header: string; width: number; getValue: (log: WorkLogData) => string }[] = [
+    { key: 'type', header: 'Type', width: 16, getValue: (log) => log.type === 'plow' ? 'Plow' : 'Shovel' },
+    { key: 'date', header: 'Date', width: 18, getValue: (log) => log.date },
+    { key: 'checkIn', header: 'Check In', width: 14, getValue: (log) => log.checkIn },
+    { key: 'checkOut', header: 'Check Out', width: 14, getValue: (log) => log.checkOut },
+    { key: 'duration', header: 'Duration', width: 14, getValue: (log) => log.duration },
+    { key: 'account', header: 'Account', width: 32, getValue: (log) => log.account },
+    { key: 'serviceType', header: 'Service', width: 20, getValue: (log) => log.serviceType },
+    { key: 'snowDepth', header: 'Snow', width: 12, getValue: (log) => log.snowDepth },
+    { key: 'saltLbs', header: 'Salt', width: 12, getValue: (log) => log.saltLbs },
+    { key: 'equipment', header: 'Equipment', width: 24, getValue: (log) => log.equipment },
+    { key: 'employee', header: 'Employee', width: 28, getValue: (log) => log.employee },
+    { key: 'conditions', header: 'Conditions', width: 22, getValue: (log) => log.conditions },
+    { key: 'notes', header: 'Notes', width: 30, getValue: (log) => log.notes || '-' },
+  ];
+
+  const activeCols = allColumnDefs.filter(c => visibleCols.includes(c.key));
+  const typeColIndex = activeCols.findIndex(c => c.key === 'type');
+  const serviceColIndex = activeCols.findIndex(c => c.key === 'serviceType');
+
   if (workLogs.length > 0) {
+    const totalDefinedWidth = activeCols.reduce((s, c) => s + c.width, 0);
+    const availableWidth = pageWidth - 30;
+    const scaleFactor = availableWidth / totalDefinedWidth;
+
+    const columnStyles: Record<number, { cellWidth: number }> = {};
+    activeCols.forEach((col, i) => {
+      columnStyles[i] = { cellWidth: col.width * scaleFactor };
+    });
+
     autoTable(doc, {
       startY: 50,
-      head: [['Type', 'Date', 'Check In', 'Check Out', 'Duration', 'Account', 'Service', 'Snow', 'Salt', 'Equipment', 'Employee', 'Conditions', 'Notes']],
-      body: workLogs.map((log) => [
-        log.type === 'plow' ? 'Plow' : 'Shovel',
-        log.date,
-        log.checkIn,
-        log.checkOut,
-        log.duration,
-        log.account,
-        log.serviceType,
-        log.snowDepth,
-        log.saltLbs,
-        log.equipment,
-        log.employee,
-        log.conditions,
-        log.notes || '-',
-      ]),
+      head: [activeCols.map(c => c.header)],
+      body: workLogs.map((log) => activeCols.map(c => c.getValue(log))),
       styles: {
-        fontSize: 6,
-        cellPadding: 1.5,
+        fontSize,
+        cellPadding: Math.max(1, fontSize * 0.25),
         textColor: [0, 0, 0],
       },
       headStyles: {
@@ -131,33 +171,17 @@ export function generateWorkLogsPDF(
         textColor: [0, 0, 0],
       },
       alternateRowStyles: {
-        fillColor: [226, 232, 240], // slate-200 for more contrast
+        fillColor: [226, 232, 240],
       },
-      columnStyles: {
-        0: { cellWidth: 16 },  // Type
-        1: { cellWidth: 18 },  // Date
-        2: { cellWidth: 14 },  // Check In
-        3: { cellWidth: 14 },  // Check Out
-        4: { cellWidth: 14 },  // Duration
-        5: { cellWidth: 32 },  // Account
-        6: { cellWidth: 20 },  // Service
-        7: { cellWidth: 12 },  // Snow
-        8: { cellWidth: 12 },  // Salt
-        9: { cellWidth: 24 },  // Equipment
-        10: { cellWidth: 28 }, // Employee
-        11: { cellWidth: 22 }, // Conditions
-        12: { cellWidth: 30 }, // Notes
-      },
+      columnStyles,
       didParseCell: (data) => {
-        // Color the Type column (index 0) based on plow vs shovel
-        if (data.section === 'body' && data.column.index === 0) {
+        if (data.section === 'body' && typeColIndex >= 0 && data.column.index === typeColIndex) {
           const type = String(data.cell.raw || '').toLowerCase();
           data.cell.styles.fillColor = getTypeColor(type);
           data.cell.styles.textColor = [255, 255, 255];
           data.cell.styles.fontStyle = 'bold';
         }
-        // Color the Service column (index 6) based on service type
-        if (data.section === 'body' && data.column.index === 6) {
+        if (data.section === 'body' && serviceColIndex >= 0 && data.column.index === serviceColIndex) {
           const serviceType = String(data.cell.raw || '');
           data.cell.styles.fillColor = getServiceColor(serviceType);
           data.cell.styles.textColor = [255, 255, 255];

@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
-import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF } from '@/lib/pdfExport';
+import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF, DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExport';
+import { PdfExportSettings } from '@/components/reports/PdfExportSettings';
 import { toast } from 'sonner';
 import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
@@ -143,6 +144,10 @@ export default function ReportsPage() {
   const [accountSortOrder, setAccountSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
   const [activeTab, setActiveTab] = useState('current');
   const [activeShiftTab, setActiveShiftTab] = useState('current');
+
+  // PDF export settings
+  const [pdfFontSize, setPdfFontSize] = useState(6);
+  const [pdfVisibleColumns, setPdfVisibleColumns] = useState<WorkLogColumn[]>(DEFAULT_VISIBLE_COLUMNS);
 
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
@@ -500,7 +505,7 @@ export default function ReportsPage() {
       saltCount,
       propertyCount: uniqueAccounts,
       dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
-    });
+    }, 'Work Logs Report', { fontSize: pdfFontSize, visibleColumns: pdfVisibleColumns });
     toast.success('PDF exported successfully');
   };
 
@@ -554,7 +559,7 @@ export default function ReportsPage() {
       saltCount,
       propertyCount: uniqueAccounts,
       dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
-    }, 'Work Logs Report', { returnBlob: true });
+    }, 'Work Logs Report', { returnBlob: true, fontSize: pdfFontSize, visibleColumns: pdfVisibleColumns });
 
     if (!pdfBlob) {
       toast.error('Failed to generate PDF');
@@ -1256,6 +1261,14 @@ export default function ReportsPage() {
           </Button>
         </div>
       </div>
+
+      {/* PDF Export Settings */}
+      <PdfExportSettings
+        fontSize={pdfFontSize}
+        onFontSizeChange={setPdfFontSize}
+        visibleColumns={pdfVisibleColumns}
+        onVisibleColumnsChange={setPdfVisibleColumns}
+      />
 
       {/* Filters Card */}
       <Card className="bg-[hsl(var(--card))]/80 border-border/50">
