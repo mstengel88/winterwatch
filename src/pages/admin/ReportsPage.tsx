@@ -517,21 +517,14 @@ export default function ReportsPage() {
 
     if (blob) {
       const url = URL.createObjectURL(blob);
-      // Use a hidden iframe to avoid Chrome popup blocker
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.addEventListener('load', () => {
-        setTimeout(() => {
-          iframe.contentWindow?.print();
-        }, 250);
-      });
-      // Clean up after printing
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-        URL.revokeObjectURL(url);
-      }, 120000);
+      // Open PDF in a new tab so the user can print from there
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.click();
+      // Clean up after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
     }
   };
 
