@@ -1,9 +1,14 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useWorkLogs } from '@/hooks/useWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useWeather } from '@/hooks/useWeather';
+import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
+import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
+import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
+import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
+import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 import { 
   Snowflake, 
   Truck, 
@@ -42,9 +51,32 @@ interface AccountWithDistance extends Account {
 }
 
 export default function DriverDashboard() {
-  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const { profile, isAdminOrManager } = useAuth();
   const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
-  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading, error: geoError } = useGeolocation();
+  const {
+  location: geoLocation,
+  isLoading: geoLoading,
+  error: geoError,
+  refreshOnce,
+} = useGeolocation();
+
+  useEffect(() => {
+    refreshOnce(); // initial prompt + fetch
+
+    const interval = setInterval(() => {
+      refreshOnce(); // keep it updated
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [refreshOnce]);
+
+  // Fetch weather based on geolocation
+  const { weather: weatherData, isLoading: weatherLoading } = useWeather(
+    geoLocation?.latitude ?? null,
+    geoLocation?.longitude ?? null
+  );
+
   const { toast } = useToast();
   const {
     photos,
@@ -56,19 +88,8 @@ export default function DriverDashboard() {
     clearPhotos,
     uploadPhotos,
     canAddMore,
+    restorePreviews,
   } = usePhotoUpload({ folder: 'work-logs' });
-
-  // Get location on mount and set up periodic refresh
-  useEffect(() => {
-    getCurrentLocation();
-    
-    // Refresh location every 30 seconds for real-time updates
-    const interval = setInterval(() => {
-      getCurrentLocation();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [getCurrentLocation]);
 
   // Form state
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -77,14 +98,25 @@ export default function DriverDashboard() {
   const [selectedEmployees, setSelectedEmployees] = useState('');
   const [snowDepth, setSnowDepth] = useState('');
   const [saltUsed, setSaltUsed] = useState('');
-  const [temperature, setTemperature] = useState('31');
-  const [weather, setWeather] = useState('Overcast');
-  const [windSpeed, setWindSpeed] = useState('7');
+  const [temperature, setTemperature] = useState('');
+  const [weather, setWeather] = useState('');
+  const [windSpeed, setWindSpeed] = useState('');
   const [notes, setNotes] = useState('');
   const [allEquipment, setAllEquipment] = useState<any[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
+  const [onShiftEmployeeIds, setOnShiftEmployeeIds] = useState<Set<string>>(new Set());
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  // Auto-populate weather fields when weather data is fetched
+  useEffect(() => {
+    if (weatherData) {
+      setTemperature(String(weatherData.temperature));
+      setWeather(weatherData.conditions);
+      setWindSpeed(String(weatherData.windSpeed));
+    }
+  }, [weatherData]);
 
   // Employee selection for UI display only - doesn't affect work log tracking
   const selectedEmployeeNameForUi = useMemo(() => {
@@ -106,6 +138,228 @@ export default function DriverDashboard() {
     checkOut,
   } = useWorkLogs({ employeeId: employee?.id });
 
+  // Plow checkout persistence (for the active work checkout section on this page)
+  // When navigating away (e.g., to /shovel) and back, the component remounts and `activeWorkLog`
+  // may be null for a moment while refetching. If we don't have a stable id during that window,
+  // the form appears to "clear".
+  const LAST_ACTIVE_PLOW_WORKLOG_ID_KEY = 'winterwatch_last_active_plow_worklog_id';
+
+  const [persistedActiveWorkLogId, setPersistedActiveWorkLogId] = useState<string>(() => {
+    try {
+      return sessionStorage.getItem(LAST_ACTIVE_PLOW_WORKLOG_ID_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+
+  useEffect(() => {
+    if (!activeWorkLog?.id) return;
+    if (activeWorkLog.id === persistedActiveWorkLogId) return;
+
+    setPersistedActiveWorkLogId(activeWorkLog.id);
+    try {
+      sessionStorage.setItem(LAST_ACTIVE_PLOW_WORKLOG_ID_KEY, activeWorkLog.id);
+    } catch {
+      // ignore
+    }
+  }, [activeWorkLog?.id, persistedActiveWorkLogId]);
+
+  const activeWorkLogIdForPersistence = persistedActiveWorkLogId || activeWorkLog?.id || '__no_active_worklog__';
+  const storageKey = `winterwatch_checkout_form_plow_${activeWorkLogIdForPersistence}`;
+
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData, saveStatus } =
+    useCheckoutFormPersistence({ workLogId: activeWorkLogIdForPersistence, variant: 'plow' });
+
+  const isRestoringCheckoutRef = useRef(false);
+  const hasLoadedNativePreviewsRef = useRef(false);
+  const hasRestoredServiceTypeRef = useRef(false);
+  const hasRestoredEquipmentRef = useRef(false);
+  const hasRestoredFormRef = useRef(false);
+
+  const hasActiveCheckoutPersistence =
+    !!activeWorkLogIdForPersistence && activeWorkLogIdForPersistence !== '__no_active_worklog__';
+
+  // iOS app switching can suspend the JS thread quickly after returning from the photo picker.
+  // Persist previews immediately (instead of waiting for a later effect) so they restore reliably.
+  const handleAddPhotos = useCallback(
+    async (files: FileList | File[]) => {
+      const nextPreviews = (await addPhotos(files)) as unknown as string[];
+      // IMPORTANT: On iOS, `activeWorkLog` can briefly go undefined on resume / after photo picker.
+      // Persist against the stable persisted ID instead of requiring `activeWorkLog`.
+      if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
+      if (isRestoringCheckoutRef.current) return;
+      await updatePhotoPreviews(nextPreviews);
+    },
+    [addPhotos, activeWorkLogIdForPersistence, updatePhotoPreviews],
+  );
+
+  const handleRemovePhoto = useCallback(
+    (index: number) => {
+      const nextPreviews = previews.filter((_, i) => i !== index);
+      removePhoto(index);
+      if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
+      if (isRestoringCheckoutRef.current) return;
+      void updatePhotoPreviews(nextPreviews);
+    },
+    [activeWorkLogIdForPersistence, previews, removePhoto, updatePhotoPreviews],
+  );
+
+  // If the active work log changes (or rehydrates after resume), allow native preview restore again.
+  useEffect(() => {
+    hasLoadedNativePreviewsRef.current = false;
+    hasRestoredFormRef.current = false;
+    hasRestoredServiceTypeRef.current = false;
+    hasRestoredEquipmentRef.current = false;
+  }, [activeWorkLog?.id]);
+
+  // Restore persisted checkout state from formData immediately (like shovel dashboard).
+  // We don't wait for activeWorkLog to be truthy because localStorage is already keyed
+  // to the stable activeWorkLogIdForPersistence.
+  useEffect(() => {
+    if (!hasActiveCheckoutPersistence) return;
+    if (hasRestoredFormRef.current) return;
+    if (Object.keys(formData).length === 0) return;
+
+    // Mark as restored so we don't immediately overwrite localStorage with empty state.
+    hasRestoredFormRef.current = true;
+    isRestoringCheckoutRef.current = true;
+
+    const persisted = formData ?? {};
+
+    if (persisted.snowDepth) setSnowDepth(persisted.snowDepth);
+    if (persisted.saltUsed) setSaltUsed(persisted.saltUsed);
+    if (persisted.notes) setNotes(persisted.notes);
+    if (persisted.weather) setWeather(persisted.weather);
+    if (persisted.equipmentId) {
+      setSelectedEquipment(persisted.equipmentId);
+      hasRestoredEquipmentRef.current = true;
+    }
+
+    if (persisted.serviceType && ['plow', 'salt', 'both'].includes(persisted.serviceType)) {
+      setServiceType(persisted.serviceType as 'plow' | 'salt' | 'both');
+      hasRestoredServiceTypeRef.current = true;
+    }
+
+    window.setTimeout(() => {
+      isRestoringCheckoutRef.current = false;
+    }, 100);
+  }, [hasActiveCheckoutPersistence, formData]);
+
+
+  // Native iOS: restore photo previews from Filesystem refs
+  useEffect(() => {
+    if (!activeWorkLog) return;
+    if (hasLoadedNativePreviewsRef.current) return;
+    if (previews.length > 0) return;
+    if (!formData.photoPreviewRefs || formData.photoPreviewRefs.length === 0) return;
+
+    hasLoadedNativePreviewsRef.current = true;
+    void (async () => {
+      try {
+        const restored = await loadCheckoutPhotoPreviews(formData.photoPreviewRefs!);
+        if (restored.length > 0) restorePreviews(restored);
+      } catch {
+        // best-effort
+      }
+    })();
+  }, [activeWorkLog, formData.photoPreviewRefs, previews.length, restorePreviews]);
+
+
+  // Persist checkout fields (only while we have a stable active workLogId)
+  // IMPORTANT: `activeWorkLog` can temporarily be null during refetch/app resume.
+  // We still want to persist against the stable ID so fields don’t “not save”.
+  useEffect(() => {
+    if (!hasActiveCheckoutPersistence) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('snowDepth', snowDepth);
+  }, [hasActiveCheckoutPersistence, snowDepth, updateField]);
+
+  useEffect(() => {
+    if (!hasActiveCheckoutPersistence) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('saltUsed', saltUsed);
+  }, [hasActiveCheckoutPersistence, saltUsed, updateField]);
+
+  useEffect(() => {
+    if (!hasActiveCheckoutPersistence) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('weather', weather);
+  }, [hasActiveCheckoutPersistence, weather, updateField]);
+
+  useEffect(() => {
+    if (!hasActiveCheckoutPersistence) return;
+    if (isRestoringCheckoutRef.current) return;
+    updateField('notes', notes);
+  }, [hasActiveCheckoutPersistence, notes, updateField]);
+
+  // Persist equipment selection
+  useEffect(() => {
+    if (!hasActiveCheckoutPersistence) return;
+    if (isRestoringCheckoutRef.current) return;
+    // Only persist if user has interacted OR we previously restored a value
+    if (hasRestoredEquipmentRef.current || selectedEquipment !== '') {
+      updateField('equipmentId', selectedEquipment);
+    }
+  }, [hasActiveCheckoutPersistence, selectedEquipment, updateField]);
+
+  // Persist service type selection
+  useEffect(() => {
+    if (!hasActiveCheckoutPersistence) return;
+    if (isRestoringCheckoutRef.current) return;
+    // Only persist if user has interacted OR we previously restored a value
+    if (hasRestoredServiceTypeRef.current || serviceType !== 'plow') {
+      updateField('serviceType', serviceType);
+    }
+  }, [hasActiveCheckoutPersistence, serviceType, updateField]);
+
+  useEffect(() => {
+    // Same reasoning as above: use the stable ID, not the live activeWorkLog reference.
+    if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
+    if (isRestoringCheckoutRef.current) return;
+    if (previews.length === 0) return;
+    void updatePhotoPreviews(previews);
+  }, [activeWorkLogIdForPersistence, previews, updatePhotoPreviews]);
+
+  // iOS: Persist photo previews immediately when app goes to background
+  // This catches the case where iOS suspends JS before the async write completes.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    if (!activeWorkLogIdForPersistence || activeWorkLogIdForPersistence === '__no_active_worklog__') return;
+
+    const listener = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive && previews.length > 0) {
+        console.log('[Persistence] App backgrounding – persisting photo previews');
+        // IMPORTANT: Saving the preview files alone is not enough; we also need the
+        // refs list persisted into the checkout-form JSON so we can restore on resume.
+        // Fire-and-forget (iOS may suspend quickly).
+        void updatePhotoPreviews(previews);
+      }
+    });
+
+    return () => {
+      void listener.then((l) => l.remove());
+    };
+  }, [activeWorkLogIdForPersistence, previews, updatePhotoPreviews]);
+// 🔍 DEBUG: check what accounts DriverDashboard is actually receiving
+  useEffect(() => {
+    const withCoords = accounts.filter(
+      (a) => a.latitude != null && a.longitude != null
+    );
+
+    console.log("📍 DriverDashboard accounts TOTAL:", accounts.length);
+    console.log("📍 DriverDashboard accounts WITH coords:", withCoords.length);
+    console.log(
+      "📍 Sample coords:",
+      withCoords.slice(0, 3).map((a) => ({
+        name: a.name,
+        latitude: a.latitude,
+        longitude: a.longitude,
+      }))
+    );
+  }, [accounts]);
+
+
+
   // Filter equipment based on selected service type and sort by number descending
   // Plow → show 'plow' and 'both', Salt/Both → show 'both' only
   const filteredEquipment = useMemo(() => {
@@ -123,17 +377,18 @@ export default function DriverDashboard() {
     });
   }, [allEquipment, serviceType]);
 
-  // Clear equipment selection when service type changes if current selection doesn't match
+  // Clear equipment selection when service type changes if current selection doesn't match.
+  // IMPORTANT: On remount/restore, `selectedEquipment` can be set before equipment finishes loading.
+  // If we validate against an empty `filteredEquipment` list, we incorrectly clear the persisted value.
   useEffect(() => {
-    if (selectedEquipment) {
-      const isValid = filteredEquipment.some(eq => eq.id === selectedEquipment);
-      if (!isValid) {
-        setSelectedEquipment('');
-      }
-    }
-  }, [serviceType, filteredEquipment, selectedEquipment]);
+    if (allEquipment.length === 0) return;
+    if (!selectedEquipment) return;
 
-  // Fetch equipment and plow employees
+    const isValid = filteredEquipment.some((eq) => eq.id === selectedEquipment);
+    if (!isValid) setSelectedEquipment('');
+  }, [allEquipment.length, filteredEquipment, selectedEquipment]);
+
+  // Fetch equipment, plow employees, and on-shift status
   useEffect(() => {
     supabase.from('equipment').select('*').eq('is_active', true).eq('status', 'available').then(({ data }) => {
       if (data) setAllEquipment(data);
@@ -148,6 +403,15 @@ export default function DriverDashboard() {
       .order('first_name')
       .then(({ data }) => {
         if (data) setPlowEmployees(data as Employee[]);
+      });
+
+    // Fetch employees currently on shift
+    supabase
+      .from('time_clock')
+      .select('employee_id')
+      .is('clock_out_time', null)
+      .then(({ data }) => {
+        if (data) setOnShiftEmployeeIds(new Set(data.map(d => d.employee_id)));
       });
   }, []);
 
@@ -208,44 +472,46 @@ export default function DriverDashboard() {
   }, [activeWorkLog]);
 
   // Calculate sorted accounts by distance
-  const sortedAccounts = useMemo((): AccountWithDistance[] => {
-    if (!geoLocation || accounts.length === 0) {
-      return accounts.map(acc => ({ ...acc, distance: undefined }));
-    }
-    
-    return accounts
-      .map((acc) => {
-        let distance: number | undefined = undefined;
-        if (acc.latitude && acc.longitude) {
-          distance = calculateDistance(
-            geoLocation.latitude,
-            geoLocation.longitude,
-            acc.latitude,
-            acc.longitude
-          );
-        }
-        return { ...acc, distance };
-      })
-      .sort((a, b) => {
-        // Accounts with distance first, sorted by distance
-        if (a.distance !== undefined && b.distance !== undefined) {
-          return a.distance - b.distance;
-        }
-        if (a.distance !== undefined) return -1;
-        if (b.distance !== undefined) return 1;
-        return a.name.localeCompare(b.name);
-      });
-  }, [geoLocation, accounts]);
+const sortedAccounts = useMemo((): AccountWithDistance[] => {
+  if (!geoLocation || accounts.length === 0) {
+    return accounts.map((acc) => ({ ...acc, distance: undefined }));
+  }
+
+  return accounts
+    .map((acc) => {
+      let distance: number | undefined = undefined;
+
+      const lat = Number(acc.latitude);
+      const lng = Number(acc.longitude);
+
+if (Number.isFinite(lat) && Number.isFinite(lng)) {
+  distance = calculateDistance(
+    geoLocation.latitude,
+    geoLocation.longitude,
+    lat,
+    lng
+  );
+}
+
+
+      return { ...acc, distance };
+    })
+    .sort((a, b) => {
+      if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
+      if (a.distance !== undefined) return -1;
+      if (b.distance !== undefined) return 1;
+      return a.name.localeCompare(b.name);
+    });
+}, [geoLocation, accounts]);
+
 
   // Get nearest account
   const nearestAccount = useMemo(() => {
-    if (sortedAccounts.length === 0) return null;
-    const first = sortedAccounts[0];
-    if (first.distance !== undefined) {
-      return { account: first, distance: first.distance };
-    }
-    return null;
-  }, [sortedAccounts]);
+  const firstWithDistance = sortedAccounts.find((a) => a.distance !== undefined);
+  if (!firstWithDistance || firstWithDistance.distance === undefined) return null;
+  return { account: firstWithDistance, distance: firstWithDistance.distance };
+}, [sortedAccounts]);
+
 
   // Auto-select nearest account when location updates and no account selected
   useEffect(() => {
@@ -256,9 +522,13 @@ export default function DriverDashboard() {
 
   // Handle manual location refresh
   const handleRefreshLocation = useCallback(async () => {
-    await getCurrentLocation();
-    toast({ title: 'Location updated' });
-  }, [getCurrentLocation, toast]);
+  const loc = await refreshOnce();
+  if (loc) {
+    toast({ title: "Location updated" });
+  }
+}, [refreshOnce, toast]);
+
+
 
   // Today's stats
   const todayStats = useMemo(() => {
@@ -284,19 +554,24 @@ export default function DriverDashboard() {
     if (success) {
       toast({ title: 'Shift started!' });
       // Refresh location after clocking in
-      getCurrentLocation();
+      refreshOnce();
     } else {
       toast({ variant: 'destructive', title: 'Failed to start shift' });
     }
   };
 
-  const handleClockOut = async () => {
+  const handleClockOutClick = () => {
+    setShowClockOutConfirm(true);
+  };
+
+  const handleClockOutConfirm = async () => {
     const success = await clockOut();
     if (success) {
       toast({ title: 'Shift ended!' });
     } else {
       toast({ variant: 'destructive', title: 'Failed to end shift' });
     }
+    return success;
   };
 
   const handleCheckIn = async () => {
@@ -377,6 +652,7 @@ export default function DriverDashboard() {
     });
     if (success) {
       toast({ title: 'Work completed!' });
+      clearPersistedData();
       setNotes('');
       setSnowDepth('');
       setSaltUsed('');
@@ -424,13 +700,21 @@ export default function DriverDashboard() {
         {/* Page Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
+            <div 
+              className={`flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 ${
+                isAdminOrManager() ? 'cursor-pointer hover:bg-primary/30 transition-colors' : ''
+              }`}
+              onClick={isAdminOrManager() ? () => navigate('/admin/notifications?tab=send') : undefined}
+              title={isAdminOrManager() ? 'Send Notification' : undefined}
+            >
               <Snowflake className="h-6 w-6 text-primary" />
             </div>
             <div>
               <h1 className="text-xl font-semibold flex items-center gap-2">
                 WinterWatch-Pro
-                <span className="text-sm font-normal text-muted-foreground">{temperature}°F</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {weatherLoading ? '...' : temperature ? `${temperature}°F` : '--°F'}
+                </span>
               </h1>
               <p className="text-sm text-muted-foreground">
                 Welcome back, {employee.first_name} {employee.last_name}! Track your plowing and salting services.
@@ -472,7 +756,7 @@ export default function DriverDashboard() {
               </div>
               {activeShift ? (
                 <Button 
-                  onClick={handleClockOut}
+                  onClick={handleClockOutClick}
                   variant="outline"
                   className="border-red-500/50 text-red-400 hover:bg-red-500/20"
                 >
@@ -488,6 +772,12 @@ export default function DriverDashboard() {
                   Start Shift
                 </Button>
               )}
+              
+              <ClockOutConfirmDialog
+                open={showClockOutConfirm}
+                onOpenChange={setShowClockOutConfirm}
+                onConfirm={handleClockOutConfirm}
+              />
             </div>
           </CardContent>
         </Card>
@@ -596,7 +886,7 @@ export default function DriverDashboard() {
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-primary">Currently working at location</p>
+                      <p className="text-sm font-medium text-primary">Currently working at "{activeWorkLog.account?.name || 'Unknown'}"</p>
                       <p className="text-xs text-muted-foreground">
                         Started {format(new Date(activeWorkLog.check_in_time!), 'h:mm a')}
                       </p>
@@ -680,7 +970,12 @@ export default function DriverDashboard() {
                       .filter((emp) => emp.id && emp.id.trim() !== '')
                       .map((emp) => (
                         <SelectItem key={emp.id} value={emp.id}>
-                          {emp.first_name} {emp.last_name}
+                          <span className="flex items-center gap-1.5">
+                            {onShiftEmployeeIds.has(emp.id) && (
+                              <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                            )}
+                            {emp.first_name} {emp.last_name}
+                          </span>
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -690,17 +985,19 @@ export default function DriverDashboard() {
 
 
             {/* Snow & Salt */}
-            <div className="mb-4 grid grid-cols-2 gap-3">
+            <div className="mb-4 grid grid-cols-2 gap-3 w-[85%]">
               <div>
                 <Label className="text-sm text-muted-foreground">
                   Snow Depth (inches) {(serviceType === 'plow' || serviceType === 'both') && <span className="text-red-400">*</span>}
                 </Label>
                 <Input 
                   type="number"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -709,16 +1006,18 @@ export default function DriverDashboard() {
                 </Label>
                 <Input 
                   type="number"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   placeholder="e.g., 150"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
 
             {/* Weather */}
-            <div className="mb-4 grid grid-cols-3 gap-3">
+            <div className="mb-4 grid grid-cols-3 gap-3 w-[85%]">
               <div>
                 <Label className="text-sm text-muted-foreground flex items-center gap-1">
                   Temp (°F) <span className="text-red-400">*</span>
@@ -727,7 +1026,7 @@ export default function DriverDashboard() {
                   type="number"
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -737,7 +1036,7 @@ export default function DriverDashboard() {
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -748,19 +1047,19 @@ export default function DriverDashboard() {
                   type="number"
                   value={windSpeed}
                   onChange={(e) => setWindSpeed(e.target.value)}
-                  className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
 
             {/* Notes */}
-            <div className="mb-4">
+            <div className="mb-4 w-[85%]">
               <Label className="text-sm text-muted-foreground">Notes (Optional)</Label>
               <Textarea
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20 min-h-[80px]"
+                className="mt-1 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20 min-h-[60px]"
               />
             </div>
 
@@ -772,22 +1071,31 @@ export default function DriverDashboard() {
                 isUploading={isUploading}
                 uploadProgress={uploadProgress}
                 canAddMore={canAddMore}
-                onAddPhotos={addPhotos}
-                onRemovePhoto={removePhoto}
+                onAddPhotos={handleAddPhotos}
+                onRemovePhoto={handleRemovePhoto}
               />
+              <SaveStatusIndicator status={saveStatus} />
             </div>
+
+            <PersistenceDebugPanel storageKey={storageKey} />
 
             {/* Submit Button */}
             {activeWorkLog ? (
               <Button 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                onClick={handleCheckOut}
+                type="button"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground min-h-[48px]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCheckOut();
+                }}
               >
                 Check Out & Complete
               </Button>
             ) : (
               <Button 
-                className="w-full bg-primary/50 hover:bg-primary/40 text-primary-foreground cursor-not-allowed"
+                type="button"
+                className="w-full bg-primary/50 hover:bg-primary/40 text-primary-foreground cursor-not-allowed min-h-[48px]"
                 disabled
               >
                 Check In First

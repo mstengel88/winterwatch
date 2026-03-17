@@ -35,6 +35,11 @@ export default function RoleBasedRedirect() {
     return <Navigate to="/shovel" replace />;
   }
 
+  // Trucker goes to trucker dashboard
+  if (roles.includes('trucker')) {
+    return <Navigate to="/trucker" replace />;
+  }
+
   // No recognized role - send to pending
   return <Navigate to="/pending" replace />;
 }

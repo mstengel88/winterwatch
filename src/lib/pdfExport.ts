@@ -1,9 +1,9 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { format, differenceInMinutes } from 'date-fns';
 
 // Version for cache busting - increment when making PDF changes
-const PDF_VERSION = '1.0.1';
-import { format } from 'date-fns';
+const PDF_VERSION = '1.0.2';
 
 interface WorkLogData {
   id: string;
@@ -33,11 +33,39 @@ interface ReportSummary {
   dateRange: string;
 }
 
+// Column keys for work logs PDF
+export type WorkLogColumn = 'type' | 'date' | 'checkIn' | 'checkOut' | 'duration' | 'account' | 'serviceType' | 'snowDepth' | 'saltLbs' | 'equipment' | 'employee' | 'conditions' | 'notes';
+
+export const WORK_LOG_COLUMNS: { key: WorkLogColumn; label: string }[] = [
+  { key: 'type', label: 'Type' },
+  { key: 'date', label: 'Date' },
+  { key: 'checkIn', label: 'Check In' },
+  { key: 'checkOut', label: 'Check Out' },
+  { key: 'duration', label: 'Duration' },
+  { key: 'account', label: 'Account' },
+  { key: 'serviceType', label: 'Service' },
+  { key: 'snowDepth', label: 'Snow' },
+  { key: 'saltLbs', label: 'Salt' },
+  { key: 'equipment', label: 'Equipment' },
+  { key: 'employee', label: 'Employee' },
+  { key: 'conditions', label: 'Conditions' },
+  { key: 'notes', label: 'Notes' },
+];
+
+export const DEFAULT_VISIBLE_COLUMNS: WorkLogColumn[] = WORK_LOG_COLUMNS.map(c => c.key);
+
+interface GeneratePdfOptions {
+  returnBlob?: boolean;
+  fontSize?: number; // 5-12, default 6
+  visibleColumns?: WorkLogColumn[];
+}
+
 export function generateWorkLogsPDF(
   workLogs: WorkLogData[],
   summary: ReportSummary,
-  title: string = 'Work Logs Report'
-): void {
+  title: string = 'Work Logs Report',
+  options?: GeneratePdfOptions
+): Blob | void {
   // Landscape orientation for wider table
   const doc = new jsPDF({ orientation: 'landscape' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -90,29 +118,46 @@ export function generateWorkLogsPDF(
     return [100, 100, 100];
   };
 
-  // Work logs table
+  const fontSize = options?.fontSize ?? 6;
+  const visibleCols = options?.visibleColumns ?? DEFAULT_VISIBLE_COLUMNS;
+
+  const allColumnDefs: { key: WorkLogColumn; header: string; width: number; getValue: (log: WorkLogData) => string }[] = [
+    { key: 'type', header: 'Type', width: 16, getValue: (log) => log.type === 'plow' ? 'Plow' : 'Shovel' },
+    { key: 'date', header: 'Date', width: 18, getValue: (log) => log.date },
+    { key: 'checkIn', header: 'Check In', width: 14, getValue: (log) => log.checkIn },
+    { key: 'checkOut', header: 'Check Out', width: 14, getValue: (log) => log.checkOut },
+    { key: 'duration', header: 'Duration', width: 14, getValue: (log) => log.duration },
+    { key: 'account', header: 'Account', width: 32, getValue: (log) => log.account },
+    { key: 'serviceType', header: 'Service', width: 20, getValue: (log) => log.serviceType },
+    { key: 'snowDepth', header: 'Snow', width: 12, getValue: (log) => log.snowDepth },
+    { key: 'saltLbs', header: 'Salt', width: 12, getValue: (log) => log.saltLbs },
+    { key: 'equipment', header: 'Equipment', width: 24, getValue: (log) => log.equipment },
+    { key: 'employee', header: 'Employee', width: 28, getValue: (log) => log.employee },
+    { key: 'conditions', header: 'Conditions', width: 22, getValue: (log) => log.conditions },
+    { key: 'notes', header: 'Notes', width: 30, getValue: (log) => log.notes || '-' },
+  ];
+
+  const activeCols = allColumnDefs.filter(c => visibleCols.includes(c.key));
+  const typeColIndex = activeCols.findIndex(c => c.key === 'type');
+  const serviceColIndex = activeCols.findIndex(c => c.key === 'serviceType');
+
   if (workLogs.length > 0) {
+    const totalDefinedWidth = activeCols.reduce((s, c) => s + c.width, 0);
+    const availableWidth = pageWidth - 30;
+    const scaleFactor = availableWidth / totalDefinedWidth;
+
+    const columnStyles: Record<number, { cellWidth: number }> = {};
+    activeCols.forEach((col, i) => {
+      columnStyles[i] = { cellWidth: col.width * scaleFactor };
+    });
+
     autoTable(doc, {
       startY: 50,
-      head: [['Type', 'Date', 'Check In', 'Check Out', 'Duration', 'Account', 'Service', 'Snow', 'Salt', 'Equipment', 'Employee', 'Conditions', 'Notes']],
-      body: workLogs.map((log) => [
-        log.type === 'plow' ? 'Plow' : 'Shovel',
-        log.date,
-        log.checkIn,
-        log.checkOut,
-        log.duration,
-        log.account,
-        log.serviceType,
-        log.snowDepth,
-        log.saltLbs,
-        log.equipment,
-        log.employee,
-        log.conditions,
-        log.notes || '-',
-      ]),
+      head: [activeCols.map(c => c.header)],
+      body: workLogs.map((log) => activeCols.map(c => c.getValue(log))),
       styles: {
-        fontSize: 6,
-        cellPadding: 1.5,
+        fontSize,
+        cellPadding: Math.max(1, fontSize * 0.25),
         textColor: [0, 0, 0],
       },
       headStyles: {
@@ -126,33 +171,17 @@ export function generateWorkLogsPDF(
         textColor: [0, 0, 0],
       },
       alternateRowStyles: {
-        fillColor: [226, 232, 240], // slate-200 for more contrast
+        fillColor: [226, 232, 240],
       },
-      columnStyles: {
-        0: { cellWidth: 16 },  // Type
-        1: { cellWidth: 18 },  // Date
-        2: { cellWidth: 14 },  // Check In
-        3: { cellWidth: 14 },  // Check Out
-        4: { cellWidth: 14 },  // Duration
-        5: { cellWidth: 32 },  // Account
-        6: { cellWidth: 20 },  // Service
-        7: { cellWidth: 12 },  // Snow
-        8: { cellWidth: 12 },  // Salt
-        9: { cellWidth: 24 },  // Equipment
-        10: { cellWidth: 28 }, // Employee
-        11: { cellWidth: 22 }, // Conditions
-        12: { cellWidth: 30 }, // Notes
-      },
+      columnStyles,
       didParseCell: (data) => {
-        // Color the Type column (index 0) based on plow vs shovel
-        if (data.section === 'body' && data.column.index === 0) {
+        if (data.section === 'body' && typeColIndex >= 0 && data.column.index === typeColIndex) {
           const type = String(data.cell.raw || '').toLowerCase();
           data.cell.styles.fillColor = getTypeColor(type);
           data.cell.styles.textColor = [255, 255, 255];
           data.cell.styles.fontStyle = 'bold';
         }
-        // Color the Service column (index 6) based on service type
-        if (data.section === 'body' && data.column.index === 6) {
+        if (data.section === 'body' && serviceColIndex >= 0 && data.column.index === serviceColIndex) {
           const serviceType = String(data.cell.raw || '');
           data.cell.styles.fillColor = getServiceColor(serviceType);
           data.cell.styles.textColor = [255, 255, 255];
@@ -180,6 +209,11 @@ export function generateWorkLogsPDF(
     );
   }
 
+  // Return blob or save file
+  if (options?.returnBlob) {
+    return doc.output('blob');
+  }
+  
   // Save with date range in filename
   const fileName = `work-logs-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
   doc.save(fileName);
@@ -271,5 +305,200 @@ export function generateInvoicePDF(
 
   // Save
   const fileName = `invoice-${accountName.toLowerCase().replace(/\s+/g, '-')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+  doc.save(fileName);
+}
+
+// Timesheet data interface
+interface TimesheetEntry {
+  employeeName: string;
+  date: string;
+  clockIn: string;
+  clockOut: string;
+  hoursWorked: string;
+  location: string;
+}
+
+export function generateTimesheetsPDF(
+  entries: TimesheetEntry[],
+  dateRange: string
+): void {
+  const doc = new jsPDF({ orientation: 'landscape' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const primaryColor: [number, number, number] = [10, 132, 183];
+
+  // Title
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('Time Sheets Report', 15, 20);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated: ${format(new Date(), 'M/d/yyyy h:mm:ss a')} (v${PDF_VERSION})`, 15, 28);
+  doc.text(`Period: ${dateRange}`, 15, 34);
+
+  // Calculate totals
+  const totalHours = entries.reduce((sum, entry) => {
+    const match = entry.hoursWorked.match(/(\d+\.?\d*)/);
+    return sum + (match ? parseFloat(match[0]) : 0);
+  }, 0);
+
+  doc.setFontSize(9);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`Total Shifts: ${entries.length} | Total Hours: ${totalHours.toFixed(1)}`, 15, 43);
+
+  // Table
+  if (entries.length > 0) {
+    autoTable(doc, {
+      startY: 50,
+      head: [['Employee', 'Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Location']],
+      body: entries.map(entry => [
+        entry.employeeName,
+        entry.date,
+        entry.clockIn,
+        entry.clockOut,
+        entry.hoursWorked,
+        entry.location,
+      ]),
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        textColor: [0, 0, 0],
+      },
+      headStyles: {
+        fillColor: primaryColor,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [226, 232, 240],
+      },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 60 },
+      },
+    });
+  } else {
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text('No time sheet entries found for this period.', 15, 60);
+  }
+
+  // Footer with page numbers
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  }
+
+  const fileName = `timesheets-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+  doc.save(fileName);
+}
+
+// Summary report interface
+interface SummaryStats {
+  totalShifts: number;
+  totalShiftHours: number;
+  totalJobs: number;
+  plowJobs: number;
+  shovelJobs: number;
+  saltApplications: number;
+  totalWorkHours: number;
+  uniqueLocations: number;
+  activeEmployees: number;
+  totalSaltLbs: number;
+  totalIceMeltLbs: number;
+}
+
+export function generateSummaryPDF(
+  stats: SummaryStats,
+  dateRange: string
+): void {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const primaryColor: [number, number, number] = [10, 132, 183];
+
+  // Title
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('WinterWatch Pro', pageWidth / 2, 25, { align: 'center' });
+
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Summary Report', pageWidth / 2, 35, { align: 'center' });
+
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Period: ${dateRange}`, pageWidth / 2, 45, { align: 'center' });
+  doc.text(`Generated: ${format(new Date(), 'M/d/yyyy h:mm:ss a')} (v${PDF_VERSION})`, pageWidth / 2, 52, { align: 'center' });
+
+  // Section: Time Clock Summary
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('Time Clock Summary', 20, 70);
+
+  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setLineWidth(0.5);
+  doc.line(20, 73, pageWidth - 20, 73);
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`Total Shifts: ${stats.totalShifts}`, 25, 82);
+  doc.text(`Total Hours: ${stats.totalShiftHours.toFixed(1)}`, 25, 90);
+
+  // Section: Work Log Summary
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('Work Log Summary', 20, 110);
+
+  doc.line(20, 113, pageWidth - 20, 113);
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0);
+  
+  const workLogY = 122;
+  doc.text(`Total Jobs: ${stats.totalJobs}`, 25, workLogY);
+  doc.text(`Plow Jobs: ${stats.plowJobs}`, 25, workLogY + 8);
+  doc.text(`Shovel Jobs: ${stats.shovelJobs}`, 25, workLogY + 16);
+  doc.text(`Salt Applications: ${stats.saltApplications}`, 25, workLogY + 24);
+  doc.text(`Total Work Hours: ${stats.totalWorkHours.toFixed(1)}`, 25, workLogY + 32);
+  doc.text(`Unique Locations: ${stats.uniqueLocations}`, 25, workLogY + 40);
+
+  // Section: Overall Statistics
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('Overall Statistics', 20, 180);
+
+  doc.line(20, 183, pageWidth - 20, 183);
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0);
+  
+  const overallY = 192;
+  doc.text(`Active Employees: ${stats.activeEmployees}`, 25, overallY);
+  doc.text(`Total Salt Used: ${stats.totalSaltLbs} lbs`, 25, overallY + 8);
+  doc.text(`Total Ice Melt Used: ${stats.totalIceMeltLbs} lbs`, 25, overallY + 16);
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text('WinterWatch Pro - Snow Removal Management', pageWidth / 2, doc.internal.pageSize.getHeight() - 15, { align: 'center' });
+
+  const fileName = `summary-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
   doc.save(fileName);
 }

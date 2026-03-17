@@ -1,69 +1,78 @@
-import { useState, useCallback } from 'react';
-import { GeoLocation } from '@/types/database';
+import { useState, useCallback, useRef } from "react";
+import { Geolocation } from "@capacitor/geolocation";
+import { Capacitor } from "@capacitor/core";
 
-interface UseGeolocationReturn {
-  location: GeoLocation | null;
-  error: string | null;
-  isLoading: boolean;
-  getCurrentLocation: () => Promise<GeoLocation | null>;
-}
+// Cache location for 30 seconds to reduce GPS calls (saves battery on iOS)
+const LOCATION_CACHE_MS = 30000;
 
-export function useGeolocation(): UseGeolocationReturn {
-  const [location, setLocation] = useState<GeoLocation | null>(null);
+export function useGeolocation() {
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  } | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Cache to prevent excessive GPS calls
+  const lastFetchRef = useRef<number>(0);
+  const cachedLocationRef = useRef<typeof location>(null);
 
-  const getCurrentLocation = useCallback(async (): Promise<GeoLocation | null> => {
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
-      return null;
+  const refreshOnce = useCallback(async (forceRefresh = false) => {
+    // Return cached location if still fresh (unless force refresh)
+    const now = Date.now();
+    if (!forceRefresh && cachedLocationRef.current && (now - lastFetchRef.current) < LOCATION_CACHE_MS) {
+      console.log("📍 Using cached location");
+      return cachedLocationRef.current;
     }
+    
+    try {
+      setIsLoading(true);
 
-    setIsLoading(true);
-    setError(null);
+      // Only request permissions on native platforms (iOS/Android)
+      if (Capacitor.isNativePlatform()) {
+        await Geolocation.requestPermissions();
+      }
 
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const loc: GeoLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          };
-          setLocation(loc);
-          setIsLoading(false);
-          resolve(loc);
-        },
-        (err) => {
-          let errorMessage = 'Failed to get location';
-          switch (err.code) {
-            case err.PERMISSION_DENIED:
-              errorMessage = 'Location permission denied. Please enable location access.';
-              break;
-            case err.POSITION_UNAVAILABLE:
-              errorMessage = 'Location information unavailable.';
-              break;
-            case err.TIMEOUT:
-              errorMessage = 'Location request timed out.';
-              break;
-          }
-          setError(errorMessage);
-          setIsLoading(false);
-          resolve(null);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000,
-        }
-      );
-    });
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000, // 10 second timeout for faster feedback
+        maximumAge: forceRefresh ? 0 : LOCATION_CACHE_MS, // Allow cached position
+      });
+
+      const loc = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
+
+      console.log("📍 refreshOnce location:", loc);
+
+      // Update cache
+      lastFetchRef.current = now;
+      cachedLocationRef.current = loc;
+      
+      setLocation(loc);
+      setError(null);
+      return loc;
+    } catch (err: any) {
+      console.error("❌ Geolocation error:", err);
+      setError("Failed to get location");
+      return cachedLocationRef.current; // Return cached on error
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  // Keep old name for compatibility if anything else uses it
+  const getCurrentLocation = refreshOnce;
 
   return {
     location,
     error,
     isLoading,
     getCurrentLocation,
+    refreshOnce,
   };
 }

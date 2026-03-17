@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, ChevronDown, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Account {
   id: string;
@@ -16,6 +20,8 @@ interface Employee {
   id: string;
   first_name: string;
   last_name: string;
+  is_active?: boolean;
+  category?: string;
 }
 
 interface Equipment {
@@ -28,6 +34,7 @@ export interface WorkLogFormData {
   type: 'plow' | 'shovel';
   account_id: string;
   employee_id: string;
+  employee_ids: string[];
   equipment_id?: string;
   service_type: string;
   date: string;
@@ -51,6 +58,7 @@ interface WorkLogDialogProps {
     type: 'plow' | 'shovel';
     account_id: string;
     employee_id: string;
+    team_member_ids?: string[];
     equipment_id?: string;
     service_type: string;
     check_in_time: string | null;
@@ -77,8 +85,9 @@ export function WorkLogDialog({
 }: WorkLogDialogProps) {
   const [type, setType] = useState<'plow' | 'shovel'>('plow');
   const [accountId, setAccountId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
+  const [employeeIds, setEmployeeIds] = useState<string[]>([]);
   const [equipmentId, setEquipmentId] = useState('');
+  const [employeePopoverOpen, setEmployeePopoverOpen] = useState(false);
   const [serviceType, setServiceType] = useState('plow');
   const [date, setDate] = useState('');
   const [checkInTime, setCheckInTime] = useState('');
@@ -88,12 +97,33 @@ export function WorkLogDialog({
   const [iceMeltUsed, setIceMeltUsed] = useState('');
   const [weather, setWeather] = useState('');
   const [notes, setNotes] = useState('');
+  const [onShiftEmployeeIds, setOnShiftEmployeeIds] = useState<Set<string>>(new Set());
+
+  // Fetch employees currently on shift
+  useEffect(() => {
+    if (!open) return;
+    const fetchOnShift = async () => {
+      const { data } = await supabase
+        .from('time_clock')
+        .select('employee_id')
+        .is('clock_out_time', null);
+      if (data) {
+        setOnShiftEmployeeIds(new Set(data.map(d => d.employee_id)));
+      }
+    };
+    fetchOnShift();
+  }, [open]);
 
   useEffect(() => {
     if (initialData) {
       setType(initialData.type);
       setAccountId(initialData.account_id);
-      setEmployeeId(initialData.employee_id || '');
+      // For shovel logs, use team_member_ids if available; otherwise fall back to employee_id
+      if (initialData.type === 'shovel' && initialData.team_member_ids && initialData.team_member_ids.length > 0) {
+        setEmployeeIds(initialData.team_member_ids);
+      } else {
+        setEmployeeIds(initialData.employee_id ? [initialData.employee_id] : []);
+      }
       setEquipmentId(initialData.equipment_id || '');
       setServiceType(initialData.service_type);
       if (initialData.check_in_time) {
@@ -113,7 +143,7 @@ export function WorkLogDialog({
     } else {
       setType('plow');
       setAccountId('');
-      setEmployeeId('');
+      setEmployeeIds([]);
       setEquipmentId('');
       setServiceType('plow');
       setDate(new Date().toISOString().split('T')[0]);
@@ -133,7 +163,8 @@ export function WorkLogDialog({
       id: initialData?.id,
       type,
       account_id: accountId,
-      employee_id: employeeId,
+      employee_id: employeeIds[0] || '',
+      employee_ids: employeeIds,
       equipment_id: equipmentId || undefined,
       service_type: serviceType,
       date,
@@ -145,6 +176,24 @@ export function WorkLogDialog({
       weather_conditions: weather || undefined,
       notes: notes || undefined,
     });
+  };
+
+  const toggleEmployee = (empId: string) => {
+    setEmployeeIds(prev => 
+      prev.includes(empId) 
+        ? prev.filter(id => id !== empId)
+        : [...prev, empId]
+    );
+  };
+
+  const getSelectedEmployeeNames = () => {
+    return employeeIds
+      .map(id => {
+        const emp = employees.find(e => e.id === id);
+        return emp ? `${emp.first_name} ${emp.last_name}` : '';
+      })
+      .filter(Boolean)
+      .join(', ');
   };
 
   const isEdit = !!initialData;
@@ -164,9 +213,15 @@ export function WorkLogDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Work Log' : 'Add New Work Log'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Edit work log details and save changes.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
@@ -180,7 +235,7 @@ export function WorkLogDialog({
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="z-[200] bg-popover">
                   <SelectItem value="plow">Plow (Driver)</SelectItem>
                   <SelectItem value="shovel">Shovel (Crew)</SelectItem>
                 </SelectContent>
@@ -195,7 +250,7 @@ export function WorkLogDialog({
                   <SelectTrigger>
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
                     {accounts
                       .filter((acc) => acc.id && acc.id.trim() !== '')
                       .map((acc) => (
@@ -205,21 +260,71 @@ export function WorkLogDialog({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Employee</Label>
-                <Select value={employeeId} onValueChange={setEmployeeId} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select employee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees
-                      .filter((emp) => emp.id && emp.id.trim() !== '')
-                      .map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.first_name} {emp.last_name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <Label>Employee(s)</Label>
+                <Popover open={employeePopoverOpen} onOpenChange={setEmployeePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between min-h-[40px] h-auto",
+                        employeeIds.length === 0 && "text-muted-foreground"
+                      )}
+                    >
+                      <span className="truncate text-left flex-1">
+                        {employeeIds.length === 0
+                          ? "Select employees"
+                          : getSelectedEmployeeNames()}
+                      </span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0 z-[200] bg-popover" align="start">
+                    <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
+                      {employees
+                      .filter((emp) => {
+                          if (!emp.id || emp.id.trim() === '' || emp.is_active === false) return false;
+                          // Exclude manager and trucker categories from work log assignments
+                          if (emp.category === 'manager' || emp.category === 'trucker') return false;
+                          // 'both' category employees should always show
+                          // 'plow' category for plow logs, 'shovel' category for shovel logs
+                          if (!emp.category || emp.category === 'both') return true;
+                          return emp.category === (type === 'plow' ? 'plow' : 'shovel');
+                        })
+                        .map((emp) => (
+                          <div
+                            key={emp.id}
+                            className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md cursor-pointer"
+                            onClick={() => toggleEmployee(emp.id)}
+                          >
+                            <Checkbox
+                              checked={employeeIds.includes(emp.id)}
+                              onCheckedChange={() => toggleEmployee(emp.id)}
+                            />
+                            <span className="text-sm flex items-center gap-1.5">
+                              {onShiftEmployeeIds.has(emp.id) && (
+                                <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" title="On shift" />
+                              )}
+                              {emp.first_name} {emp.last_name}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                    {employeeIds.length > 0 && (
+                      <div className="border-t p-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-muted-foreground"
+                          onClick={() => setEmployeeIds([])}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Clear all
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -231,7 +336,7 @@ export function WorkLogDialog({
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-[200] bg-popover">
                     {serviceTypeOptions.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
@@ -245,7 +350,7 @@ export function WorkLogDialog({
                     <SelectTrigger>
                       <SelectValue placeholder="Select equipment" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" className="z-[200] bg-popover max-h-[200px]">
                       <SelectItem value="none">None</SelectItem>
                       {equipment
                         .filter((eq) => eq.id && eq.id.trim() !== '')
@@ -332,11 +437,20 @@ export function WorkLogDialog({
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="min-h-[44px]"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !accountId || !employeeId}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || !accountId || employeeIds.length === 0}
+              className="min-h-[44px]"
+            >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isEdit ? 'Update' : 'Create'}
             </Button>

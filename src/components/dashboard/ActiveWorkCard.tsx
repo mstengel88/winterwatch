@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WorkLog, Account } from '@/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPin, LogOut, Snowflake, Loader2, Clock } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
+import { SaveStatusIndicator } from './SaveStatusIndicator';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
+import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
+import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 
 interface ActiveWorkCardProps {
   workLog: WorkLog;
@@ -26,12 +30,96 @@ interface CheckOutData {
 
 export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: ActiveWorkCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Use persistence hook - formData updates when visibility changes
+  const { formData, updateField, updatePhotoPreviews, clearPersistedData, saveStatus } = useCheckoutFormPersistence({
+    workLogId: workLog.id,
+    variant: 'plow',
+  });
+
+  const storageKey = `winterwatch_checkout_form_plow_${workLog.id}`;
+  
+  // Form state synced with persistence
   const [snowDepth, setSnowDepth] = useState('');
   const [saltUsed, setSaltUsed] = useState('');
   const [weather, setWeather] = useState('');
   const [notes, setNotes] = useState('');
+  const isRestoringRef = useRef(false);
   
   const photoUpload = usePhotoUpload({ folder: 'work-logs' });
+  const hasLoadedNativePreviewsRef = useRef(false);
+
+  // Restore form state from persisted data whenever formData changes
+  useEffect(() => {
+    if (Object.keys(formData).length > 0) {
+      isRestoringRef.current = true;
+      setSnowDepth(formData.snowDepth || '');
+      setSaltUsed(formData.saltUsed || '');
+      setWeather(formData.weather || '');
+      setNotes(formData.notes || '');
+      
+      // Restore photos if available
+      if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
+        photoUpload.restorePreviews(formData.photoPreviews);
+      }
+      
+      // Reset flag after a tick to allow state to settle
+      setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 100);
+    }
+  }, [formData]); // Re-run when formData updates (e.g., on visibility change)
+
+  // Native iOS: restore photo previews from Filesystem refs
+  useEffect(() => {
+    if (hasLoadedNativePreviewsRef.current) return;
+    if (photoUpload.previews.length > 0) return;
+    if (!formData.photoPreviewRefs || formData.photoPreviewRefs.length === 0) return;
+
+    hasLoadedNativePreviewsRef.current = true;
+    void (async () => {
+      try {
+        const previews = await loadCheckoutPhotoPreviews(formData.photoPreviewRefs!);
+        if (previews.length > 0) {
+          photoUpload.restorePreviews(previews);
+        }
+      } catch {
+        // best-effort
+      }
+    })();
+  }, [formData.photoPreviewRefs, photoUpload]);
+
+  // Persist form changes (skip during restoration)
+  useEffect(() => {
+    if (!isRestoringRef.current && snowDepth) {
+      updateField('snowDepth', snowDepth);
+    }
+  }, [snowDepth, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && saltUsed) {
+      updateField('saltUsed', saltUsed);
+    }
+  }, [saltUsed, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && weather) {
+      updateField('weather', weather);
+    }
+  }, [weather, updateField]);
+
+  useEffect(() => {
+    if (!isRestoringRef.current && notes) {
+      updateField('notes', notes);
+    }
+  }, [notes, updateField]);
+
+  // Persist photo previews when they change (skip during restoration)
+  useEffect(() => {
+    if (!isRestoringRef.current && photoUpload.previews.length > 0) {
+      updatePhotoPreviews(photoUpload.previews);
+    }
+  }, [photoUpload.previews, updatePhotoPreviews]);
 
   const handleCheckOut = async () => {
     setIsSubmitting(true);
@@ -42,13 +130,19 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
       photoUrls = await photoUpload.uploadPhotos(workLog.id);
     }
     
-    await onCheckOut({
+    const success = await onCheckOut({
       snowDepthInches: snowDepth ? parseFloat(snowDepth) : undefined,
       saltUsedLbs: saltUsed ? parseFloat(saltUsed) : undefined,
       weatherConditions: weather || undefined,
       notes: notes || undefined,
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
     });
+    
+    // Clear persisted data on successful checkout
+    if (success) {
+      clearPersistedData();
+    }
+    
     setIsSubmitting(false);
   };
 
@@ -156,7 +250,9 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
           canAddMore={photoUpload.canAddMore}
           onAddPhotos={photoUpload.addPhotos}
           onRemovePhoto={photoUpload.removePhoto}
+          hasRestoredPreviews={photoUpload.hasRestoredPreviews}
         />
+        <SaveStatusIndicator status={saveStatus} />
 
         <Button
           onClick={handleCheckOut}
@@ -171,6 +267,8 @@ export function ActiveWorkCard({ workLog, onCheckOut, variant = 'plow' }: Active
           )}
           Check Out
         </Button>
+
+        <PersistenceDebugPanel storageKey={storageKey} />
       </CardContent>
     </Card>
   );

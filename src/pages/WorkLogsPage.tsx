@@ -57,12 +57,14 @@ export default function WorkLogsPage() {
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address), equipment:equipment(name)')
           .gte('created_at', startDate)
           .lte('created_at', endDate)
+          .eq('billing_status', 'current')
           .order('created_at', { ascending: false }),
         supabase
           .from('shovel_work_logs')
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address)')
           .gte('created_at', startDate)
           .lte('created_at', endDate)
+          .eq('billing_status', 'current')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -256,8 +258,15 @@ export default function WorkLogsPage() {
   };
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
+    <AppLayout variant="wide">
+      <div 
+        className="
+          space-y-6
+          w-full max-w-full
+          px-4 sm:px-6
+          [padding-left:calc(1rem-area-inset-left)]
+          [padding-right:calc(1rem-area-inset-right)]
+        ">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -350,8 +359,8 @@ export default function WorkLogsPage() {
                     No work logs found matching your criteria.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
+                  <div className="w-full max-w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                    <Table className="min-w-[900px]">
                       <TableHeader>
                         <TableRow className="border-border/50 hover:bg-transparent">
                           <TableHead>Date</TableHead>
