@@ -503,7 +503,7 @@ export default function ReportsPage() {
 
       return {
         id: log.id,
-        type: log.type === 'plow' ? 'Plow' : 'Shovel',
+        type: log.type,
         date: format(new Date(log.date), 'MM/dd/yy'),
         checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
         checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
@@ -564,6 +564,7 @@ export default function ReportsPage() {
     const { rawLogs, summary, generatedAt } = getWorkLogExportData();
     const activeColumns = pdfVisibleColumns;
 
+    const formatTypeLabel = (type: string) => type.toLowerCase() === 'shovel' ? 'Shovel' : 'Plow';
     const getTypeClass = (type: string) => type.toLowerCase() === 'shovel' ? 'type-shovel' : 'type-plow';
     const getServiceClass = (serviceType: string) => {
       const normalized = serviceType.toLowerCase();
@@ -585,7 +586,7 @@ export default function ReportsPage() {
               const value = log[column] ?? '-';
 
               if (column === 'type') {
-                return `<td><span class="badge ${getTypeClass(String(value))}">${escapePrintHtml(String(value))}</span></td>`;
+                return `<td><span class="badge ${getTypeClass(String(value))}">${escapePrintHtml(formatTypeLabel(String(value)))}</span></td>`;
               }
 
               if (column === 'serviceType') {
