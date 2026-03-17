@@ -148,7 +148,6 @@ export default function ReportsPage() {
   // PDF export settings
   const [pdfFontSize, setPdfFontSize] = useState(6);
   const [pdfVisibleColumns, setPdfVisibleColumns] = useState<WorkLogColumn[]>(DEFAULT_VISIBLE_COLUMNS);
-  const [activeShiftTab, setActiveShiftTab] = useState('current');
 
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
