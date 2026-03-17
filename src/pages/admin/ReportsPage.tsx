@@ -464,7 +464,37 @@ export default function ReportsPage() {
     return `${hours.toFixed(1)}h`;
   };
 
-  const handlePrintPDF = () => {
+  const workLogColumnLabels: Record<WorkLogColumn, string> = {
+    type: 'Type',
+    date: 'Date',
+    checkIn: 'Check In',
+    checkOut: 'Check Out',
+    duration: 'Duration',
+    account: 'Account',
+    serviceType: 'Service',
+    snowDepth: 'Snow',
+    saltLbs: 'Salt',
+    equipment: 'Equipment',
+    employee: 'Employee',
+    conditions: 'Conditions',
+    notes: 'Notes',
+  };
+
+  const parseLocalReportDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const escapePrintHtml = (value: string | undefined) =>
+    String(value ?? '-')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/\n/g, '<br />');
+
+  const getWorkLogExportData = () => {
     const rawLogs = filteredWorkLogs.map((log) => {
       const employeeDisplay =
         log.type === 'shovel' && log.team_member_names && log.team_member_names.length > 0
@@ -503,149 +533,260 @@ export default function ReportsPage() {
     const uniqueAccounts = new Set(filteredWorkLogs.map(log => log.account_name)).size;
     const plowCount = filteredWorkLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
     const saltCount = filteredWorkLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
+    const startDate = parseLocalReportDate(fromDate);
+    const endDate = parseLocalReportDate(toDate);
 
-    const blob = generateWorkLogsPDF(rawLogs, {
-      totalJobs: stats.total,
-      totalHours,
-      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
-      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
-      plowCount,
-      saltCount,
-      propertyCount: uniqueAccounts,
-      dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
-    }, 'Work Logs Report', { returnBlob: true, fontSize: pdfFontSize, visibleColumns: pdfVisibleColumns });
+    return {
+      rawLogs,
+      summary: {
+        totalJobs: stats.total,
+        totalHours,
+        totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
+        totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
+        plowCount,
+        saltCount,
+        propertyCount: uniqueAccounts,
+        dateRange: `${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`,
+      },
+      fileName: `work-logs-report-${format(startDate, 'yyyy-MM-dd')}-to-${format(endDate, 'yyyy-MM-dd')}.pdf`,
+      generatedAt: format(new Date(), 'M/d/yyyy h:mm:ss a'),
+    };
+  };
 
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      // Open PDF in a new tab so the user can print from there
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.click();
-      // Clean up after a delay
-      setTimeout(() => URL.revokeObjectURL(url), 120000);
+  const handlePrintPDF = () => {
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+
+    if (!printWindow) {
+      toast.error('Chrome blocked the print window. Please allow pop-ups and try again.');
+      return;
     }
+
+    const { rawLogs, summary, generatedAt } = getWorkLogExportData();
+    const activeColumns = pdfVisibleColumns;
+
+    const formatTypeLabel = (type: string) => type.toLowerCase() === 'shovel' ? 'Shovel' : 'Plow';
+    const getTypeClass = (type: string) => type.toLowerCase() === 'shovel' ? 'type-shovel' : 'type-plow';
+    const getServiceClass = (serviceType: string) => {
+      const normalized = serviceType.toLowerCase();
+      if (normalized === 'salt') return 'service-salt';
+      if (normalized === 'shovel') return 'service-shovel';
+      if (normalized === 'ice_melt' || normalized === 'ice melt') return 'service-ice-melt';
+      if (normalized === 'both') return 'service-both';
+      return 'service-plow';
+    };
+
+    const tableHeaderHtml = activeColumns
+      .map((column) => `<th>${escapePrintHtml(workLogColumnLabels[column])}</th>`)
+      .join('');
+
+    const tableBodyHtml = rawLogs.length > 0
+      ? rawLogs.map((log) => `
+          <tr>
+            ${activeColumns.map((column) => {
+              const value = log[column] ?? '-';
+
+              if (column === 'type') {
+                return `<td><span class="badge ${getTypeClass(String(value))}">${escapePrintHtml(formatTypeLabel(String(value)))}</span></td>`;
+              }
+
+              if (column === 'serviceType') {
+                return `<td><span class="badge ${getServiceClass(String(value))}">${escapePrintHtml(String(value))}</span></td>`;
+              }
+
+              return `<td>${escapePrintHtml(String(value))}</td>`;
+            }).join('')}
+          </tr>
+        `).join('')
+      : `<tr><td colspan="${activeColumns.length}" class="empty-state">No work logs found for this period.</td></tr>`;
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Work Logs Report</title>
+          <style>
+            @page {
+              size: landscape;
+              margin: 12mm;
+            }
+
+            :root {
+              color-scheme: light;
+            }
+
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            body {
+              margin: 0;
+              font-family: Helvetica, Arial, sans-serif;
+              color: hsl(222 47% 11%);
+              background: hsl(0 0% 100%);
+              font-size: ${pdfFontSize}pt;
+            }
+
+            .report {
+              width: 100%;
+            }
+
+            .header {
+              margin-bottom: 12pt;
+            }
+
+            .title {
+              margin: 0 0 6pt;
+              font-size: 18pt;
+              font-weight: 700;
+              color: hsl(222 47% 11%);
+            }
+
+            .meta {
+              margin: 0;
+              color: hsl(215 16% 47%);
+              font-size: ${Math.max(pdfFontSize - 1, 5)}pt;
+              line-height: 1.5;
+            }
+
+            .summary {
+              margin: 10pt 0 12pt;
+              font-size: ${Math.max(pdfFontSize, 6)}pt;
+              font-weight: 600;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              table-layout: fixed;
+            }
+
+            th,
+            td {
+              border: 1px solid hsl(214 32% 91%);
+              padding: 4pt;
+              text-align: left;
+              vertical-align: top;
+              word-break: break-word;
+            }
+
+            th {
+              background: hsl(200 90% 38%);
+              color: hsl(0 0% 100%);
+              font-weight: 700;
+            }
+
+            tbody tr:nth-child(even) {
+              background: hsl(210 40% 98%);
+            }
+
+            .badge {
+              display: inline-block;
+              padding: 2pt 5pt;
+              border-radius: 999px;
+              font-weight: 700;
+            }
+
+            .type-plow,
+            .service-plow {
+              background: hsl(200 90% 38%);
+              color: hsl(0 0% 100%);
+            }
+
+            .type-shovel,
+            .service-shovel {
+              background: hsl(262 83% 58%);
+              color: hsl(0 0% 100%);
+            }
+
+            .service-salt {
+              background: hsl(45 93% 47%);
+              color: hsl(222 47% 11%);
+            }
+
+            .service-ice-melt {
+              background: hsl(188 94% 43%);
+              color: hsl(0 0% 100%);
+            }
+
+            .service-both {
+              background: hsl(142 71% 45%);
+              color: hsl(0 0% 100%);
+            }
+
+            .empty-state {
+              text-align: center;
+              color: hsl(215 16% 47%);
+              padding: 18pt;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="report">
+            <header class="header">
+              <h1 class="title">Work Logs Report</h1>
+              <p class="meta">Generated: ${escapePrintHtml(generatedAt)}</p>
+              <p class="meta">Period: ${escapePrintHtml(summary.dateRange)}</p>
+              <p class="summary">Total Services: ${summary.totalJobs} | Plow: ${summary.plowCount} | Salt: ${summary.saltCount} | Properties: ${summary.propertyCount}</p>
+            </header>
+            <table>
+              <thead>
+                <tr>${tableHeaderHtml}</tr>
+              </thead>
+              <tbody>
+                ${tableBodyHtml}
+              </tbody>
+            </table>
+          </div>
+          <script>
+            window.onload = function () {
+              setTimeout(function () {
+                window.focus();
+                window.print();
+              }, 150);
+            };
+            window.onafterprint = function () {
+              window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleExportPDF = () => {
-    const rawLogs = filteredWorkLogs.map((log) => {
-      const employeeDisplay =
-        log.type === 'shovel' && log.team_member_names && log.team_member_names.length > 0
-          ? log.team_member_names.join(', ')
-          : log.employee_name;
+    const { rawLogs, summary } = getWorkLogExportData();
 
-      return {
-        id: log.id,
-        type: log.type,
-        date: format(new Date(log.date), 'MM/dd/yy'),
-        checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
-        checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
-        duration: formatDuration(log.check_in_time, log.check_out_time),
-        account: log.account_name,
-        serviceType: log.service_type,
-        snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
-        saltLbs: log.salt_used_lbs
-          ? `${log.salt_used_lbs}lb`
-          : log.ice_melt_used_lbs
-            ? `${log.ice_melt_used_lbs}lb`
-            : '-',
-        equipment: log.equipment_name || '-',
-        employee: employeeDisplay,
-        conditions: log.weather_conditions || '-',
-        notes: log.notes || undefined,
-      };
+    generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
+      fontSize: pdfFontSize,
+      visibleColumns: pdfVisibleColumns,
     });
-
-
-    const totalHours = filteredWorkLogs.reduce((sum, log) => {
-      if (log.check_in_time && log.check_out_time) {
-        return sum + differenceInMinutes(new Date(log.check_out_time), new Date(log.check_in_time)) / 60;
-      }
-      return sum;
-    }, 0);
-
-    // Count unique properties
-    const uniqueAccounts = new Set(filteredWorkLogs.map(log => log.account_name)).size;
-    const plowCount = filteredWorkLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
-    const saltCount = filteredWorkLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
-
-    generateWorkLogsPDF(rawLogs, {
-      totalJobs: stats.total,
-      totalHours,
-      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
-      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
-      plowCount,
-      saltCount,
-      propertyCount: uniqueAccounts,
-      dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
-    }, 'Work Logs Report', { fontSize: pdfFontSize, visibleColumns: pdfVisibleColumns });
     toast.success('PDF exported successfully');
   };
 
   const handleExportToDrive = async () => {
-    const rawLogs = filteredWorkLogs.map((log) => {
-      const employeeDisplay =
-        log.type === 'shovel' && log.team_member_names && log.team_member_names.length > 0
-          ? log.team_member_names.join(', ')
-          : log.employee_name;
+    const { rawLogs, summary, fileName } = getWorkLogExportData();
 
-      return {
-        id: log.id,
-        type: log.type,
-        date: format(new Date(log.date), 'MM/dd/yy'),
-        checkIn: log.check_in_time ? format(new Date(log.check_in_time), 'HH:mm') : '-',
-        checkOut: log.check_out_time ? format(new Date(log.check_out_time), 'HH:mm') : '-',
-        duration: formatDuration(log.check_in_time, log.check_out_time),
-        account: log.account_name,
-        serviceType: log.service_type,
-        snowDepth: log.snow_depth_inches ? `${log.snow_depth_inches}"` : '-',
-        saltLbs: log.salt_used_lbs
-          ? `${log.salt_used_lbs}lb`
-          : log.ice_melt_used_lbs
-            ? `${log.ice_melt_used_lbs}lb`
-            : '-',
-        equipment: log.equipment_name || '-',
-        employee: employeeDisplay,
-        conditions: log.weather_conditions || '-',
-        notes: log.notes || undefined,
-      };
+    const pdfBlob = generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
+      returnBlob: true,
+      fontSize: pdfFontSize,
+      visibleColumns: pdfVisibleColumns,
     });
-
-    const totalHours = filteredWorkLogs.reduce((sum, log) => {
-      if (log.check_in_time && log.check_out_time) {
-        return sum + differenceInMinutes(new Date(log.check_out_time), new Date(log.check_in_time)) / 60;
-      }
-      return sum;
-    }, 0);
-
-    const uniqueAccounts = new Set(filteredWorkLogs.map(log => log.account_name)).size;
-    const plowCount = filteredWorkLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
-    const saltCount = filteredWorkLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
-
-    // Generate PDF blob
-    const pdfBlob = generateWorkLogsPDF(rawLogs, {
-      totalJobs: stats.total,
-      totalHours,
-      totalSaltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.salt_used_lbs || 0), 0),
-      totalIceMeltLbs: filteredWorkLogs.reduce((sum, l) => sum + (l.ice_melt_used_lbs || 0), 0),
-      plowCount,
-      saltCount,
-      propertyCount: uniqueAccounts,
-      dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
-    }, 'Work Logs Report', { returnBlob: true, fontSize: pdfFontSize, visibleColumns: pdfVisibleColumns });
 
     if (!pdfBlob) {
       toast.error('Failed to generate PDF');
       return;
     }
 
-    const fileName = `work-logs-report-${format(new Date(fromDate), 'yyyy-MM-dd')}-to-${format(new Date(toDate), 'yyyy-MM-dd')}.pdf`;
-    
     toast.loading('Uploading to Google Drive...', { id: 'drive-export' });
-    
+
     const result = await exportPdfToDrive(pdfBlob, fileName, 'WinterWatch Reports');
-    
+
     if (result.success) {
       toast.success('Exported to Google Drive!', { id: 'drive-export' });
       if (result.webViewLink) {
@@ -658,7 +799,7 @@ export default function ReportsPage() {
       }
     } else {
       toast.error(result.error || 'Failed to export to Google Drive', { id: 'drive-export' });
-      
+
       if (result.code === 'NO_PROVIDER_TOKEN' || result.code === 'TOKEN_EXPIRED' || result.code === 'ACCESS_DENIED') {
         toast.info('Please sign out and sign back in with Google to grant Drive permissions.');
       }
