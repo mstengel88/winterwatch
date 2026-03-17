@@ -145,9 +145,27 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('current');
   const [activeShiftTab, setActiveShiftTab] = useState('current');
 
-  // PDF export settings
-  const [pdfFontSize, setPdfFontSize] = useState(6);
-  const [pdfVisibleColumns, setPdfVisibleColumns] = useState<WorkLogColumn[]>(DEFAULT_VISIBLE_COLUMNS);
+  // PDF export settings - persist to localStorage
+  const [pdfFontSize, setPdfFontSize] = useState(() => {
+    const saved = localStorage.getItem('pdf-export-font-size');
+    return saved ? Number(saved) : 6;
+  });
+  const [pdfVisibleColumns, setPdfVisibleColumns] = useState<WorkLogColumn[]>(() => {
+    const saved = localStorage.getItem('pdf-export-visible-columns');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { return DEFAULT_VISIBLE_COLUMNS; }
+    }
+    return DEFAULT_VISIBLE_COLUMNS;
+  });
+
+  const handleFontSizeChange = (size: number) => {
+    setPdfFontSize(size);
+    localStorage.setItem('pdf-export-font-size', String(size));
+  };
+  const handleVisibleColumnsChange = (columns: WorkLogColumn[]) => {
+    setPdfVisibleColumns(columns);
+    localStorage.setItem('pdf-export-visible-columns', JSON.stringify(columns));
+  };
 
   // Selection state for bulk actions
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
