@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
-import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF } from '@/lib/pdfExport';
+import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF, DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExport';
+import { PdfExportSettings } from '@/components/reports/PdfExportSettings';
 import { toast } from 'sonner';
 import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
