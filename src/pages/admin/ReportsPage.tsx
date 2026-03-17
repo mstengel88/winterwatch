@@ -517,14 +517,21 @@ export default function ReportsPage() {
 
     if (blob) {
       const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, '_blank');
-      if (printWindow) {
-        printWindow.addEventListener('load', () => {
-          printWindow.print();
-        });
-      }
-      // Clean up the URL after a delay
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      // Use a hidden iframe to avoid Chrome popup blocker
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.addEventListener('load', () => {
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+        }, 250);
+      });
+      // Clean up after printing
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        URL.revokeObjectURL(url);
+      }, 120000);
     }
   };
 
