@@ -1283,9 +1283,9 @@ export default function ReportsPage() {
       {/* PDF Export Settings */}
       <PdfExportSettings
         fontSize={pdfFontSize}
-        onFontSizeChange={setPdfFontSize}
+        onFontSizeChange={handleFontSizeChange}
         visibleColumns={pdfVisibleColumns}
-        onVisibleColumnsChange={setPdfVisibleColumns}
+        onVisibleColumnsChange={handleVisibleColumnsChange}
       />
 
       {/* Filters Card */}
