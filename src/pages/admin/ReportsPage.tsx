@@ -559,7 +559,7 @@ export default function ReportsPage() {
       saltCount,
       propertyCount: uniqueAccounts,
       dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
-    }, 'Work Logs Report', { returnBlob: true });
+    }, 'Work Logs Report', { returnBlob: true, fontSize: pdfFontSize, visibleColumns: pdfVisibleColumns });
 
     if (!pdfBlob) {
       toast.error('Failed to generate PDF');
