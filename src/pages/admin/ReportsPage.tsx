@@ -505,7 +505,7 @@ export default function ReportsPage() {
       saltCount,
       propertyCount: uniqueAccounts,
       dateRange: `${format(new Date(fromDate), 'yyyy-MM-dd')} to ${format(new Date(toDate), 'yyyy-MM-dd')}`,
-    });
+    }, 'Work Logs Report', { fontSize: pdfFontSize, visibleColumns: pdfVisibleColumns });
     toast.success('PDF exported successfully');
   };
 
