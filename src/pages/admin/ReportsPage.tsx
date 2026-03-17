@@ -1262,6 +1262,14 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      {/* PDF Export Settings */}
+      <PdfExportSettings
+        fontSize={pdfFontSize}
+        onFontSizeChange={setPdfFontSize}
+        visibleColumns={pdfVisibleColumns}
+        onVisibleColumnsChange={setPdfVisibleColumns}
+      />
+
       {/* Filters Card */}
       <Card className="bg-[hsl(var(--card))]/80 border-border/50">
         <CardContent className="pt-6">
