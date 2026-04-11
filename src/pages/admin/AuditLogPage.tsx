@@ -25,6 +25,19 @@ interface AuditLog {
   created_at: string;
 }
 
+interface AuditLogsQuery {
+  from: (table: string) => {
+    select: (columns: string) => AuditLogsQueryBuilder;
+  };
+}
+
+interface AuditLogsQueryBuilder {
+  order: (column: string, options: { ascending: boolean }) => AuditLogsQueryBuilder;
+  limit: (count: number) => AuditLogsQueryBuilder;
+  eq: (column: string, value: string) => AuditLogsQueryBuilder;
+  then: PromiseLike<{ data: AuditLog[] | null; error: Error | null }>["then"];
+}
+
 const tableLabels: Record<string, string> = {
   work_logs: 'Plow Reports',
   shovel_work_logs: 'Shovel Reports',
@@ -59,7 +72,7 @@ export default function AuditLogPage() {
     queryKey: ['audit-logs', tableFilter, actionFilter],
     queryFn: async () => {
       // Use type assertion since audit_logs is a new table not yet in generated types
-      let query = (supabase as any)
+      let query = (supabase as unknown as AuditLogsQuery)
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })

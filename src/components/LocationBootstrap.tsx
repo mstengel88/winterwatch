@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 
 /**
  * LocationBootstrap - Location initialization for immediate proximity display
@@ -12,8 +13,6 @@ export function LocationBootstrap() {
 
     async function run() {
       try {
-        const { Capacitor } = await import("@capacitor/core");
-
         if (!Capacitor.isNativePlatform()) {
           console.log("[LocationBootstrap] Web platform - using browser geolocation");
           // On web, try to get position using browser API
@@ -84,7 +83,6 @@ export function LocationBootstrap() {
       (async () => {
         try {
           if (!watchId) return;
-          const { Capacitor } = await import("@capacitor/core");
           if (!Capacitor.isNativePlatform()) return;
           const { Geolocation } = await import("@capacitor/geolocation");
           await Geolocation.clearWatch({ id: watchId });

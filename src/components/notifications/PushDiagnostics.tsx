@@ -22,8 +22,17 @@ type Snapshot = {
   notes: string[];
 };
 
+type DiagnosticsWindow = Window &
+  typeof globalThis & {
+    cordova?: unknown;
+    plugins?: Record<string, unknown>;
+    Capacitor?: {
+      Plugins?: Record<string, unknown>;
+    };
+  };
+
 async function takeSnapshot(): Promise<Snapshot> {
-  const w = window as any;
+  const w = window as DiagnosticsWindow;
 
   const isNativePlatform = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();

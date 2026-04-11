@@ -9,7 +9,7 @@ import { Capacitor } from '@capacitor/core';
 /**
  * Debounce function for expensive operations
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
   delay: number
 ): (...args: Parameters<T>) => void {
@@ -24,7 +24,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle function for rate-limiting frequent operations
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -56,7 +56,7 @@ export function useDebouncedValue<T>(value: T, delay: number = 300): T {
 /**
  * Hook for throttled callbacks
  */
-export function useThrottledCallback<T extends (...args: any[]) => any>(
+export function useThrottledCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): T {

@@ -228,7 +228,6 @@ function App() {
     preloadCommonRoutes();
     
     (async () => {
-      const { Capacitor } = await import("@capacitor/core");
       if (Capacitor.isNativePlatform()) {
         // iOS 18.x stability: Defer deep link initialization to allow WebView to stabilize.
         // We need this for OAuth (Apple/Google Sign-In) to work on iOS.

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Employee, TimeClockEntry } from '@/types/database';
@@ -26,7 +26,7 @@ export function useEmployee(): UseEmployeeReturn {
   // Send GPS pings while on shift
   useLocationTracking(employee?.id, activeShift?.id);
 
-  const fetchEmployee = async () => {
+  const fetchEmployee = useCallback(async () => {
     if (!user) {
       setEmployee(null);
       setIsLoading(false);
@@ -51,9 +51,9 @@ export function useEmployee(): UseEmployeeReturn {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchActiveShift = async () => {
+  const fetchActiveShift = useCallback(async () => {
     if (!employee) {
       setActiveShift(null);
       return;
@@ -77,15 +77,15 @@ export function useEmployee(): UseEmployeeReturn {
     } catch (err) {
       console.error('Error fetching active shift:', err);
     }
-  };
+  }, [employee]);
 
   useEffect(() => {
     fetchEmployee();
-  }, [user]);
+  }, [fetchEmployee]);
 
   useEffect(() => {
     fetchActiveShift();
-  }, [employee]);
+  }, [fetchActiveShift]);
 
   const clockIn = async (): Promise<boolean> => {
     if (!employee) {

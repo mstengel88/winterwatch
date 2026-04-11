@@ -6,6 +6,28 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+type EmployeeName = {
+  first_name: string;
+  last_name: string;
+};
+
+type ActiveShiftRow = {
+  id: string;
+  employee_id: string;
+  clock_in_time: string;
+  employee: EmployeeName | null;
+};
+
+type WorkLogSummaryRow = {
+  id: string;
+  status: string;
+  service_type: string;
+  billing_status: string | null;
+  check_in_time: string | null;
+  account: { name: string } | null;
+  employee: EmployeeName | null;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -78,11 +100,13 @@ Deno.serve(async (req) => {
         totalHoursToday += (end - start) / (1000 * 60 * 60);
       });
 
+      const typedActiveShifts = (activeShifts || []) as ActiveShiftRow[];
+
       responseData.time_clock = {
-        active_shifts: (activeShifts || []).length,
-        active_employees: (activeShifts || []).map((s) => ({
+        active_shifts: typedActiveShifts.length,
+        active_employees: typedActiveShifts.map((s) => ({
           name: s.employee
-            ? `${(s.employee as any).first_name} ${(s.employee as any).last_name}`
+            ? `${s.employee.first_name} ${s.employee.last_name}`
             : "Unknown",
           employee_id: s.employee_id,
           clock_in_time: s.clock_in_time,
@@ -106,7 +130,7 @@ Deno.serve(async (req) => {
         .select("id, status, service_type, billing_status, check_in_time, account:accounts(name), employee:employees(first_name, last_name)")
         .gte("created_at", todayISO);
 
-      const allLogs = [...(plowLogs || []), ...(shovelLogs || [])];
+      const allLogs = [...((plowLogs || []) as WorkLogSummaryRow[]), ...((shovelLogs || []) as WorkLogSummaryRow[])];
       const inProgressLogs = allLogs.filter((l) => l.status === "in_progress");
 
       responseData.work_logs = {
@@ -117,9 +141,9 @@ Deno.serve(async (req) => {
         in_progress_details: inProgressLogs.map((l) => ({
           id: l.id,
           service_type: l.service_type,
-          account: (l.account as any)?.name || "Unknown",
+          account: l.account?.name || "Unknown",
           employee: l.employee
-            ? `${(l.employee as any).first_name} ${(l.employee as any).last_name}`
+            ? `${l.employee.first_name} ${l.employee.last_name}`
             : "Unassigned",
           started: l.check_in_time,
         })),

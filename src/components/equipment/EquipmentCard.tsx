@@ -13,6 +13,10 @@ interface EquipmentCardProps {
   onViewHistory: (equipment: Equipment) => void;
 }
 
+type EquipmentWithServiceType = Equipment & {
+  service_type?: 'plow' | 'salt' | 'both';
+};
+
 export function EquipmentCard({ equipment, onEdit, onDelete, onLogService, onViewHistory }: EquipmentCardProps) {
   const getStatusColor = (status: string | null) => {
     switch (status) {
@@ -42,7 +46,7 @@ export function EquipmentCard({ equipment, onEdit, onDelete, onLogService, onVie
     }
   };
 
-  const serviceType = (equipment as any).service_type || 'both';
+  const serviceType = (equipment as EquipmentWithServiceType).service_type || 'both';
 
   return (
     <Card className="bg-card/50 border-border/50 hover:border-border transition-colors">

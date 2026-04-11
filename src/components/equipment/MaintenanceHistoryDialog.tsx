@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ export function MaintenanceHistoryDialog({ equipment, open, onOpenChange, onUpda
   const [logs, setLogs] = useState<MaintenanceLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!equipment) return;
     
     setIsLoading(true);
@@ -48,13 +48,13 @@ export function MaintenanceHistoryDialog({ equipment, open, onOpenChange, onUpda
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [equipment]);
 
   useEffect(() => {
     if (open && equipment) {
       fetchLogs();
     }
-  }, [open, equipment]);
+  }, [open, equipment, fetchLogs]);
 
   const handleDelete = async (logId: string) => {
     if (!confirm('Delete this maintenance log?')) return;

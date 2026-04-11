@@ -51,7 +51,7 @@ export function MaintenanceRequestsTab() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRequests((data as any) || []);
+      setRequests((data as MaintenanceRequest[] | null) || []);
     } catch (error) {
       console.error('Error fetching maintenance requests:', error);
       toast.error('Failed to load maintenance requests');

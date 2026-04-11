@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,11 +24,7 @@ export function NotificationMandatorySettings() {
   const [types, setTypes] = useState<NotificationType[]>([]);
   const [settings, setSettings] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    fetchNotificationTypes();
-  }, []);
-
-  const fetchNotificationTypes = async () => {
+  const fetchNotificationTypes = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -59,7 +55,11 @@ export function NotificationMandatorySettings() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchNotificationTypes();
+  }, [fetchNotificationTypes]);
 
   const handleSave = async () => {
     setIsSaving(true);

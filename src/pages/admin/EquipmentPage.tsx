@@ -15,6 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MaintenanceRequestsTab } from '@/components/equipment/MaintenanceRequestsTab';
 import { MaintenanceNotificationSettings } from '@/components/equipment/MaintenanceNotificationSettings';
 
+type EquipmentWithServiceType = Equipment & {
+  service_type?: 'plow' | 'salt' | 'both';
+};
+
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,7 +81,7 @@ export default function EquipmentPage() {
         license_plate: equip.license_plate || '',
         vin: equip.vin || '',
         status: equip.status || 'available',
-        service_type: (equip as any).service_type || 'both',
+        service_type: (equip as EquipmentWithServiceType).service_type || 'both',
         notes: equip.notes || '',
         is_active: equip.is_active,
       });

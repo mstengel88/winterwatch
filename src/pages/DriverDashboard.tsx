@@ -50,6 +50,12 @@ interface AccountWithDistance extends Account {
   distance?: number;
 }
 
+interface EquipmentOption {
+  id: string;
+  name: string;
+  service_type: 'plow' | 'salt' | 'both';
+}
+
 export default function DriverDashboard() {
   const navigate = useNavigate();
   const { profile, isAdminOrManager } = useAuth();
@@ -102,7 +108,7 @@ export default function DriverDashboard() {
   const [weather, setWeather] = useState('');
   const [windSpeed, setWindSpeed] = useState('');
   const [notes, setNotes] = useState('');
-  const [allEquipment, setAllEquipment] = useState<any[]>([]);
+  const [allEquipment, setAllEquipment] = useState<EquipmentOption[]>([]);
   const [plowEmployees, setPlowEmployees] = useState<Employee[]>([]);
   const [onShiftEmployeeIds, setOnShiftEmployeeIds] = useState<Set<string>>(new Set());
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -698,10 +704,10 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
     <AppLayout>
       <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
             <div 
-              className={`flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20 ${
+              className={`mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/20 ${
                 isAdminOrManager() ? 'cursor-pointer hover:bg-primary/30 transition-colors' : ''
               }`}
               onClick={isAdminOrManager() ? () => navigate('/admin/notifications?tab=send') : undefined}
@@ -721,9 +727,9 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="rounded-2xl border border-border/50 bg-card/60 px-4 py-3 sm:text-right">
             <p className="text-xs text-muted-foreground">This Week</p>
-            <p className="flex items-center justify-end gap-1.5 text-lg font-semibold text-success">
+            <p className="flex items-center gap-1.5 text-lg font-semibold text-success sm:justify-end">
               <Clock className="h-4 w-4" />
               {weeklyHours}h
             </p>
@@ -733,7 +739,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
         {/* Daily Shift Card */}
         <Card className="bg-[hsl(var(--card))]/80 border-border/50">
           <CardContent className="py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
                   <Clock className="h-5 w-5 text-primary" />
@@ -741,7 +747,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 <div>
                   <p className="font-medium">Daily Shift</p>
                   {activeShift ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
                       <span className="text-lg font-mono font-bold text-primary">
                         {formatTime(shiftTimer.hours)}:{formatTime(shiftTimer.minutes)}:{formatTime(shiftTimer.seconds)}
                       </span>
@@ -758,7 +764,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 <Button 
                   onClick={handleClockOutClick}
                   variant="outline"
-                  className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                  className="w-full border-red-500/50 text-red-400 hover:bg-red-500/20 sm:w-auto"
                 >
                   <LogIn className="h-4 w-4 mr-2" />
                   End Shift
@@ -766,7 +772,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
               ) : (
                 <Button 
                   onClick={handleClockIn}
-                  className="bg-primary hover:bg-primary/90"
+                  className="w-full bg-primary hover:bg-primary/90 sm:w-auto"
                 >
                   <LogIn className="h-4 w-4 mr-2" />
                   Start Shift
@@ -790,8 +796,9 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             <h2 className="mb-3 text-base font-semibold">Quick Log Entry</h2>
             
             {/* Nearest Location Card */}
-            <div className="bg-primary rounded-lg p-4 flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
+            <div className="mb-4 rounded-2xl bg-primary p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
                 <Navigation className="h-5 w-5 text-primary-foreground/70" />
                 <div>
                   {geoLoading ? (
@@ -819,16 +826,17 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                     </p>
                   )}
                 </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRefreshLocation}
+                  disabled={geoLoading}
+                  className="h-11 w-11 shrink-0 rounded-full text-primary-foreground hover:bg-primary-foreground/20"
+                >
+                  <Navigation className={`h-5 w-5 ${geoLoading ? 'animate-pulse' : ''}`} />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleRefreshLocation}
-                disabled={geoLoading}
-                className="text-primary-foreground hover:bg-primary-foreground/20"
-              >
-                <Navigation className={`h-5 w-5 ${geoLoading ? 'animate-pulse' : ''}`} />
-              </Button>
             </div>
 
             {/* Account Select */}
@@ -905,12 +913,12 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             {/* Service Type */}
             <div className="space-y-2 mb-4">
               <Label className="text-sm">Service Type</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <Button
                   variant={serviceType === 'plow' ? 'default' : 'ghost'}
                   className={serviceType === 'plow' 
-                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
-                    : 'bg-transparent hover:bg-muted/30'
+                    ? 'h-12 justify-start bg-primary hover:bg-primary/90 text-primary-foreground' 
+                    : 'h-12 justify-start bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('plow')}
                 >
@@ -920,8 +928,8 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 <Button
                   variant={serviceType === 'salt' ? 'default' : 'ghost'}
                   className={serviceType === 'salt' 
-                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
-                    : 'bg-transparent hover:bg-muted/30'
+                    ? 'h-12 justify-start bg-primary hover:bg-primary/90 text-primary-foreground' 
+                    : 'h-12 justify-start bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('salt')}
                 >
@@ -931,8 +939,8 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 <Button
                   variant={serviceType === 'both' ? 'default' : 'ghost'}
                   className={serviceType === 'both' 
-                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
-                    : 'bg-transparent hover:bg-muted/30'
+                    ? 'h-12 justify-start bg-primary hover:bg-primary/90 text-primary-foreground' 
+                    : 'h-12 justify-start bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('both')}
                 >
@@ -943,11 +951,11 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             </div>
 
             {/* Equipment & Employees */}
-            <div className="mb-4 grid grid-cols-2 gap-3">
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <Label className="text-sm text-muted-foreground">Equipment <span className="text-red-400">*</span></Label>
                 <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                  <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
+                  <SelectTrigger className="mt-1.5 h-12 rounded-xl bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select equipment..." />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-primary/30">
@@ -962,7 +970,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
               <div>
                 <Label className="text-sm text-muted-foreground">Employees <span className="text-red-400">*</span></Label>
                 <Select value={selectedEmployees} onValueChange={setSelectedEmployees}>
-                  <SelectTrigger className="mt-1.5 bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
+                  <SelectTrigger className="mt-1.5 h-12 rounded-xl bg-secondary border-primary/30 focus:border-primary focus:ring-primary/20">
                     <SelectValue placeholder="Select employees..." />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-primary/30">
@@ -985,7 +993,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
 
 
             {/* Snow & Salt */}
-            <div className="mb-4 grid grid-cols-2 gap-3 w-[85%]">
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <Label className="text-sm text-muted-foreground">
                   Snow Depth (inches) {(serviceType === 'plow' || serviceType === 'both') && <span className="text-red-400">*</span>}
@@ -997,7 +1005,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
-                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-12 rounded-xl text-base bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -1011,13 +1019,13 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   placeholder="e.g., 150"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
-                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-12 rounded-xl text-base bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
 
             {/* Weather */}
-            <div className="mb-4 grid grid-cols-3 gap-3 w-[85%]">
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label className="text-sm text-muted-foreground flex items-center gap-1">
                   Temp (°F) <span className="text-red-400">*</span>
@@ -1026,7 +1034,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   type="number"
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
-                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-12 rounded-xl text-base bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -1036,7 +1044,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-12 rounded-xl text-base bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
               <div>
@@ -1047,19 +1055,19 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                   type="number"
                   value={windSpeed}
                   onChange={(e) => setWindSpeed(e.target.value)}
-                  className="mt-1 h-8 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
+                  className="mt-1 h-12 rounded-xl text-base bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
                 />
               </div>
             </div>
 
             {/* Notes */}
-            <div className="mb-4 w-[85%]">
+            <div className="mb-4">
               <Label className="text-sm text-muted-foreground">Notes (Optional)</Label>
               <Textarea
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="mt-1 text-sm bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20 min-h-[60px]"
+                className="mt-1 min-h-[100px] rounded-2xl text-base bg-secondary border-primary/30 focus:border-primary focus-visible:ring-primary/20"
               />
             </div>
 
@@ -1083,7 +1091,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             {activeWorkLog ? (
               <Button 
                 type="button"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground min-h-[48px]"
+                className="min-h-[52px] w-full rounded-2xl bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -1095,7 +1103,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
             ) : (
               <Button 
                 type="button"
-                className="w-full bg-primary/50 hover:bg-primary/40 text-primary-foreground cursor-not-allowed min-h-[48px]"
+                className="min-h-[52px] w-full cursor-not-allowed rounded-2xl bg-primary/50 text-base font-semibold text-primary-foreground hover:bg-primary/40"
                 disabled
               >
                 Check In First
@@ -1118,7 +1126,7 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
               <Card className="border-border/50 bg-card">
                 <CardContent className="py-2 px-0">
                   <div className="divide-y divide-border">
-                    {recentWorkLogs.map((log: any) => {
+                    {recentWorkLogs.map((log) => {
                       const isInProgress = log.status === 'in_progress' || (log.check_in_time && !log.check_out_time);
                       return (
                         <div key={log.id} className={`flex items-start gap-3 py-3 px-4 ${isInProgress ? 'bg-primary/5' : ''}`}>

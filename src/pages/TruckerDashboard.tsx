@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,13 @@ interface MaintenanceRequest {
   equipment: { name: string } | null;
 }
 
+interface MaintenanceRequestInsert {
+  employee_id: string;
+  equipment_id: string;
+  problem_description: string;
+  mileage: number | null;
+}
+
 export default function TruckerDashboard() {
   const { user } = useAuth();
   const { employee, isLoading: employeeLoading } = useEmployee();
@@ -45,27 +52,19 @@ export default function TruckerDashboard() {
   const [problem, setProblem] = useState('');
   const [mileage, setMileage] = useState('');
 
-  useEffect(() => {
-    fetchTrucks();
-  }, []);
-
-  useEffect(() => {
-    if (employee) fetchRequests();
-  }, [employee]);
-
-  const fetchTrucks = async () => {
+  const fetchTrucks = useCallback(async () => {
     const { data } = await supabase
       .from('equipment')
       .select('id, name, type, license_plate')
       .eq('is_active', true)
       .order('name');
     setTrucks((data as Equipment[]) ?? []);
-  };
+  }, []);
 
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     if (!employee) return;
     setLoading(true);
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('maintenance_requests')
       .select('id, problem_description, mileage, status, created_at, equipment:equipment_id(name)')
       .eq('employee_id', employee.id)
@@ -73,7 +72,15 @@ export default function TruckerDashboard() {
       .limit(20);
     setRequests((data as MaintenanceRequest[]) ?? []);
     setLoading(false);
-  };
+  }, [employee]);
+
+  useEffect(() => {
+    fetchTrucks();
+  }, [fetchTrucks]);
+
+  useEffect(() => {
+    if (employee) fetchRequests();
+  }, [employee, fetchRequests]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,14 +95,14 @@ export default function TruckerDashboard() {
 
     setSubmitting(true);
     const selectedTruckData = trucks.find(t => t.id === selectedTruck);
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('maintenance_requests')
       .insert({
         employee_id: employee.id,
         equipment_id: selectedTruck,
         problem_description: problem.trim(),
         mileage: mileage ? parseFloat(mileage) : null,
-      });
+      } as MaintenanceRequestInsert);
 
     if (error) {
       toast({ title: 'Error', description: 'Failed to submit request.', variant: 'destructive' });
@@ -142,7 +149,7 @@ export default function TruckerDashboard() {
 
   return (
     <AppLayout>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="mx-auto max-w-2xl space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Trucker Dashboard</h1>
           <p className="text-muted-foreground text-sm">
@@ -151,7 +158,7 @@ export default function TruckerDashboard() {
         </div>
 
         {/* Maintenance Request Form */}
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
@@ -166,14 +173,14 @@ export default function TruckerDashboard() {
                 <Input
                   value={employee ? `${employee.first_name} ${employee.last_name}` : 'No employee record found'}
                   disabled
-                  className="bg-muted"
+                  className="h-12 rounded-xl bg-muted"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="truck">Truck Number *</Label>
                 <Select value={selectedTruck} onValueChange={setSelectedTruck}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-12 rounded-xl">
                     <SelectValue placeholder="Select a truck" />
                   </SelectTrigger>
                   <SelectContent>
@@ -195,6 +202,7 @@ export default function TruckerDashboard() {
                   placeholder="Current mileage"
                   value={mileage}
                   onChange={(e) => setMileage(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="h-12 rounded-xl"
                 />
               </div>
 
@@ -206,10 +214,11 @@ export default function TruckerDashboard() {
                   value={problem}
                   onChange={(e) => setProblem(e.target.value)}
                   rows={4}
+                  className="min-h-[120px] rounded-2xl"
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={submitting || !employee}>
+              <Button type="submit" className="min-h-[52px] w-full rounded-2xl text-base font-semibold" disabled={submitting || !employee}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wrench className="h-4 w-4 mr-2" />}
                 Submit Request
               </Button>
@@ -218,7 +227,7 @@ export default function TruckerDashboard() {
         </Card>
 
         {/* Previous Requests */}
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />

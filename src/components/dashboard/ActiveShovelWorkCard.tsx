@@ -57,6 +57,8 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
   
   const photoUpload = usePhotoUpload({ folder: 'shovel-logs' });
   const hasLoadedNativePreviewsRef = useRef(false);
+  const restorePhotoPreviews = photoUpload.restorePreviews;
+  const previewCount = photoUpload.previews.length;
 
   // Restore form state from persisted data whenever formData changes
   useEffect(() => {
@@ -68,8 +70,8 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
       setNotes(formData.notes || '');
       
       // Restore photos if available
-      if (formData.photoPreviews && formData.photoPreviews.length > 0 && photoUpload.previews.length === 0) {
-        photoUpload.restorePreviews(formData.photoPreviews);
+      if (formData.photoPreviews && formData.photoPreviews.length > 0 && previewCount === 0) {
+        restorePhotoPreviews(formData.photoPreviews);
       }
       
       // Reset flag after a tick to allow state to settle
@@ -77,12 +79,12 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
         isRestoringRef.current = false;
       }, 100);
     }
-  }, [formData]); // Re-run when formData updates (e.g., on visibility change)
+  }, [formData, previewCount, restorePhotoPreviews]); // Re-run when formData updates (e.g., on visibility change)
 
   // Native iOS: restore photo previews from Filesystem refs
   useEffect(() => {
     if (hasLoadedNativePreviewsRef.current) return;
-    if (photoUpload.previews.length > 0) return;
+    if (previewCount > 0) return;
     if (!formData.photoPreviewRefs || formData.photoPreviewRefs.length === 0) return;
 
     hasLoadedNativePreviewsRef.current = true;
@@ -90,13 +92,13 @@ export function ActiveShovelWorkCard({ workLog, onCheckOut }: ActiveShovelWorkCa
       try {
         const previews = await loadCheckoutPhotoPreviews(formData.photoPreviewRefs!);
         if (previews.length > 0) {
-          photoUpload.restorePreviews(previews);
+          restorePhotoPreviews(previews);
         }
       } catch {
         // best-effort
       }
     })();
-  }, [formData.photoPreviewRefs, photoUpload]);
+  }, [formData.photoPreviewRefs, previewCount, restorePhotoPreviews]);
 
   // Persist form changes (skip during restoration)
   useEffect(() => {

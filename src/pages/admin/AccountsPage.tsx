@@ -18,6 +18,16 @@ import { accountSchema, getValidationError } from '@/lib/validations';
 
 const SERVICE_TYPE_OPTIONS = ['plow', 'shovel', 'both'];
 
+type AccountWithServiceType = Account & {
+  service_type?: 'plow' | 'shovel' | 'both';
+};
+
+type BulkAccountUpdates = {
+  service_type?: string;
+  priority?: number;
+  is_active?: boolean;
+};
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,7 +99,7 @@ export default function AccountsPage() {
         longitude: account.longitude?.toString() || '',
         geofence_radius: account.geofence_radius?.toString() || '100',
         priority: account.priority?.toString() || '5',
-        service_type: (account as any).service_type || 'both',
+        service_type: (account as AccountWithServiceType).service_type || 'both',
         notes: account.notes || '',
         is_active: account.is_active,
       });
@@ -211,7 +221,7 @@ export default function AccountsPage() {
 
     setIsSaving(true);
     try {
-      const updates: Record<string, any> = {};
+      const updates: BulkAccountUpdates = {};
       if (bulkFormData.service_type) updates.service_type = bulkFormData.service_type;
       if (bulkFormData.priority) updates.priority = parseInt(bulkFormData.priority);
       if (bulkFormData.is_active !== '') updates.is_active = bulkFormData.is_active === 'true';
@@ -288,7 +298,7 @@ export default function AccountsPage() {
   };
 
   const getServiceBadge = (account: Account) => {
-    const serviceType = (account as any).service_type || 'both';
+    const serviceType = (account as AccountWithServiceType).service_type || 'both';
     if (serviceType === 'plow') {
       return <Badge className="bg-primary/20 text-primary border-primary/30">Plow</Badge>;
     }

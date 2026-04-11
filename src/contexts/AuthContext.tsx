@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, AppRole, Profile } from '@/types/auth';
@@ -13,7 +14,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [initialized, setInitialized] = useState(false); // 🔥 important
 
-  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -26,9 +27,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return (data as Profile | null) ?? null;
-  };
+  }, []);
 
-  const fetchRoles = async (userId: string): Promise<AppRole[]> => {
+  const fetchRoles = useCallback(async (userId: string): Promise<AppRole[]> => {
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
@@ -40,13 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return (data as { role: AppRole }[] | null)?.map((r) => r.role) ?? [];
-  };
+  }, []);
 
-  const loadUserData = async (userId: string) => {
+  const loadUserData = useCallback(async (userId: string) => {
     const [p, r] = await Promise.all([fetchProfile(userId), fetchRoles(userId)]);
     setProfile(p);
     setRoles(r);
-  };
+  }, [fetchProfile, fetchRoles]);
 
   useEffect(() => {
     let mounted = true;
@@ -119,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadUserData]);
 
   const signIn: AuthContextType['signIn'] = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -170,8 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(await fetchProfile(user.id));
       },
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, session, profile, roles, isLoading, initialized]
+    [user, session, profile, roles, isLoading, initialized, fetchProfile]
   );
 
   return (

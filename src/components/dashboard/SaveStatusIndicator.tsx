@@ -9,7 +9,7 @@ export function SaveStatusIndicator({ status }: SaveStatusIndicatorProps) {
   if (status === 'idle') return null;
 
   return (
-    <div className="flex items-center justify-center gap-1.5 text-xs py-1">
+    <div className="flex min-h-[36px] items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-xs">
       {status === 'saving' && (
         <>
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />

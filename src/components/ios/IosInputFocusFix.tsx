@@ -13,6 +13,9 @@ export function IosInputFocusFix() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
 
+    const captureEventOptions: AddEventListenerOptions = { capture: true };
+    const focusOptions: FocusOptions = { preventScroll: true };
+
     const resolveControl = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return;
 
@@ -51,9 +54,7 @@ export function IosInputFocusFix() {
       // Synchronous focus is important: iOS can reject focus if it doesn't happen
       // within a user-gesture event (causing `activationDenied`).
       try {
-        // preventScroll avoids a scroll-jump during focus.
-        // TS DOM lib doesn't always include the option, so we cast.
-        (control as any).focus?.({ preventScroll: true });
+        control.focus(focusOptions);
       } catch {
         control.focus();
       }
@@ -106,10 +107,10 @@ export function IosInputFocusFix() {
     document.addEventListener("pointerup", onPointerUp, { passive: true, capture: true });
 
     return () => {
-      document.removeEventListener("touchstart", onTouchStart, { capture: true } as any);
-      document.removeEventListener("pointerdown", onPointerDown, { capture: true } as any);
-      document.removeEventListener("touchend", onTouchEnd, { capture: true } as any);
-      document.removeEventListener("pointerup", onPointerUp, { capture: true } as any);
+      document.removeEventListener("touchstart", onTouchStart, captureEventOptions);
+      document.removeEventListener("pointerdown", onPointerDown, captureEventOptions);
+      document.removeEventListener("touchend", onTouchEnd, captureEventOptions);
+      document.removeEventListener("pointerup", onPointerUp, captureEventOptions);
     };
   }, []);
 

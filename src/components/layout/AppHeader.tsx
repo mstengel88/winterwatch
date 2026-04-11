@@ -19,9 +19,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog, History, MapPin } from 'lucide-react';
+import { Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog, History, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { AppRole } from '@/types/auth';
 import logo from '@/assets/logo.png';
 
 const APP_VERSION = '2.2';
@@ -48,6 +50,7 @@ export function AppHeader() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isNative } = useNativePlatform();
+  const isMobile = useIsMobile();
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch unread notification count
@@ -97,7 +100,7 @@ export function AppHeader() {
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
     // Check if user has any of the required roles
-    return item.roles.some((role) => hasRole(role as any));
+    return item.roles.some((role) => hasRole(role as AppRole));
   });
 
   const initials = profile?.full_name
@@ -109,6 +112,7 @@ export function AppHeader() {
 
   const displayName = profile?.full_name || profile?.email || 'User';
   const shortName = displayName.length > 12 ? displayName.slice(0, 12) + '...' : displayName;
+  const mobilePrimaryNav = filteredNavItems.slice(0, 4);
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
@@ -132,28 +136,35 @@ export function AppHeader() {
   };
 
   return (
-    <header className={cn(
-      "sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60",
-      isNative && "pt-[env(safe-area-inset-top)]"
-    )}>
-      <div className="container flex h-14 items-center justify-between px-4 max-w-6xl mx-auto">
+    <>
+      <header className={cn(
+        "sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60",
+        isNative && "pt-[env(safe-area-inset-top)]"
+      )}>
+        <div className={cn(
+          "mx-auto flex items-center justify-between px-4",
+          isMobile ? "h-16 max-w-full" : "h-14 max-w-6xl"
+        )}>
         {/* Left: Mobile Menu + Logo */}
         <div className="flex items-center gap-3">
           {/* Mobile Hamburger Menu */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden h-8 w-8">
+              <Button variant="ghost" size="icon" className="md:hidden h-10 w-10 rounded-full">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0">
-              <SheetHeader className="border-b border-border/40 p-4">
+            <SheetContent side="left" className="w-[86vw] max-w-80 p-0">
+              <SheetHeader className="border-b border-border/40 px-4 pb-4 pt-6 text-left">
                 <SheetTitle className="flex items-center gap-2">
                   <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
-                  <span className="font-semibold">WinterWatch-Pro</span>
+                  <div className="flex flex-col">
+                    <span className="font-semibold">WinterWatch-Pro</span>
+                    <span className="text-xs font-normal text-muted-foreground">Quick navigation</span>
+                  </div>
                 </SheetTitle>
               </SheetHeader>
-              <nav className="flex flex-col p-4 space-y-1">
+              <nav className="flex flex-col gap-1 p-4">
                 {filteredNavItems.map((item) => {
                   const active = isActive(item.href);
                   return (
@@ -161,7 +172,7 @@ export function AppHeader() {
                       key={item.href}
                       variant={active ? 'secondary' : 'ghost'}
                       className={cn(
-                        'justify-start gap-3 h-11',
+                        'justify-start gap-3 h-12 rounded-2xl',
                         active && 'bg-primary/10 text-primary border border-primary/30'
                       )}
                       onClick={() => handleNavigate(item.href)}
@@ -171,8 +182,27 @@ export function AppHeader() {
                     </Button>
                   );
                 })}
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="justify-start rounded-2xl"
+                    onClick={() => handleNavigate('/profile')}
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start rounded-2xl"
+                    onClick={() => handleNavigate('/settings')}
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Button>
+                </div>
               </nav>
-              <div className="absolute bottom-0 left-0 right-0 border-t border-border/40 p-4">
+              <div className="border-t border-border/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <div className="flex items-center gap-3 mb-3">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary/20 text-primary">
@@ -202,8 +232,15 @@ export function AppHeader() {
             onClick={() => navigate(getHomeRoute())}
           >
             <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
-            <span className="font-semibold text-foreground hidden sm:inline">WinterWatch-Pro</span>
-            <span className="text-[10px] text-muted-foreground">v{APP_VERSION}</span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-foreground leading-none hidden sm:inline">WinterWatch-Pro</span>
+              <span className={cn(
+                "text-[10px] leading-none text-muted-foreground",
+                isMobile && "sm:hidden"
+              )}>
+                v{APP_VERSION}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -234,7 +271,7 @@ export function AppHeader() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground relative"
+            className="relative h-10 w-10 rounded-full text-muted-foreground"
             onClick={() => {
               // Mark all as read when opening
               if (user && unreadCount > 0) {
@@ -258,14 +295,17 @@ export function AppHeader() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 gap-2 px-2">
+              <Button variant="ghost" className={cn(
+                "gap-2 rounded-full",
+                isMobile ? "h-10 w-10 px-0" : "h-9 px-2"
+              )}>
                 <Avatar className="h-6 w-6">
                   <AvatarFallback className="bg-primary/20 text-primary text-xs">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden sm:inline text-sm text-foreground">{shortName}</span>
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                {!isMobile && <span className="hidden sm:inline text-sm text-foreground">{shortName}</span>}
+                {!isMobile && <ChevronDown className="h-3 w-3 text-muted-foreground" />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -328,7 +368,43 @@ export function AppHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
-    </header>
+        </div>
+      </header>
+
+      {isMobile && (
+        <div className="ios-bottom-nav md:hidden">
+          <div className="grid grid-cols-5 gap-1 px-2 py-2">
+            {mobilePrimaryNav.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => handleNavigate(item.href)}
+                  className={cn(
+                    "flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium transition-colors",
+                    active
+                      ? "bg-primary/12 text-primary"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+            >
+              <Menu className="h-4 w-4" />
+              <span>More</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

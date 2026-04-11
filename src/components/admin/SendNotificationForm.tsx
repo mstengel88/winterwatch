@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,11 +36,7 @@ export function SendNotificationForm() {
   const [sendToAll, setSendToAll] = useState(true);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [employeesRes, typesRes] = await Promise.all([
@@ -72,7 +68,11 @@ export function SendNotificationForm() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [notificationType]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleEmployeeToggle = (userId: string) => {
     setSelectedEmployees((prev) =>

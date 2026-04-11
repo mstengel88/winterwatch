@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, differenceInMinutes } from 'date-fns';
+import { DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExportConfig';
 
 // Version for cache busting - increment when making PDF changes
 const PDF_VERSION = '1.0.2';
@@ -32,27 +33,6 @@ interface ReportSummary {
   propertyCount: number;
   dateRange: string;
 }
-
-// Column keys for work logs PDF
-export type WorkLogColumn = 'type' | 'date' | 'checkIn' | 'checkOut' | 'duration' | 'account' | 'serviceType' | 'snowDepth' | 'saltLbs' | 'equipment' | 'employee' | 'conditions' | 'notes';
-
-export const WORK_LOG_COLUMNS: { key: WorkLogColumn; label: string }[] = [
-  { key: 'type', label: 'Type' },
-  { key: 'date', label: 'Date' },
-  { key: 'checkIn', label: 'Check In' },
-  { key: 'checkOut', label: 'Check Out' },
-  { key: 'duration', label: 'Duration' },
-  { key: 'account', label: 'Account' },
-  { key: 'serviceType', label: 'Service' },
-  { key: 'snowDepth', label: 'Snow' },
-  { key: 'saltLbs', label: 'Salt' },
-  { key: 'equipment', label: 'Equipment' },
-  { key: 'employee', label: 'Employee' },
-  { key: 'conditions', label: 'Conditions' },
-  { key: 'notes', label: 'Notes' },
-];
-
-export const DEFAULT_VISIBLE_COLUMNS: WorkLogColumn[] = WORK_LOG_COLUMNS.map(c => c.key);
 
 interface GeneratePdfOptions {
   returnBlob?: boolean;
@@ -278,7 +258,7 @@ export function generateInvoicePDF(
   });
 
   // Summary
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  const finalY = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 0) + 10;
   
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(pageWidth - 80, finalY, 66, 30, 2, 2, 'F');

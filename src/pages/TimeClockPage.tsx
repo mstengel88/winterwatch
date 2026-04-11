@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,7 +73,7 @@ export default function TimeClockPage() {
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   const [pendingClockOut, setPendingClockOut] = useState<{ entryId: string; employeeName: string } | null>(null);
 
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     setIsLoading(true);
     try {
       const days = parseInt(dateFilter);
@@ -95,11 +95,11 @@ export default function TimeClockPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dateFilter]);
 
   useEffect(() => {
     fetchEntries();
-  }, [dateFilter]);
+  }, [fetchEntries]);
 
   const handleClockOutClick = (entryId: string, employeeName: string) => {
     setPendingClockOut({ entryId, employeeName });
@@ -240,7 +240,7 @@ export default function TimeClockPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Hours</CardTitle>
@@ -329,7 +329,7 @@ export default function TimeClockPage() {
             <CardHeader className="pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <CardTitle className="text-base">Time Entries</CardTitle>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:flex">
                   <div className="relative flex-1 sm:w-[200px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -340,7 +340,7 @@ export default function TimeClockPage() {
                     />
                   </div>
                   <Select value={dateFilter} onValueChange={setDateFilter}>
-                    <SelectTrigger className="w-[130px] bg-background/50">
+                    <SelectTrigger className="w-full sm:w-[130px] bg-background/50">
                       <Calendar className="h-4 w-4 mr-2" />
                       <SelectValue />
                     </SelectTrigger>

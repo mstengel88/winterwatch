@@ -35,6 +35,11 @@ interface LogMaintenanceDialogProps {
   onSuccess: () => void;
 }
 
+interface EquipmentMaintenanceUpdate {
+  last_maintenance_date: string;
+  next_maintenance_date?: string;
+}
+
 export function LogMaintenanceDialog({ equipment, open, onOpenChange, onSuccess }: LogMaintenanceDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -99,7 +104,7 @@ export function LogMaintenanceDialog({ equipment, open, onOpenChange, onSuccess 
       if (logError) throw logError;
 
       // Update equipment's last maintenance date
-      const updateData: any = {
+      const updateData: EquipmentMaintenanceUpdate = {
         last_maintenance_date: new Date().toISOString().split('T')[0],
       };
       if (formData.next_service_date) {

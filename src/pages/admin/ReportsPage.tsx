@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, type MouseEvent, type TouchEvent } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent, type TouchEvent } from 'react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,8 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
-import { generateWorkLogsPDF, generateTimesheetsPDF, generateSummaryPDF, DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExport';
-import { PdfExportSettings } from '@/components/reports/PdfExportSettings';
+import { DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExportConfig';
 import { toast } from 'sonner';
 import { ShiftDialog } from '@/components/reports/ShiftDialog';
 import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
@@ -34,6 +33,11 @@ import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useGoogleDriveExport } from '@/hooks/useGoogleDriveExport';
 import { cn } from '@/lib/utils';
+
+const PdfExportSettings = lazy(async () => {
+  const module = await import('@/components/reports/PdfExportSettings');
+  return { default: module.PdfExportSettings };
+});
 
 interface TimeClockEntry {
   id: string;
@@ -73,6 +77,91 @@ interface WorkLogEntry {
   billed: boolean;
   billing_status: 'current' | 'billable' | 'completed';
 }
+
+interface JoinedName {
+  first_name: string;
+  last_name: string;
+}
+
+interface JoinedAccountName {
+  name: string;
+}
+
+interface JoinedEquipmentName {
+  name: string;
+}
+
+interface PlowLogRow {
+  id: string;
+  created_at: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  account_id: string;
+  account?: JoinedAccountName | null;
+  employee_id: string | null;
+  employee?: JoinedName | null;
+  equipment_id: string | null;
+  equipment?: JoinedEquipmentName | null;
+  service_type: string;
+  snow_depth_inches: number | null;
+  salt_used_lbs: number | null;
+  weather_conditions: string | null;
+  photo_urls: string[] | null;
+  notes: string | null;
+  billed?: boolean | null;
+  billing_status?: 'current' | 'billable' | 'completed' | null;
+}
+
+interface ShovelLogRow {
+  id: string;
+  created_at: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  account_id: string;
+  account?: JoinedAccountName | null;
+  employee_id: string | null;
+  employee?: JoinedName | null;
+  service_type: string;
+  snow_depth_inches: number | null;
+  ice_melt_used_lbs: number | null;
+  weather_conditions: string | null;
+  team_member_ids?: string[] | null;
+  photo_urls: string[] | null;
+  notes: string | null;
+  billed?: boolean | null;
+  billing_status?: 'current' | 'billable' | 'completed' | null;
+}
+
+interface EmployeeNameRow {
+  first_name: string;
+  last_name: string;
+}
+
+type BulkPlowPayload = {
+  account_id?: string;
+  employee_id?: string;
+  equipment_id?: string | null;
+  service_type?: string;
+  snow_depth_inches?: number | null;
+  salt_used_lbs?: number | null;
+  weather_conditions?: string | null;
+  notes?: string | null;
+  billing_status?: 'current' | 'billable' | 'completed';
+  billed?: boolean;
+};
+
+type BulkShovelPayload = {
+  account_id?: string;
+  employee_id?: string;
+  team_member_ids?: string[];
+  service_type?: string;
+  snow_depth_inches?: number | null;
+  ice_melt_used_lbs?: number | null;
+  weather_conditions?: string | null;
+  notes?: string | null;
+  billing_status?: 'current' | 'billable' | 'completed';
+  billed?: boolean;
+};
 
 interface Account {
   id: string;
@@ -235,7 +324,7 @@ export default function ReportsPage() {
     setCurrentPhotoIndex((prev) => (prev - 1 + viewingPhotos.length) % viewingPhotos.length);
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
       // Parse as local time (not UTC) by splitting the date string
@@ -281,7 +370,7 @@ export default function ReportsPage() {
       setEquipment((equipmentRes.data || []) as Equipment[]);
 
       // Map work logs to unified format
-      const plowLogs: WorkLogEntry[] = (workLogsRes.data || []).map((log: any) => ({
+      const plowLogs: WorkLogEntry[] = ((workLogsRes.data as PlowLogRow[] | null) || []).map((log) => ({
         id: log.id,
         type: 'plow' as const,
         date: log.created_at,
@@ -307,16 +396,16 @@ export default function ReportsPage() {
       }));
 
       // For shovel logs, fetch team member names if available
-      const shovelLogsData = shovelLogsRes.data || [];
+      const shovelLogsData = (shovelLogsRes.data as ShovelLogRow[] | null) || [];
       const shovelLogs: WorkLogEntry[] = await Promise.all(
-        shovelLogsData.map(async (log: any) => {
+        shovelLogsData.map(async (log) => {
           let teamMemberNames: string[] = [];
           if (log.team_member_ids && log.team_member_ids.length > 0) {
             const { data: teamMembers } = await supabase
               .from('employees')
               .select('first_name, last_name')
               .in('id', log.team_member_ids);
-            teamMemberNames = (teamMembers || []).map((m: any) => `${m.first_name} ${m.last_name}`);
+            teamMemberNames = ((teamMembers as EmployeeNameRow[] | null) || []).map((m) => `${m.first_name} ${m.last_name}`);
           }
           return {
             id: log.id,
@@ -354,11 +443,11 @@ export default function ReportsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fromDate, toDate]);
 
   useEffect(() => {
     fetchData();
-  }, [fromDate, toDate]);
+  }, [fetchData]);
 
   // Filtered data
   const filteredShifts = useMemo(() => {
@@ -759,8 +848,9 @@ export default function ReportsPage() {
     printWindow.document.close();
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const { rawLogs, summary } = getWorkLogExportData();
+    const { generateWorkLogsPDF } = await import('@/lib/pdfExport');
 
     generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
       fontSize: pdfFontSize,
@@ -771,6 +861,7 @@ export default function ReportsPage() {
 
   const handleExportToDrive = async () => {
     const { rawLogs, summary, fileName } = getWorkLogExportData();
+    const { generateWorkLogsPDF } = await import('@/lib/pdfExport');
 
     const pdfBlob = generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
       returnBlob: true,
@@ -806,7 +897,7 @@ export default function ReportsPage() {
     }
   };
 
-  const handleExportTimeSheets = () => {
+  const handleExportTimeSheets = async () => {
     // Generate PDF for time sheets
     const entries = filteredShifts.map(shift => {
       const employeeName = shift.employee ? `${shift.employee.first_name} ${shift.employee.last_name}` : 'Unknown';
@@ -825,11 +916,12 @@ export default function ReportsPage() {
     });
 
     const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
+    const { generateTimesheetsPDF } = await import('@/lib/pdfExport');
     generateTimesheetsPDF(entries, dateRange);
     toast.success('Time sheets PDF exported successfully');
   };
 
-  const handleExportSummary = () => {
+  const handleExportSummary = async () => {
     // Calculate summary statistics
     const totalShiftHours = filteredShifts.reduce((sum, shift) => {
       if (shift.clock_in_time && shift.clock_out_time) {
@@ -865,6 +957,7 @@ export default function ReportsPage() {
     };
 
     const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
+    const { generateSummaryPDF } = await import('@/lib/pdfExport');
     generateSummaryPDF(summaryStats, dateRange);
     toast.success('Summary PDF exported successfully');
   };
@@ -1316,7 +1409,7 @@ export default function ReportsPage() {
 
       // Build update payloads based on what fields were toggled
       const buildPlowPayload = () => {
-        const payload: Record<string, any> = {};
+        const payload: BulkPlowPayload = {};
         if (data.account_id) payload.account_id = data.account_id;
         if (data.employee_ids && data.employee_ids.length > 0) payload.employee_id = data.employee_ids[0];
         if (data.equipment_id !== undefined) payload.equipment_id = data.equipment_id || null;
@@ -1332,7 +1425,7 @@ export default function ReportsPage() {
       };
 
       const buildShovelPayload = () => {
-        const payload: Record<string, any> = {};
+        const payload: BulkShovelPayload = {};
         if (data.account_id) payload.account_id = data.account_id;
         if (data.employee_ids && data.employee_ids.length > 0) {
           payload.employee_id = data.employee_ids[0];
@@ -1478,12 +1571,14 @@ export default function ReportsPage() {
       </div>
 
       {/* PDF Export Settings */}
-      <PdfExportSettings
-        fontSize={pdfFontSize}
-        onFontSizeChange={handleFontSizeChange}
-        visibleColumns={pdfVisibleColumns}
-        onVisibleColumnsChange={handleVisibleColumnsChange}
-      />
+      <Suspense fallback={null}>
+        <PdfExportSettings
+          fontSize={pdfFontSize}
+          onFontSizeChange={handleFontSizeChange}
+          visibleColumns={pdfVisibleColumns}
+          onVisibleColumnsChange={handleVisibleColumnsChange}
+        />
+      </Suspense>
 
       {/* Filters Card */}
       <Card className="bg-[hsl(var(--card))]/80 border-border/50">

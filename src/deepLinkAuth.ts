@@ -1,6 +1,7 @@
 // IMPORTANT: Use the same Supabase client instance as the rest of the app.
 // If we exchange the OAuth code with a different client, the session may be
 // stored under a different storage key and AuthContext won't see it.
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 
 const CALLBACK_PREFIX = "winterwatch://auth/callback";
@@ -123,7 +124,6 @@ async function handleAuthCallbackUrl(url: string) {
 }
 
 export async function initDeepLinkAuth() {
-  const { Capacitor } = await import("@capacitor/core");
   if (!Capacitor.isNativePlatform()) return;
 
   // IMPORTANT (iOS 18.x stability):

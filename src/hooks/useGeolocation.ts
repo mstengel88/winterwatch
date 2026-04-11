@@ -56,7 +56,7 @@ export function useGeolocation() {
       setLocation(loc);
       setError(null);
       return loc;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Geolocation error:", err);
       setError("Failed to get location");
       return cachedLocationRef.current; // Return cached on error

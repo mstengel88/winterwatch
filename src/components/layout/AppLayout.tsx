@@ -11,7 +11,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, variant = "default" }: AppLayoutProps) {
-  const { isNative } = useNativePlatform();
+  const { isNative, isIOS } = useNativePlatform();
 
   return (
     <div
@@ -29,13 +29,14 @@ export function AppLayout({ children, variant = "default" }: AppLayoutProps) {
       <main
         className={cn(
           // IMPORTANT: avoid Tailwind `container` (can cause iOS width/offset issues)
-          "mx-auto w-full max-w-full px-4 py-6",
+          "mx-auto w-full max-w-full px-4 py-4 sm:py-6",
           // Prevent children (tables/tabs) from forcing the whole page wider
           "min-w-0",
           // Keep the page from drifting horizontally; horizontal scroll should be inside specific sections (e.g., table wrapper)
           "overflow-x-hidden",
           variant === "wide" ? "max-w-[1400px]" : "max-w-6xl",
-          isNative && "pb-safe"
+          isNative && "pb-safe",
+          isIOS && "pb-ios-tabbar"
         )}
       >
         {children}

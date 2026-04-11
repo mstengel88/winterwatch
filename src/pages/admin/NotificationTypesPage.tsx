@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,11 +57,7 @@ export default function NotificationTypesPage() {
     is_mandatory: false,
   });
 
-  useEffect(() => {
-    fetchTypes();
-  }, []);
-
-  const fetchTypes = async () => {
+  const fetchTypes = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -82,7 +78,11 @@ export default function NotificationTypesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchTypes();
+  }, [fetchTypes]);
 
   const openCreate = () => {
     setEditingType(null);

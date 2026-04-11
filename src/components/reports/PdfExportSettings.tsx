@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Settings2, ChevronDown } from 'lucide-react';
-import { WORK_LOG_COLUMNS, DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExport';
+import { WORK_LOG_COLUMNS, DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExportConfig';
 
 interface PdfExportSettingsProps {
   fontSize: number;

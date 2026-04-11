@@ -26,6 +26,29 @@ interface ActiveLog {
   check_in_time: string;
 }
 
+interface JoinedPerson {
+  first_name: string;
+  last_name: string;
+}
+
+interface JoinedAccount {
+  name: string;
+}
+
+interface RawActiveLogRow {
+  id: string;
+  check_in_time: string;
+  employee_id: string | null;
+  account: JoinedAccount | null;
+  employee: JoinedPerson | null;
+}
+
+interface ForceCheckoutUpdate {
+  status: "completed";
+  check_out_time: string;
+  notes: string;
+}
+
 export function ForceCheckoutPanel() {
   const [activeLogs, setActiveLogs] = useState<ActiveLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +71,7 @@ export function ForceCheckoutPanel() {
           .order("check_in_time", { ascending: false }),
       ]);
 
-      const plow: ActiveLog[] = (plowRes.data || []).map((l: any) => ({
+      const plow: ActiveLog[] = ((plowRes.data as RawActiveLogRow[] | null) || []).map((l) => ({
         id: l.id,
         type: "plow",
         account_name: l.account?.name || "Unknown",
@@ -57,7 +80,7 @@ export function ForceCheckoutPanel() {
         check_in_time: l.check_in_time,
       }));
 
-      const shovel: ActiveLog[] = (shovelRes.data || []).map((l: any) => ({
+      const shovel: ActiveLog[] = ((shovelRes.data as RawActiveLogRow[] | null) || []).map((l) => ({
         id: l.id,
         type: "shovel",
         account_name: l.account?.name || "Unknown",
@@ -94,7 +117,7 @@ export function ForceCheckoutPanel() {
           status: "completed",
           check_out_time: now,
           notes: "Force checked out by admin",
-        } as any)
+        } as ForceCheckoutUpdate)
         .eq("id", confirmTarget.id);
 
       if (error) throw error;

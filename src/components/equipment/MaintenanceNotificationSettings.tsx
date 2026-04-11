@@ -12,6 +12,22 @@ interface AdminUser {
   enabled: boolean;
 }
 
+interface RoleRow {
+  user_id: string;
+  role: string;
+}
+
+interface ProfileRow {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+interface MaintenanceNotificationSettingRow {
+  user_id: string;
+  enabled: boolean;
+}
+
 export function MaintenanceNotificationSettings() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,20 +58,20 @@ export function MaintenanceNotificationSettings() {
         .in('id', uniqueUserIds);
 
       // Get existing notification settings
-      const { data: settings } = await (supabase as any)
+      const { data: settings } = await supabase
         .from('maintenance_notification_settings')
         .select('user_id, enabled')
         .in('user_id', uniqueUserIds);
 
       const settingsMap = new Map(
-        (settings || []).map((s: any) => [s.user_id, s.enabled])
+        ((settings as MaintenanceNotificationSettingRow[] | null) || []).map((s) => [s.user_id, s.enabled])
       );
       const profilesMap = new Map(
-        (profiles || []).map(p => [p.id, { full_name: p.full_name, email: p.email }])
+        ((profiles as ProfileRow[] | null) || []).map((p) => [p.id, { full_name: p.full_name, email: p.email }])
       );
 
       const adminUsers: AdminUser[] = uniqueUserIds.map(uid => {
-        const role = roles?.find(r => r.user_id === uid);
+        const role = (roles as RoleRow[] | null)?.find((r) => r.user_id === uid);
         return {
           user_id: uid,
           role: role?.role || 'unknown',
@@ -80,7 +96,7 @@ export function MaintenanceNotificationSettings() {
   const toggleUser = async (userId: string, enabled: boolean) => {
     setUpdatingId(userId);
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('maintenance_notification_settings')
         .upsert(
           { user_id: userId, enabled },

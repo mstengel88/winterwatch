@@ -531,8 +531,8 @@ export default function ShovelDashboard() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <div className="flex items-center gap-3">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
               <Footprints className="h-5 w-5 text-purple-400" />
             </div>
@@ -549,7 +549,7 @@ export default function ShovelDashboard() {
         {/* Daily Shift Card with Timer */}
         <Card className="bg-[hsl(var(--card))]/80 border-border/50">
           <CardContent className="py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">
                   <Clock className="h-5 w-5 text-purple-400" />
@@ -557,7 +557,7 @@ export default function ShovelDashboard() {
                 <div>
                   <p className="font-medium">Daily Shift</p>
                   {activeShift ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
                       <span className="text-xl font-mono font-bold text-purple-400">
                         {formatTime(shiftTimer.hours)}:{formatTime(shiftTimer.minutes)}:{formatTime(shiftTimer.seconds)}
                       </span>
@@ -572,7 +572,7 @@ export default function ShovelDashboard() {
                 <Button 
                   onClick={handleClockOutClick}
                   variant="outline"
-                  className="border-red-500/50 text-red-400 hover:bg-red-500/20"
+                  className="w-full border-red-500/50 text-red-400 hover:bg-red-500/20 sm:w-auto"
                 >
                   <LogOut className="h-4 w-4 mr-2" />
                   End Shift
@@ -580,7 +580,7 @@ export default function ShovelDashboard() {
               ) : (
                 <Button 
                   onClick={handleClockIn}
-                  className="bg-purple-600 hover:bg-purple-700"
+                  className="w-full bg-purple-600 hover:bg-purple-700 sm:w-auto"
                 >
                   <LogIn className="h-4 w-4 mr-2" />
                   Start Shift
@@ -604,8 +604,9 @@ export default function ShovelDashboard() {
             <h2 className="text-base font-semibold">Quick Log Entry</h2>
             
             {/* Nearest Location Card */}
-            <div className="bg-purple-600 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-purple-600 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
                 <Navigation className="h-5 w-5 text-purple-200" />
                 <div>
                   {nearestAccount ? (
@@ -633,21 +634,22 @@ export default function ShovelDashboard() {
                     </>
                   )}
                 </div>
+                </div>
+                <button
+                  onClick={handleRefreshLocation}
+                  disabled={geoLoading}
+                  className="h-11 w-11 rounded-full hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+                >
+                  <Navigation className={`mx-auto h-5 w-5 text-white ${geoLoading ? 'animate-pulse' : ''}`} />
+                </button>
               </div>
-              <button
-                onClick={handleRefreshLocation}
-                disabled={geoLoading}
-                className="p-2 rounded-full hover:bg-purple-500/30 transition-colors disabled:opacity-50"
-              >
-                <Navigation className={`h-5 w-5 text-white ${geoLoading ? 'animate-pulse' : ''}`} />
-              </button>
             </div>
 
             {/* Select Account */}
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Select Account (verify or change)</Label>
               <Select value={selectedAccount} onValueChange={setSelectedAccount} disabled={!!activeWorkLog}>
-                <SelectTrigger className="bg-[hsl(var(--card))]/80 border-border/50">
+                <SelectTrigger className="h-12 rounded-xl bg-[hsl(var(--card))]/80 border-border/50">
                   <SelectValue placeholder="Select nearest account" />
                 </SelectTrigger>
                 <SelectContent className="bg-[hsl(var(--card))] border-border">
@@ -673,7 +675,7 @@ export default function ShovelDashboard() {
             {!activeWorkLog && (
               <>
                 <Button 
-                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  className="min-h-[52px] w-full rounded-2xl bg-purple-600 text-base font-semibold hover:bg-purple-700"
                   onClick={handleCheckIn}
                   disabled={!activeShift || !selectedAccount}
                 >
@@ -717,12 +719,12 @@ export default function ShovelDashboard() {
             {/* Service Type */}
             <div className="space-y-2">
               <Label className="text-sm">Service Type <span className="text-red-400">*</span></Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <Button
                   variant={serviceType === 'shovel' ? 'default' : 'ghost'}
                   className={serviceType === 'shovel' 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                    : 'bg-transparent hover:bg-muted/30'
+                    ? 'h-12 justify-start bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'h-12 justify-start bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('shovel')}
                 >
@@ -732,8 +734,8 @@ export default function ShovelDashboard() {
                 <Button
                   variant={serviceType === 'salt' ? 'default' : 'ghost'}
                   className={serviceType === 'salt' 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                    : 'bg-transparent hover:bg-muted/30'
+                    ? 'h-12 justify-start bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'h-12 justify-start bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('salt')}
                 >
@@ -743,8 +745,8 @@ export default function ShovelDashboard() {
                 <Button
                   variant={serviceType === 'both' ? 'default' : 'ghost'}
                   className={serviceType === 'both' 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                    : 'bg-transparent hover:bg-muted/30'
+                    ? 'h-12 justify-start bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'h-12 justify-start bg-transparent hover:bg-muted/30'
                   }
                   onClick={() => setServiceType('both')}
                 >
@@ -794,7 +796,7 @@ export default function ShovelDashboard() {
                     shovelEmployees.map((emp) => (
                       <div 
                         key={emp.id}
-                        className="flex items-center gap-3 cursor-pointer"
+                        className="flex min-h-[48px] items-center gap-3 rounded-xl px-2 cursor-pointer hover:bg-muted/30"
                         onClick={() => toggleTeamMember(emp.id)}
                       >
                         <Checkbox 
@@ -809,7 +811,7 @@ export default function ShovelDashboard() {
               </Card>
             </div>
             {/* Snow Depth and Salt Used */}
-            <div className="grid grid-cols-2 gap-4 w-[85%]">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-sm">
                   Snow Depth (inches) {serviceType !== 'salt' && <span className="text-red-400">*</span>}
@@ -818,7 +820,7 @@ export default function ShovelDashboard() {
                   placeholder="e.g., 3.5"
                   value={snowDepth}
                   onChange={(e) => setSnowDepth(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
+                  className="h-12 rounded-xl bg-[hsl(var(--card))]/50 border-border/30 text-base"
                 />
               </div>
               <div className="space-y-1">
@@ -829,19 +831,19 @@ export default function ShovelDashboard() {
                   placeholder="e.g., 50"
                   value={saltUsed}
                   onChange={(e) => setSaltUsed(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
+                  className="h-12 rounded-xl bg-[hsl(var(--card))]/50 border-border/30 text-base"
                 />
               </div>
             </div>
 
             {/* Temp, Weather, Wind */}
-            <div className="grid grid-cols-3 gap-3 w-[85%]">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="space-y-1">
                 <Label className="text-sm">Temp (°F) <span className="text-red-400">*</span></Label>
                 <Input 
                   value={temperature}
                   onChange={(e) => setTemperature(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
+                  className="h-12 rounded-xl bg-[hsl(var(--card))]/50 border-border/30 text-base"
                 />
               </div>
               <div className="space-y-1">
@@ -849,7 +851,7 @@ export default function ShovelDashboard() {
                 <Input 
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
+                  className="h-12 rounded-xl bg-[hsl(var(--card))]/50 border-border/30 text-base"
                 />
               </div>
               <div className="space-y-1">
@@ -857,19 +859,19 @@ export default function ShovelDashboard() {
                 <Input 
                   value={wind}
                   onChange={(e) => setWind(e.target.value)}
-                  className="bg-[hsl(var(--card))]/50 border-border/30 h-8 text-sm"
+                  className="h-12 rounded-xl bg-[hsl(var(--card))]/50 border-border/30 text-base"
                 />
               </div>
             </div>
 
             {/* Notes */}
-            <div className="space-y-1 w-[85%]">
+            <div className="space-y-1">
               <Label className="text-sm">Notes (Optional)</Label>
               <Textarea 
                 placeholder="Any additional notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="bg-[hsl(var(--card))]/50 border-border/30 min-h-[60px] text-sm"
+                className="min-h-[100px] rounded-2xl bg-[hsl(var(--card))]/50 border-border/30 text-base"
               />
             </div>
 
@@ -900,7 +902,7 @@ export default function ShovelDashboard() {
                 handleLogService();
               }}
               disabled={!activeShift || !isFormValid || isUploading}
-              className={`w-full py-6 text-lg font-semibold transition-colors min-h-[48px] ${
+              className={`min-h-[52px] w-full rounded-2xl py-4 text-base font-semibold transition-colors ${
                 !activeShift || !isFormValid || isUploading
                   ? 'bg-muted text-muted-foreground cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
@@ -948,7 +950,7 @@ export default function ShovelDashboard() {
                             <Shovel className="h-4 w-4 text-purple-400" />
                           </div>
                           <div>
-                            <p className="font-medium text-sm">{(log as any).account?.name || 'Unknown'}</p>
+                            <p className="font-medium text-sm">{log.account?.name || 'Unknown'}</p>
                             <p className="text-xs text-muted-foreground">
                               {log.check_in_time && format(new Date(log.check_in_time), 'h:mm a')}
                               {log.check_out_time && ` - ${format(new Date(log.check_out_time), 'h:mm a')}`}
