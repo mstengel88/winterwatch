@@ -11,6 +11,8 @@ import { useDispatchRouteTracking } from "@/hooks/useDispatchRouteTracking";
 import { DISPATCH_DRIVER_ROUTE_URL } from "@/lib/dispatchRouteConfig";
 import { cn } from "@/lib/utils";
 
+const TRACKING_ENABLED_KEY = "winterwatchDispatchTrackingEnabled";
+
 function getSearchValue(search: URLSearchParams, key: string) {
   return search.get(key)?.trim() || "";
 }
@@ -23,7 +25,7 @@ export default function DispatchRoutePage() {
   const [truck, setTruck] = useState(getSearchValue(initialSearch, "truck"));
   const [trackingEnabled, setTrackingEnabled] = useState(
     getSearchValue(initialSearch, "track") === "1" ||
-      window.localStorage.getItem("winterwatchDispatchTrackingEnabled") === "true",
+      window.localStorage.getItem(TRACKING_ENABLED_KEY) !== "false",
   );
 
   const driverName = employee
@@ -50,7 +52,7 @@ export default function DispatchRoutePage() {
 
   function toggleTracking(nextEnabled: boolean) {
     setTrackingEnabled(nextEnabled);
-    window.localStorage.setItem("winterwatchDispatchTrackingEnabled", String(nextEnabled));
+    window.localStorage.setItem(TRACKING_ENABLED_KEY, String(nextEnabled));
   }
 
   return (
@@ -84,7 +86,7 @@ export default function DispatchRoutePage() {
                   className="gap-2 rounded-2xl"
                 >
                   <LocateFixed className="h-4 w-4" />
-                  {trackingEnabled ? "Stop GPS" : "Start GPS"}
+                  {trackingEnabled ? "Pause GPS" : "Resume GPS"}
                 </Button>
                 <Button
                   type="button"

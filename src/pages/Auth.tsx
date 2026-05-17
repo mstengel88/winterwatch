@@ -39,7 +39,7 @@ export default function Auth() {
   const { toast } = useToast();
   
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = location.state?.from?.pathname || '/';
 
 
   // Redirect when authenticated
@@ -111,6 +111,8 @@ export default function Auth() {
               description: error.message,
             });
           }
+        } else {
+          navigate(from, { replace: true });
         }
       } else {
         const { error } = await signUp(email, password, fullName);
