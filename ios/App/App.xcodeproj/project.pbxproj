@@ -22,6 +22,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		AA1111111111111111111111 /* BridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222222222222222222222 /* BridgeViewController.swift */; };
 		AB3333333333333333333333 /* OneSignalBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2222222222222222222222 /* OneSignalBridgePlugin.swift */; };
+		AC3333333333333333333333 /* DispatchLocationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2222222222222222222222 /* DispatchLocationPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +64,7 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		AA2222222222222222222222 /* BridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeViewController.swift; sourceTree = "<group>"; };
 		AB2222222222222222222222 /* OneSignalBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneSignalBridgePlugin.swift; sourceTree = "<group>"; };
+		AC2222222222222222222222 /* DispatchLocationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DispatchLocationPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -129,6 +131,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				AA2222222222222222222222 /* BridgeViewController.swift */,
 				AB2222222222222222222222 /* OneSignalBridgePlugin.swift */,
+				AC2222222222222222222222 /* DispatchLocationPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -272,6 +275,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				AA1111111111111111111111 /* BridgeViewController.swift in Sources */,
 				AB3333333333333333333333 /* OneSignalBridgePlugin.swift in Sources */,
+				AC3333333333333333333333 /* DispatchLocationPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -512,10 +516,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 3.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.winterwatchapp;
-				PRODUCT_NAME = "WinterWatch-Pro";
+				PRODUCT_NAME = "WinterWatch Pro";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -535,9 +539,9 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.winterwatchapp;
-				PRODUCT_NAME = "WinterWatch-Pro";
+				PRODUCT_NAME = "WinterWatch Pro";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

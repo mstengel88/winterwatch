@@ -12,6 +12,7 @@ class BridgeViewController: CAPBridgeViewController {
         // Ensure our local Swift plugin is always registered at runtime.
         // This is the most reliable approach when auto-registration is flaky.
         bridge?.registerPluginInstance(OneSignalBridgePlugin())
+        bridge?.registerPluginInstance(DispatchLocationPlugin())
         
         // Apply performance optimizations after bridge loads
         applyPerformanceOptimizations()

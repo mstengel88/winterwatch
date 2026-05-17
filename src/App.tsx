@@ -25,6 +25,7 @@ import { AppVersionCheck } from "@/components/ios/AppVersionCheck";
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
 const TruckerDashboard = lazy(() => import("./pages/TruckerDashboard"));
+const DispatchRoutePage = lazy(() => import("./pages/DispatchRoutePage"));
 const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
 const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
 const Pending = lazy(() => import("./pages/Pending"));
@@ -142,6 +143,15 @@ const AppRoutes = () => (
                 element={
                   <ProtectedRoute allowedRoles={["trucker", "admin", "manager"]}>
                     <TruckerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/dispatch-route"
+                element={
+                  <ProtectedRoute allowedRoles={["driver", "trucker", "admin", "manager"]}>
+                    <DispatchRoutePage />
                   </ProtectedRoute>
                 }
               />

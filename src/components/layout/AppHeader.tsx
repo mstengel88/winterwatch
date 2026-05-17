@@ -19,14 +19,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog, History, MapPin } from 'lucide-react';
+import { Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog, History, MapPin, Route } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AppRole } from '@/types/auth';
 import logo from '@/assets/logo.png';
 
-const APP_VERSION = '2.2';
+const APP_VERSION = '3.0';
 
 interface NavItem {
   href: string;
@@ -37,6 +37,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
+  { href: '/dispatch-route', label: 'Dispatch Route', icon: Route, roles: ['driver', 'trucker', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
   { href: '/trucker', label: 'Trucker', icon: Wrench, roles: ['trucker', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
@@ -116,6 +117,7 @@ export function AppHeader() {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
+    if (href === '/dispatch-route') return location.pathname === href;
     if (href === '/shovel') return location.pathname === href;
     if (href === '/trucker') return location.pathname === href;
     return location.pathname.startsWith(href);
