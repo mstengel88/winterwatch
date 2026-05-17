@@ -104,8 +104,8 @@ export function useDispatchRouteTracking({
       lastSentAtRef.current = now;
 
       if (!DISPATCH_DRIVER_TRACKING_TOKEN) {
-        setStatus("error");
-        setMessage("Dispatch tracking token is missing in WinterWatch.");
+        setStatus("idle");
+        setMessage("Live GPS is handled by the dispatch driver page. Add a WinterWatch tracking token only if you want native background GPS from WinterWatch.");
         return;
       }
 
@@ -158,6 +158,12 @@ export function useDispatchRouteTracking({
       if (!enabled) {
         setStatus("idle");
         setMessage("Live dispatch GPS is off.");
+        return;
+      }
+
+      if (!DISPATCH_DRIVER_TRACKING_TOKEN) {
+        setStatus("idle");
+        setMessage("Live GPS is handled by the dispatch driver page. Add a WinterWatch tracking token only if you want native background GPS from WinterWatch.");
         return;
       }
 

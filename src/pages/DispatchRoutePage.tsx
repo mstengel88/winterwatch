@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import { ExternalLink, LocateFixed, MapPin, RefreshCcw, ShieldCheck, Truck } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,7 @@ export default function DispatchRoutePage() {
     url.searchParams.set("winterwatch", "1");
     return url.toString();
   }, [orderId, routeId]);
+  const isNative = Capacitor.isNativePlatform();
 
   const tracking = useDispatchRouteTracking({
     enabled: trackingEnabled,
@@ -54,6 +57,29 @@ export default function DispatchRoutePage() {
     setTrackingEnabled(nextEnabled);
     window.localStorage.setItem(TRACKING_ENABLED_KEY, String(nextEnabled));
   }
+
+  async function openDriverRoute() {
+    if (isNative) {
+      await Browser.open({ url: driverRouteUrl, windowName: "_self" });
+      return;
+    }
+
+    window.open(driverRouteUrl, "_blank", "noopener,noreferrer");
+  }
+
+  useEffect(() => {
+    if (!isNative) return;
+
+    const autoOpenKey = `winterwatchDispatchRouteOpened:${driverRouteUrl}`;
+    if (window.sessionStorage.getItem(autoOpenKey) === "true") return;
+    window.sessionStorage.setItem(autoOpenKey, "true");
+
+    const timer = window.setTimeout(() => {
+      void openDriverRoute().catch(() => undefined);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [driverRouteUrl, isNative]);
 
   return (
     <AppLayout variant="wide">
@@ -91,11 +117,11 @@ export default function DispatchRoutePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => window.open(driverRouteUrl, "_blank", "noopener,noreferrer")}
+                  onClick={() => void openDriverRoute()}
                   className="gap-2 rounded-2xl"
                 >
                   <ExternalLink className="h-4 w-4" />
-                  Open Full Page
+                  Open Driver Route
                 </Button>
               </div>
             </div>
@@ -182,14 +208,31 @@ export default function DispatchRoutePage() {
               </div>
             </section>
 
-            <section className="min-h-[640px] overflow-hidden rounded-3xl border border-border bg-background shadow-inner">
-              <iframe
-                title="Green Hills Dispatch Driver Route"
-                src={driverRouteUrl}
-                className="h-[72dvh] min-h-[640px] w-full border-0"
-                allow="camera; geolocation; clipboard-write"
-              />
-            </section>
+            {isNative ? (
+              <section className="flex min-h-[420px] flex-col items-center justify-center gap-4 rounded-3xl border border-border bg-background p-8 text-center shadow-inner">
+                <div className="rounded-full bg-primary/10 p-4 text-primary">
+                  <ExternalLink className="h-8 w-8" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Driver route opens securely</h2>
+                  <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+                    iOS blocks contractor login cookies inside embedded frames, so the route opens as a top-level in-app page where login and live GPS can work normally.
+                  </p>
+                </div>
+                <Button type="button" onClick={() => void openDriverRoute()} className="rounded-2xl">
+                  Open Driver Route
+                </Button>
+              </section>
+            ) : (
+              <section className="min-h-[640px] overflow-hidden rounded-3xl border border-border bg-background shadow-inner">
+                <iframe
+                  title="Green Hills Dispatch Driver Route"
+                  src={driverRouteUrl}
+                  className="h-[72dvh] min-h-[640px] w-full border-0"
+                  allow="camera; geolocation; clipboard-write"
+                />
+              </section>
+            )}
           </CardContent>
         </Card>
       </div>
