@@ -997,6 +997,7 @@ export type Database = {
         | "admin"
         | "manager"
         | "driver"
+        | "dispatch_driver"
         | "shovel_crew"
         | "client"
         | "work_log_viewer"
@@ -1140,6 +1141,7 @@ export const Constants = {
         "admin",
         "manager",
         "driver",
+        "dispatch_driver",
         "shovel_crew",
         "client",
         "work_log_viewer",

@@ -25,6 +25,11 @@ export default function RoleBasedRedirect() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Dispatch-only drivers go directly to the route bridge.
+  if (roles.includes('dispatch_driver')) {
+    return <Navigate to="/dispatch-route" replace />;
+  }
+
   // Driver goes to driver dashboard
   if (roles.includes('driver')) {
     return <Navigate to="/dashboard" replace />;

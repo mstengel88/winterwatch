@@ -150,7 +150,7 @@ const AppRoutes = () => (
               <Route
                 path="/dispatch-route"
                 element={
-                  <ProtectedRoute allowedRoles={["driver", "trucker", "admin", "manager"]}>
+                  <ProtectedRoute allowedRoles={["dispatch_driver", "driver", "trucker", "admin", "manager"]}>
                     <DispatchRoutePage />
                   </ProtectedRoute>
                 }

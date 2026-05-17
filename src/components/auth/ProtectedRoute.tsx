@@ -29,6 +29,11 @@ export function ProtectedRoute({
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  const isDispatchOnlyUser = roles.includes('dispatch_driver') && roles.length === 1;
+  if (isDispatchOnlyUser && location.pathname !== '/dispatch-route') {
+    return <Navigate to="/dispatch-route" replace />;
+  }
+
   // If specific roles are required, check them
   if (allowedRoles && allowedRoles.length > 0) {
     const hasAllowedRole = allowedRoles.some(role => roles.includes(role));
@@ -36,6 +41,9 @@ export function ProtectedRoute({
       // Redirect to appropriate dashboard based on user's actual role
       if (roles.includes('shovel_crew')) {
         return <Navigate to="/shovel" replace />;
+      }
+      if (roles.includes('dispatch_driver')) {
+        return <Navigate to="/dispatch-route" replace />;
       }
       if (roles.includes('driver')) {
         return <Navigate to="/dashboard" replace />;

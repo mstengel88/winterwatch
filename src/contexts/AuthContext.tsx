@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       hasRole: (r: AppRole) => roles.includes(r),
       isAdminOrManager: () => roles.includes('admin') || roles.includes('manager'),
-      isStaff: () => roles.includes('driver') || roles.includes('shovel_crew'),
+      isStaff: () => roles.includes('driver') || roles.includes('dispatch_driver') || roles.includes('shovel_crew'),
       refreshProfile: async () => {
         if (!user) return;
         setProfile(await fetchProfile(user.id));

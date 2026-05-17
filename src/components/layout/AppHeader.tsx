@@ -37,7 +37,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
-  { href: '/dispatch-route', label: 'Dispatch Route', icon: Route, roles: ['driver', 'trucker', 'admin', 'manager'] },
+  { href: '/dispatch-route', label: 'Dispatch Route', icon: Route, roles: ['dispatch_driver', 'driver', 'trucker', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
   { href: '/trucker', label: 'Trucker', icon: Wrench, roles: ['trucker', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
 ];
 
 export function AppHeader() {
-  const { profile, signOut, hasRole, isAdminOrManager, user } = useAuth();
+  const { profile, roles, signOut, hasRole, isAdminOrManager, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -114,6 +114,7 @@ export function AppHeader() {
   const displayName = profile?.full_name || profile?.email || 'User';
   const shortName = displayName.length > 12 ? displayName.slice(0, 12) + '...' : displayName;
   const mobilePrimaryNav = filteredNavItems.slice(0, 4);
+  const isDispatchOnlyUser = roles.includes('dispatch_driver') && roles.length === 1;
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
@@ -125,6 +126,9 @@ export function AppHeader() {
 
   // Determine home route based on role
   const getHomeRoute = () => {
+    if (hasRole('dispatch_driver')) {
+      return '/dispatch-route';
+    }
     if (isAdminOrManager() || hasRole('driver')) {
       return '/dashboard';
     }
@@ -185,24 +189,26 @@ export function AppHeader() {
                   );
                 })}
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    className="justify-start rounded-2xl"
-                    onClick={() => handleNavigate('/profile')}
-                  >
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start rounded-2xl"
-                    onClick={() => handleNavigate('/settings')}
-                  >
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </Button>
-                </div>
+                {!isDispatchOnlyUser && (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="justify-start rounded-2xl"
+                      onClick={() => handleNavigate('/profile')}
+                    >
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="justify-start rounded-2xl"
+                      onClick={() => handleNavigate('/settings')}
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Button>
+                  </div>
+                )}
               </nav>
               <div className="border-t border-border/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <div className="flex items-center gap-3 mb-3">
@@ -270,30 +276,32 @@ export function AppHeader() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative h-10 w-10 rounded-full text-muted-foreground"
-            onClick={() => {
-              // Mark all as read when opening
-              if (user && unreadCount > 0) {
-                supabase
-                  .from('notifications_log')
-                  .update({ read_at: new Date().toISOString() })
-                  .eq('user_id', user.id)
-                  .is('read_at', null)
-                  .then(() => setUnreadCount(0));
-              }
-              navigate('/admin/notifications');
-            }}
-          >
-            <Bell className="h-4 w-4" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-4 min-w-[16px] flex items-center justify-center px-1">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </Button>
+          {!isDispatchOnlyUser && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-10 w-10 rounded-full text-muted-foreground"
+              onClick={() => {
+                // Mark all as read when opening
+                if (user && unreadCount > 0) {
+                  supabase
+                    .from('notifications_log')
+                    .update({ read_at: new Date().toISOString() })
+                    .eq('user_id', user.id)
+                    .is('read_at', null)
+                    .then(() => setUnreadCount(0));
+                }
+                navigate('/admin/notifications');
+              }}
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-4 min-w-[16px] flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </Button>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -313,15 +321,19 @@ export function AppHeader() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/settings')}>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-              {isAdminOrManager() && (
+              {!isDispatchOnlyUser && (
+                <>
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                </>
+              )}
+              {!isDispatchOnlyUser && isAdminOrManager() && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/admin')}>
