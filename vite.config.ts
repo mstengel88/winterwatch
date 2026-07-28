@@ -1,11 +1,28 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const environment = loadEnv(mode, process.cwd(), "");
+  const supabaseUrl = environment.VITE_SUPABASE_URL?.trim();
+
+  if (!supabaseUrl) {
+    throw new Error("VITE_SUPABASE_URL is required.");
+  }
+
+  const supabaseApiPattern = new RegExp(
+    `^${escapeRegExp(supabaseUrl.replace(/\/$/, ""))}/.*`,
+    "i",
+  );
+
+  return {
   server: {
     host: "::",
     port: 8080,
@@ -27,7 +44,7 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/caegybyfdkmgjrygnavg\.supabase\.co\/.*/i,
+            urlPattern: supabaseApiPattern,
             handler: "NetworkFirst",
             options: {
               cacheName: "supabase-api-cache",
@@ -109,7 +126,7 @@ export default defineConfig(({ mode }) => ({
       "date-fns",
     ],
   },
-}));
-
+  };
+});
 
 
