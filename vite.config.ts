@@ -88,6 +88,10 @@ export default defineConfig(({ mode }) => {
       output: {
         // Split larger libraries by feature so iOS only downloads what the current screen needs.
         manualChunks(id) {
+          if (id.includes("vite/preload-helper")) {
+            return "preload-helper";
+          }
+
           if (!id.includes("node_modules")) return undefined;
 
           if (
@@ -164,4 +168,3 @@ export default defineConfig(({ mode }) => {
   },
   };
 });
-
