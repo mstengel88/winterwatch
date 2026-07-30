@@ -12,6 +12,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Building2, Loader2, Mail, Plus, Trash2, UserPlus, Users } from "lucide-react";
 
 type ContactRole = "manager" | "client" | "admin";
+type AppUserRole =
+  | "admin"
+  | "manager"
+  | "driver"
+  | "shovel_crew"
+  | "client"
+  | "work_log_viewer";
 type EmployeeCategory = "plow" | "shovel" | "both" | "manager" | "trucker";
 type ServiceType = "plow" | "shovel" | "both";
 
@@ -41,6 +48,15 @@ type AccountDraft = {
   notes: string;
 };
 
+type UserDraft = {
+  full_name: string;
+  email: string;
+  phone: string;
+  role: AppUserRole;
+  create_employee: boolean;
+  employee_category: EmployeeCategory;
+};
+
 const createEmployeeDraft = (): EmployeeDraft => ({
   first_name: "",
   last_name: "",
@@ -67,6 +83,15 @@ const createAccountDraft = (): AccountDraft => ({
   notes: "",
 });
 
+const createUserDraft = (): UserDraft => ({
+  full_name: "",
+  email: "",
+  phone: "",
+  role: "manager",
+  create_employee: false,
+  employee_category: "manager",
+});
+
 type OnboardingResult = {
   organization: { id: string; name: string; slug: string; plan: string; status: string };
   primary_contact?: {
@@ -75,6 +100,13 @@ type OnboardingResult = {
     invited: boolean;
     employee_created: boolean;
   } | null;
+  users_created?: Array<{
+    id: string;
+    email: string;
+    role: string;
+    invited: boolean;
+    employee_created: boolean;
+  }>;
   employees_created: Array<{ id: string; name: string; category: string }>;
   accounts_created: Array<{ id: string; name: string; service_type: string }>;
 };
@@ -97,6 +129,7 @@ export default function CustomerOnboardingPage() {
   const [primaryEmployeeCategory, setPrimaryEmployeeCategory] = useState<EmployeeCategory>("manager");
   const [assignPrimaryToAccounts, setAssignPrimaryToAccounts] = useState(false);
 
+  const [users, setUsers] = useState<UserDraft[]>([]);
   const [employees, setEmployees] = useState<EmployeeDraft[]>([]);
   const [accounts, setAccounts] = useState<AccountDraft[]>([createAccountDraft()]);
 
@@ -105,11 +138,13 @@ export default function CustomerOnboardingPage() {
   const summary = useMemo(() => {
     const employeeCount = employees.filter((row) => row.first_name.trim() && row.last_name.trim()).length;
     const accountCount = accounts.filter((row) => row.name.trim() && row.address.trim()).length;
+    const userCount = users.filter((row) => row.full_name.trim() && row.email.trim()).length;
     return {
+      userCount,
       employeeCount,
       accountCount,
     };
-  }, [employees, accounts]);
+  }, [users, employees, accounts]);
 
   const updateEmployee = (index: number, key: keyof EmployeeDraft, value: string) => {
     setEmployees((current) =>
@@ -119,6 +154,12 @@ export default function CustomerOnboardingPage() {
 
   const updateAccount = (index: number, key: keyof AccountDraft, value: string) => {
     setAccounts((current) =>
+      current.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)),
+    );
+  };
+
+  const updateUser = (index: number, key: keyof UserDraft, value: string | boolean) => {
+    setUsers((current) =>
       current.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)),
     );
   };
@@ -135,6 +176,7 @@ export default function CustomerOnboardingPage() {
     setCreatePrimaryEmployee(true);
     setPrimaryEmployeeCategory("manager");
     setAssignPrimaryToAccounts(false);
+    setUsers([]);
     setEmployees([]);
     setAccounts([createAccountDraft()]);
   };
@@ -179,6 +221,16 @@ export default function CustomerOnboardingPage() {
               employee_category: primaryEmployeeCategory,
             }
           : null,
+        additional_users: users
+          .filter((row) => row.full_name.trim() && row.email.trim())
+          .map((row) => ({
+            full_name: row.full_name.trim(),
+            email: row.email.trim(),
+            phone: row.phone.trim() || undefined,
+            role: row.role,
+            create_employee: row.create_employee,
+            employee_category: row.employee_category,
+          })),
         employees: employees
           .filter((row) => row.first_name.trim() && row.last_name.trim())
           .map((row) => ({
@@ -393,7 +445,101 @@ export default function CustomerOnboardingPage() {
           <Card className="bg-card/50 border-border/50">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>3. Employees</CardTitle>
+                <CardTitle>3. Additional Users & Roles</CardTitle>
+                <CardDescription>Add any extra login accounts this customer needs on day one.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setUsers((current) => [...current, createUserDraft()])}>
+                <Plus className="h-4 w-4" />
+                Add User
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {users.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+                  No extra logins yet. Add managers, drivers, shovel crew, or client users here if you want them invited now.
+                </div>
+              ) : (
+                users.map((entry, index) => (
+                  <div key={`user-${index}`} className="space-y-4 rounded-xl border border-border/50 p-4">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary">User {index + 1}</Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setUsers((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Full Name</Label>
+                        <Input value={entry.full_name} onChange={(event) => updateUser(index, "full_name", event.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <Input type="email" value={entry.email} onChange={(event) => updateUser(index, "email", event.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Phone</Label>
+                        <Input value={entry.phone} onChange={(event) => updateUser(index, "phone", event.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Role</Label>
+                        <Select value={entry.role} onValueChange={(value) => updateUser(index, "role", value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="driver">Driver</SelectItem>
+                            <SelectItem value="shovel_crew">Shovel Crew</SelectItem>
+                            <SelectItem value="work_log_viewer">Work Log Viewer</SelectItem>
+                            <SelectItem value="client">Client</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Employee Category</Label>
+                        <Select
+                          value={entry.employee_category}
+                          onValueChange={(value) => updateUser(index, "employee_category", value)}
+                          disabled={!entry.create_employee}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="both">Both</SelectItem>
+                            <SelectItem value="plow">Plow</SelectItem>
+                            <SelectItem value="shovel">Shovel</SelectItem>
+                            <SelectItem value="trucker">Trucker</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2 flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/20 p-4">
+                        <div>
+                          <p className="text-sm font-medium">Create employee record for this user</p>
+                          <p className="text-xs text-muted-foreground">Turn this on when the login also needs to clock in or complete work.</p>
+                        </div>
+                        <Switch
+                          checked={entry.create_employee}
+                          onCheckedChange={(value) => updateUser(index, "create_employee", value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 border-border/50">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>4. Employees</CardTitle>
                 <CardDescription>Add any starter employees you want created right away.</CardDescription>
               </div>
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setEmployees((current) => [...current, createEmployeeDraft()])}>
@@ -473,7 +619,7 @@ export default function CustomerOnboardingPage() {
           <Card className="bg-card/50 border-border/50">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>4. Accounts</CardTitle>
+                <CardTitle>5. Accounts</CardTitle>
                 <CardDescription>Add the first service locations for this customer.</CardDescription>
               </div>
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setAccounts((current) => [...current, createAccountDraft()])}>
@@ -591,8 +737,8 @@ export default function CustomerOnboardingPage() {
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
                   <div>
-                    <p className="text-sm font-medium">{summary.employeeCount} extra employees</p>
-                    <p className="text-xs text-muted-foreground">{summary.accountCount} starter accounts</p>
+                    <p className="text-sm font-medium">{summary.userCount} extra users</p>
+                    <p className="text-xs text-muted-foreground">{summary.employeeCount} extra employees and {summary.accountCount} starter accounts</p>
                   </div>
                 </div>
               </div>
@@ -615,6 +761,11 @@ export default function CustomerOnboardingPage() {
                     <div className="text-sm text-muted-foreground">
                       Primary contact: {result.primary_contact.email}
                       {result.primary_contact.invited ? " (invite sent)" : " (existing user linked)"}
+                    </div>
+                  )}
+                  {result.users_created && result.users_created.length > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      Additional users: {result.users_created.length}
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">

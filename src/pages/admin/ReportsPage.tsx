@@ -852,7 +852,7 @@ export default function ReportsPage() {
     const { rawLogs, summary } = getWorkLogExportData();
     const { generateWorkLogsPDF } = await import('@/lib/pdfExport');
 
-    generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
+    await generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
       fontSize: pdfFontSize,
       visibleColumns: pdfVisibleColumns,
     });
@@ -863,7 +863,7 @@ export default function ReportsPage() {
     const { rawLogs, summary, fileName } = getWorkLogExportData();
     const { generateWorkLogsPDF } = await import('@/lib/pdfExport');
 
-    const pdfBlob = generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
+    const pdfBlob = await generateWorkLogsPDF(rawLogs, summary, 'Work Logs Report', {
       returnBlob: true,
       fontSize: pdfFontSize,
       visibleColumns: pdfVisibleColumns,
@@ -917,7 +917,7 @@ export default function ReportsPage() {
 
     const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
     const { generateTimesheetsPDF } = await import('@/lib/pdfExport');
-    generateTimesheetsPDF(entries, dateRange);
+    await generateTimesheetsPDF(entries, dateRange);
     toast.success('Time sheets PDF exported successfully');
   };
 
@@ -958,7 +958,7 @@ export default function ReportsPage() {
 
     const dateRange = `${format(new Date(fromDate), 'MMM d, yyyy')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
     const { generateSummaryPDF } = await import('@/lib/pdfExport');
-    generateSummaryPDF(summaryStats, dateRange);
+    await generateSummaryPDF(summaryStats, dateRange);
     toast.success('Summary PDF exported successfully');
   };
 

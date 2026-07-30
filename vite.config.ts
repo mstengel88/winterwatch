@@ -114,12 +114,15 @@ export default defineConfig(({ mode }) => {
             return "supabase";
           }
 
+          if (id.includes("/jspdf-autotable/")) {
+            return "jspdf-autotable";
+          }
+
           if (
             id.includes("/jspdf/") ||
-            id.includes("/jspdf-autotable/") ||
             id.includes("/html2canvas/")
           ) {
-            return "pdf-vendor";
+            return "jspdf-core";
           }
 
           if (id.includes("/leaflet/")) {

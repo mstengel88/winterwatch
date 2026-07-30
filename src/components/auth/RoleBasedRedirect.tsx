@@ -25,9 +25,9 @@ export default function RoleBasedRedirect() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Dispatch-only drivers go directly to the route bridge.
+  // Dispatch driver accounts now use the main dashboard.
   if (roles.includes('dispatch_driver')) {
-    return <Navigate to="/dispatch-route" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   // Driver goes to driver dashboard
@@ -40,9 +40,9 @@ export default function RoleBasedRedirect() {
     return <Navigate to="/shovel" replace />;
   }
 
-  // Trucker goes to trucker dashboard
+  // Trucker accounts now use the main dashboard.
   if (roles.includes('trucker')) {
-    return <Navigate to="/trucker" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   // No recognized role - send to pending

@@ -184,7 +184,7 @@ async function handleDispatchTrackingUrl(url: string) {
     }),
   );
 
-  const routePath = `/dispatch-route?route=${encodeURIComponent(routeId)}${
+  const routePath = `/dashboard?route=${encodeURIComponent(routeId)}${
     orderId ? `&order=${encodeURIComponent(orderId)}` : ""
   }${truck ? `&truck=${encodeURIComponent(truck)}` : ""}&track=1`;
   window.sessionStorage.setItem("winterwatchDispatchTrackingHandshakeComplete", "true");

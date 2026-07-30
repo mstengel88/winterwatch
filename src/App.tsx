@@ -24,8 +24,6 @@ import { AppVersionCheck } from "@/components/ios/AppVersionCheck";
 // DriverDashboard is the most common landing page - preload after initial render
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const ShovelDashboard = lazy(() => import("./pages/ShovelDashboard"));
-const TruckerDashboard = lazy(() => import("./pages/TruckerDashboard"));
-const DispatchRoutePage = lazy(() => import("./pages/DispatchRoutePage"));
 const WorkLogsPage = lazy(() => import("./pages/WorkLogsPage"));
 const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
 const Pending = lazy(() => import("./pages/Pending"));
@@ -125,7 +123,7 @@ const AppRoutes = () => (
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={["driver", "admin", "manager"]}>
+                  <ProtectedRoute allowedRoles={["driver", "dispatch_driver", "trucker", "admin", "manager"]}>
                     <DriverDashboard />
                   </ProtectedRoute>
                 }
@@ -136,24 +134,6 @@ const AppRoutes = () => (
                 element={
                   <ProtectedRoute allowedRoles={["shovel_crew", "admin", "manager"]}>
                     <ShovelDashboard />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/trucker"
-                element={
-                  <ProtectedRoute allowedRoles={["trucker", "admin", "manager"]}>
-                    <TruckerDashboard />
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/dispatch-route"
-                element={
-                  <ProtectedRoute allowedRoles={["dispatch_driver", "driver", "trucker", "admin", "manager"]}>
-                    <DispatchRoutePage />
                   </ProtectedRoute>
                 }
               />

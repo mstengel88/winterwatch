@@ -21,6 +21,18 @@ interface PrimaryContactInput {
   notes?: string | null;
 }
 
+interface AdditionalUserInput {
+  email: string;
+  full_name: string;
+  phone?: string;
+  role: AppRole;
+  create_employee?: boolean;
+  employee_category?: EmployeeCategory;
+  hourly_rate?: number | null;
+  hire_date?: string | null;
+  notes?: string | null;
+}
+
 interface EmployeeInput {
   first_name: string;
   last_name: string;
@@ -58,6 +70,7 @@ interface OnboardCustomerPayload {
     status?: string;
   };
   primary_contact?: PrimaryContactInput | null;
+  additional_users?: AdditionalUserInput[];
   employees?: EmployeeInput[];
   accounts?: AccountInput[];
   options?: {
@@ -101,6 +114,131 @@ function splitName(fullName: string): { first_name: string; last_name: string } 
   return {
     first_name: parts.slice(0, -1).join(" "),
     last_name: parts[parts.length - 1],
+  };
+}
+
+interface ProvisionedUserSummary {
+  id: string;
+  email: string;
+  role: string;
+  invited: boolean;
+  employee_created: boolean;
+}
+
+async function provisionUserAccess(params: {
+  supabase: ReturnType<typeof createClient>;
+  requesterId: string;
+  organizationId: string;
+  input: PrimaryContactInput | AdditionalUserInput;
+  inviteRedirectTo?: string;
+}): Promise<ProvisionedUserSummary> {
+  const { supabase, requesterId, organizationId, input, inviteRedirectTo } = params;
+  const normalizedEmail = input.email.trim().toLowerCase();
+
+  const { data: matchingProfiles, error: profileLookupError } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("email", normalizedEmail);
+
+  if (profileLookupError) {
+    throw profileLookupError;
+  }
+
+  let invited = false;
+  let profileId = matchingProfiles?.[0]?.id ?? null;
+
+  if (!profileId) {
+    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+      normalizedEmail,
+      {
+        data: { full_name: input.full_name.trim() },
+        redirectTo: cleanText(inviteRedirectTo) ?? undefined,
+      },
+    );
+
+    if (inviteError) {
+      throw inviteError;
+    }
+
+    profileId = inviteData.user?.id ?? null;
+    invited = true;
+  }
+
+  if (!profileId) {
+    throw new Error(`Unable to resolve user for ${normalizedEmail}`);
+  }
+
+  const { error: profileUpdateError } = await supabase
+    .from("profiles")
+    .update({
+      full_name: cleanText(input.full_name),
+      phone: cleanText(input.phone),
+      active_organization_id: organizationId,
+    })
+    .eq("id", profileId);
+
+  if (profileUpdateError) {
+    throw profileUpdateError;
+  }
+
+  const { error: roleInsertError } = await supabase
+    .from("user_roles")
+    .upsert(
+      {
+        user_id: profileId,
+        role: input.role,
+        organization_id: organizationId,
+        created_by: requesterId,
+      },
+      { onConflict: "organization_id,user_id,role" },
+    );
+
+  if (roleInsertError) {
+    throw roleInsertError;
+  }
+
+  let employeeCreated = false;
+  if (input.create_employee) {
+    const { data: existingEmployee, error: existingEmployeeError } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("user_id", profileId)
+      .maybeSingle();
+
+    if (existingEmployeeError && existingEmployeeError.code !== "PGRST116") {
+      throw existingEmployeeError;
+    }
+
+    if (!existingEmployee) {
+      const nameParts = splitName(input.full_name);
+      const { error: employeeInsertError } = await supabase.from("employees").insert({
+        user_id: profileId,
+        organization_id: organizationId,
+        first_name: nameParts.first_name,
+        last_name: nameParts.last_name,
+        email: normalizedEmail,
+        phone: cleanText(input.phone),
+        category: input.employee_category || "manager",
+        hourly_rate: input.hourly_rate ?? null,
+        hire_date: cleanText(input.hire_date),
+        notes: cleanText(input.notes),
+        is_active: true,
+      });
+
+      if (employeeInsertError) {
+        throw employeeInsertError;
+      }
+
+      employeeCreated = true;
+    }
+  }
+
+  return {
+    id: profileId,
+    email: normalizedEmail,
+    role: input.role,
+    invited,
+    employee_created: employeeCreated,
   };
 }
 
@@ -150,6 +288,8 @@ Deno.serve(async (req) => {
     const canManageCustomers = (requesterRoles || []).some((row) =>
       row.role === "admin" || row.role === "manager"
     );
+    const requesterOrganizationRole: Extract<AppRole, "admin" | "manager"> =
+      (requesterRoles || []).some((row) => row.role === "admin") ? "admin" : "manager";
 
     if (!canManageCustomers) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -204,118 +344,51 @@ Deno.serve(async (req) => {
       throw organizationError;
     }
 
-    let primaryContactSummary:
-      | { id: string; email: string; role: string; invited: boolean; employee_created: boolean }
-      | null = null;
+    const { error: requesterAccessError } = await supabase
+      .from("user_roles")
+      .upsert(
+        {
+          user_id: user.id,
+          role: requesterOrganizationRole,
+          organization_id: organization.id,
+          created_by: user.id,
+        },
+        { onConflict: "organization_id,user_id,role" },
+      );
+
+    if (requesterAccessError) {
+      throw requesterAccessError;
+    }
+
+    let primaryContactSummary: ProvisionedUserSummary | null = null;
     let primaryContactUserId: string | null = null;
+    const createdUsers: ProvisionedUserSummary[] = [];
 
     if (payload.primary_contact?.email?.trim()) {
-      const primaryContact = payload.primary_contact;
-      const normalizedEmail = primaryContact.email.trim().toLowerCase();
+      primaryContactSummary = await provisionUserAccess({
+        supabase,
+        requesterId: user.id,
+        organizationId: organization.id,
+        input: payload.primary_contact,
+        inviteRedirectTo: payload.options?.invite_redirect_to,
+      });
+      primaryContactUserId = primaryContactSummary.id;
+    }
 
-      const { data: matchingProfiles, error: profileLookupError } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, phone")
-        .ilike("email", normalizedEmail);
-
-      if (profileLookupError) {
-        throw profileLookupError;
+    for (const additionalUser of payload.additional_users || []) {
+      if (!additionalUser.full_name.trim() || !additionalUser.email.trim()) {
+        continue;
       }
 
-      let invited = false;
-      let profileId = matchingProfiles?.[0]?.id ?? null;
+      const provisionedUser = await provisionUserAccess({
+        supabase,
+        requesterId: user.id,
+        organizationId: organization.id,
+        input: additionalUser,
+        inviteRedirectTo: payload.options?.invite_redirect_to,
+      });
 
-      if (!profileId) {
-        const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-          normalizedEmail,
-          {
-            data: { full_name: primaryContact.full_name.trim() },
-            redirectTo: cleanText(payload.options?.invite_redirect_to) ?? undefined,
-          },
-        );
-
-        if (inviteError) {
-          throw inviteError;
-        }
-
-        profileId = inviteData.user?.id ?? null;
-        invited = true;
-      }
-
-      if (!profileId) {
-        throw new Error("Unable to resolve primary contact user");
-      }
-
-      primaryContactUserId = profileId;
-
-      await supabase
-        .from("profiles")
-        .update({
-          full_name: cleanText(primaryContact.full_name),
-          phone: cleanText(primaryContact.phone),
-          active_organization_id: organization.id,
-        })
-        .eq("id", profileId);
-
-      const { error: roleInsertError } = await supabase
-        .from("user_roles")
-        .upsert(
-          {
-            user_id: profileId,
-            role: primaryContact.role,
-            organization_id: organization.id,
-            created_by: user.id,
-          },
-          { onConflict: "organization_id,user_id,role" },
-        );
-
-      if (roleInsertError) {
-        throw roleInsertError;
-      }
-
-      let employeeCreated = false;
-      if (primaryContact.create_employee) {
-        const { data: existingEmployee, error: existingEmployeeError } = await supabase
-          .from("employees")
-          .select("id")
-          .eq("user_id", profileId)
-          .maybeSingle();
-
-        if (existingEmployeeError && existingEmployeeError.code !== "PGRST116") {
-          throw existingEmployeeError;
-        }
-
-        if (!existingEmployee) {
-          const nameParts = splitName(primaryContact.full_name);
-          const { error: employeeInsertError } = await supabase.from("employees").insert({
-            user_id: profileId,
-            organization_id: organization.id,
-            first_name: nameParts.first_name,
-            last_name: nameParts.last_name,
-            email: normalizedEmail,
-            phone: cleanText(primaryContact.phone),
-            category: primaryContact.employee_category || "manager",
-            hourly_rate: primaryContact.hourly_rate ?? null,
-            hire_date: cleanText(primaryContact.hire_date),
-            notes: cleanText(primaryContact.notes),
-            is_active: true,
-          });
-
-          if (employeeInsertError) {
-            throw employeeInsertError;
-          }
-
-          employeeCreated = true;
-        }
-      }
-
-      primaryContactSummary = {
-        id: profileId,
-        email: normalizedEmail,
-        role: primaryContact.role,
-        invited,
-        employee_created: employeeCreated,
-      };
+      createdUsers.push(provisionedUser);
     }
 
     const createdEmployees: Array<{ id: string; name: string; category: string }> = [];
@@ -401,6 +474,7 @@ Deno.serve(async (req) => {
         success: true,
         organization,
         primary_contact: primaryContactSummary,
+        users_created: createdUsers,
         employees_created: createdEmployees,
         accounts_created: createdAccounts,
       }),

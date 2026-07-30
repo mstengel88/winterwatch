@@ -1,7 +1,6 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format, differenceInMinutes } from 'date-fns';
 import { DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExportConfig';
+import { loadPdfRuntime } from '@/lib/pdfRuntime';
 
 // Version for cache busting - increment when making PDF changes
 const PDF_VERSION = '1.0.2';
@@ -40,12 +39,13 @@ interface GeneratePdfOptions {
   visibleColumns?: WorkLogColumn[];
 }
 
-export function generateWorkLogsPDF(
+export async function generateWorkLogsPDF(
   workLogs: WorkLogData[],
   summary: ReportSummary,
   title: string = 'Work Logs Report',
   options?: GeneratePdfOptions
-): Blob | void {
+): Promise<Blob | void> {
+  const { jsPDF, autoTable } = await loadPdfRuntime();
   // Landscape orientation for wider table
   const doc = new jsPDF({ orientation: 'landscape' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -199,11 +199,12 @@ export function generateWorkLogsPDF(
   doc.save(fileName);
 }
 
-export function generateInvoicePDF(
+export async function generateInvoicePDF(
   accountName: string,
   workLogs: WorkLogData[],
   dateRange: string
-): void {
+): Promise<void> {
+  const { jsPDF, autoTable } = await loadPdfRuntime();
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -258,7 +259,7 @@ export function generateInvoicePDF(
   });
 
   // Summary
-  const finalY = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 0) + 10;
+  const finalY = (((doc as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 0) + 10);
   
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(pageWidth - 80, finalY, 66, 30, 2, 2, 'F');
@@ -298,10 +299,11 @@ interface TimesheetEntry {
   location: string;
 }
 
-export function generateTimesheetsPDF(
+export async function generateTimesheetsPDF(
   entries: TimesheetEntry[],
   dateRange: string
-): void {
+): Promise<void> {
+  const { jsPDF, autoTable } = await loadPdfRuntime();
   const doc = new jsPDF({ orientation: 'landscape' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -398,10 +400,11 @@ interface SummaryStats {
   totalIceMeltLbs: number;
 }
 
-export function generateSummaryPDF(
+export async function generateSummaryPDF(
   stats: SummaryStats,
   dateRange: string
-): void {
+): Promise<void> {
+  const { jsPDF } = await loadPdfRuntime();
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const primaryColor: [number, number, number] = [10, 132, 183];

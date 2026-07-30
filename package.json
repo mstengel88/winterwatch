@@ -7,10 +7,11 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "sync:pdf-vendors": "node scripts/sync-pdf-vendors.mjs",
     "dev": "vite",
-    "build": "vite build",
-    "build:cap": "CAPACITOR=true vite build",
-    "build:dev": "vite build --mode development",
+    "build": "npm run sync:pdf-vendors && vite build",
+    "build:cap": "npm run sync:pdf-vendors && CAPACITOR=true vite build",
+    "build:dev": "npm run sync:pdf-vendors && vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

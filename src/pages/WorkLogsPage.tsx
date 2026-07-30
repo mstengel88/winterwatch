@@ -256,7 +256,7 @@ export default function WorkLogsPage() {
 
     const { generateWorkLogsPDF } = await import('@/lib/pdfExport');
 
-    generateWorkLogsPDF(rawLogs, {
+    await generateWorkLogsPDF(rawLogs, {
       totalJobs: filteredLogs.length,
       totalHours,
       totalSaltLbs: filteredLogs.reduce((sum, log) => sum + (log.salt_used_lbs || 0), 0),

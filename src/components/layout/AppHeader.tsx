@@ -26,7 +26,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog, History, MapPin, Route } from 'lucide-react';
+import { Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, UserCog, History, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -42,10 +42,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
-  { href: '/dispatch-route', label: 'Dispatch Route', icon: Route, roles: ['dispatch_driver', 'driver', 'trucker', 'admin', 'manager'] },
+  { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'dispatch_driver', 'trucker', 'admin', 'manager'] },
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
-  { href: '/trucker', label: 'Trucker', icon: Wrench, roles: ['trucker', 'admin', 'manager'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
   { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
@@ -131,7 +129,7 @@ export function AppHeader() {
   const displayName = profile?.full_name || profile?.email || 'User';
   const shortName = displayName.length > 12 ? displayName.slice(0, 12) + '...' : displayName;
   const mobilePrimaryNav = filteredNavItems.slice(0, 4);
-  const isDispatchOnlyUser = roles.includes('dispatch_driver') && roles.length === 1;
+  const isDispatchOnlyUser = false;
   const activeOrganization = organizations.find((organization) => organization.id === activeOrganizationId) ?? null;
 
   const handleOrganizationSwitch = async (organizationId: string) => {
@@ -152,25 +150,17 @@ export function AppHeader() {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
-    if (href === '/dispatch-route') return location.pathname === href;
     if (href === '/shovel') return location.pathname === href;
-    if (href === '/trucker') return location.pathname === href;
     return location.pathname.startsWith(href);
   };
 
   // Determine home route based on role
   const getHomeRoute = () => {
-    if (hasRole('dispatch_driver')) {
-      return '/dispatch-route';
-    }
-    if (isAdminOrManager() || hasRole('driver')) {
+    if (isAdminOrManager() || hasRole('driver') || hasRole('dispatch_driver') || hasRole('trucker')) {
       return '/dashboard';
     }
     if (hasRole('shovel_crew')) {
       return '/shovel';
-    }
-    if (hasRole('trucker')) {
-      return '/trucker';
     }
     return '/';
   };
