@@ -22,7 +22,7 @@ export default function RoleBasedRedirect() {
 
   // Admin and managers should land in the admin workspace first.
   if (roles.includes('admin') || roles.includes('manager')) {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to="/admin/organizations" replace />;
   }
 
   // Dispatch driver accounts now use the main dashboard.

@@ -191,10 +191,11 @@ const AppRoutes = () => (
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<AdminDashboardPage />} />
+                <Route index element={<Navigate to="organizations" replace />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="customer-setup" element={<CustomerOnboardingPage />} />
                 <Route path="organizations" element={<OrganizationsPage />} />
+                <Route path="overview" element={<AdminDashboardPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="equipment" element={<EquipmentPage />} />

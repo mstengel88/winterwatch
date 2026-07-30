@@ -35,7 +35,7 @@ export function ProtectedRoute({
     if (!hasAllowedRole) {
       // Redirect to appropriate dashboard based on user's actual role
       if (roles.includes('admin') || roles.includes('manager')) {
-        return <Navigate to="/admin" replace />;
+        return <Navigate to="/admin/organizations" replace />;
       }
       if (roles.includes('shovel_crew')) {
         return <Navigate to="/shovel" replace />;

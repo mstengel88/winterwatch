@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
   { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
-  { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
+  { href: '/admin/organizations', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
 ];
 
 export function AppHeader() {
@@ -157,7 +157,7 @@ export function AppHeader() {
   // Determine home route based on role
   const getHomeRoute = () => {
     if (isAdminOrManager()) {
-      return '/admin';
+      return '/admin/organizations';
     }
     if (hasRole('driver') || hasRole('dispatch_driver') || hasRole('trucker')) {
       return '/dashboard';
@@ -411,7 +411,7 @@ export function AppHeader() {
               {!isDispatchOnlyUser && isAdminOrManager() && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/admin')}>
+                  <DropdownMenuItem onClick={() => navigate('/admin/organizations')}>
                     <Shield className="mr-2 h-4 w-4" />
                     Admin
                   </DropdownMenuItem>
