@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Bell, Plus, Pencil, Trash2, Loader2, Lock, Shield } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationType {
   id: string;
@@ -41,6 +42,7 @@ interface NotificationType {
 }
 
 export default function NotificationTypesPage() {
+  const { activeOrganizationId } = useAuth();
   const { toast } = useToast();
   const [types, setTypes] = useState<NotificationType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,11 +60,18 @@ export default function NotificationTypesPage() {
   });
 
   const fetchTypes = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setTypes([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('notification_types')
         .select('*')
+        .filter('organization_id', 'eq', activeOrganizationId)
         .order('is_system', { ascending: false })
         .order('label');
 
@@ -78,7 +87,7 @@ export default function NotificationTypesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [activeOrganizationId, toast]);
 
   useEffect(() => {
     fetchTypes();
@@ -102,6 +111,15 @@ export default function NotificationTypesPage() {
   };
 
   const handleSave = async () => {
+    if (!activeOrganizationId) {
+      toast({
+        variant: 'destructive',
+        title: 'No organization selected',
+        description: 'Choose an organization before managing notification types.',
+      });
+      return;
+    }
+
     if (!formData.name.trim() || !formData.label.trim()) {
       toast({
         variant: 'destructive',
@@ -138,7 +156,8 @@ export default function NotificationTypesPage() {
         const { error } = await supabase
           .from('notification_types')
           .update(updateData)
-          .eq('id', editingType.id);
+          .eq('id', editingType.id)
+          .filter('organization_id', 'eq', activeOrganizationId);
 
         if (error) throw error;
         toast({ title: 'Updated', description: 'Notification type updated' });
@@ -152,7 +171,8 @@ export default function NotificationTypesPage() {
             description: formData.description.trim() || null,
             is_mandatory: formData.is_mandatory,
             is_system: false,
-          });
+            organization_id: activeOrganizationId,
+          } as never);
 
         if (error) {
           if (error.code === '23505') {
@@ -184,12 +204,14 @@ export default function NotificationTypesPage() {
 
   const handleDelete = async () => {
     if (!deleteType) return;
+    if (!activeOrganizationId) return;
 
     try {
       const { error } = await supabase
         .from('notification_types')
         .delete()
-        .eq('id', deleteType.id);
+        .eq('id', deleteType.id)
+        .filter('organization_id', 'eq', activeOrganizationId);
 
       if (error) throw error;
       
@@ -207,11 +229,14 @@ export default function NotificationTypesPage() {
   };
 
   const toggleActive = async (type: NotificationType) => {
+    if (!activeOrganizationId) return;
+
     try {
       const { error } = await supabase
         .from('notification_types')
         .update({ is_active: !type.is_active })
-        .eq('id', type.id);
+        .eq('id', type.id)
+        .filter('organization_id', 'eq', activeOrganizationId);
 
       if (error) throw error;
       fetchTypes();
@@ -221,11 +246,14 @@ export default function NotificationTypesPage() {
   };
 
   const toggleMandatory = async (type: NotificationType) => {
+    if (!activeOrganizationId) return;
+
     try {
       const { error } = await supabase
         .from('notification_types')
         .update({ is_mandatory: !type.is_mandatory })
-        .eq('id', type.id);
+        .eq('id', type.id)
+        .filter('organization_id', 'eq', activeOrganizationId);
 
       if (error) throw error;
       fetchTypes();

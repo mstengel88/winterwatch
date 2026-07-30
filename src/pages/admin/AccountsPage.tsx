@@ -15,6 +15,7 @@ import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Penci
 import { Checkbox } from '@/components/ui/checkbox';
 import { Account } from '@/types/database';
 import { accountSchema, getValidationError } from '@/lib/validations';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SERVICE_TYPE_OPTIONS = ['plow', 'shovel', 'both'];
 
@@ -29,6 +30,7 @@ type BulkAccountUpdates = {
 };
 
 export default function AccountsPage() {
+  const { activeOrganizationId } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -62,10 +64,16 @@ export default function AccountsPage() {
 
   const fetchAccounts = async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setAccounts([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('accounts')
         .select('*')
+        .filter('organization_id', 'eq', activeOrganizationId)
         .order('priority')
         .order('name');
 
@@ -81,7 +89,7 @@ export default function AccountsPage() {
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+  }, [activeOrganizationId]);
 
   const openDialog = (account?: Account) => {
     if (account) {
@@ -138,6 +146,7 @@ export default function AccountsPage() {
     try {
       const validated = validationResult.data;
       const accountData = {
+        organization_id: activeOrganizationId,
         name: validated.name,
         address: validated.address,
         city: validated.city || null,
@@ -159,7 +168,8 @@ export default function AccountsPage() {
         const { error } = await supabase
           .from('accounts')
           .update(accountData)
-          .eq('id', editingAccount.id);
+          .eq('id', editingAccount.id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
         if (error) throw error;
         toast.success('Account updated');
       } else {
@@ -182,7 +192,11 @@ export default function AccountsPage() {
     if (!confirm('Are you sure you want to delete this account?')) return;
 
     try {
-      const { error } = await supabase.from('accounts').delete().eq('id', id);
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .eq('id', id)
+        .filter('organization_id', 'eq', activeOrganizationId!);
       if (error) throw error;
       toast.success('Account deleted');
       fetchAccounts();
@@ -235,6 +249,7 @@ export default function AccountsPage() {
       const { error } = await supabase
         .from('accounts')
         .update(updates)
+        .filter('organization_id', 'eq', activeOrganizationId!)
         .in('id', Array.from(selectedIds));
 
       if (error) throw error;
@@ -259,6 +274,7 @@ export default function AccountsPage() {
       const { error } = await supabase
         .from('accounts')
         .delete()
+        .filter('organization_id', 'eq', activeOrganizationId!)
         .in('id', Array.from(selectedIds));
 
       if (error) throw error;

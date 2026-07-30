@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner';
 import { Clock, Bell, Loader2, Plus, Pencil, Trash2, Users, Play } from 'lucide-react';
 import { OvertimeNotificationHistory } from './OvertimeNotificationHistory';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface OvertimeSetting {
   id: string;
@@ -31,6 +32,7 @@ interface Employee {
 const GLOBAL_SETTING_ID = '__GLOBAL__';
 
 export function OvertimeNotificationSettings() {
+  const { activeOrganizationId } = useAuth();
   const [settings, setSettings] = useState<OvertimeSetting[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,10 +55,16 @@ export function OvertimeNotificationSettings() {
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setSettings([]);
+      setEmployees([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       const [settingsRes, employeesRes] = await Promise.all([
-        supabase.from('overtime_notification_settings').select('*'),
-        supabase.from('employees').select('id, first_name, last_name, is_active').eq('is_active', true).order('last_name'),
+        supabase.from('overtime_notification_settings').select('*').filter('organization_id', 'eq', activeOrganizationId),
+        supabase.from('employees').select('id, first_name, last_name, is_active').filter('organization_id', 'eq', activeOrganizationId).eq('is_active', true).order('last_name'),
       ]);
 
       if (settingsRes.error) throw settingsRes.error;
@@ -70,7 +78,7 @@ export function OvertimeNotificationSettings() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   useEffect(() => {
     fetchData();
@@ -116,6 +124,7 @@ export function OvertimeNotificationSettings() {
     try {
       const isGlobal = formData.employee_id === GLOBAL_SETTING_ID;
       const data = {
+        organization_id: activeOrganizationId,
         employee_id: isGlobal ? null : formData.employee_id,
         threshold_hours: thresholdHours,
         is_enabled: formData.is_enabled,
@@ -127,7 +136,8 @@ export function OvertimeNotificationSettings() {
         const { error } = await supabase
           .from('overtime_notification_settings')
           .update(data)
-          .eq('id', editingSetting.id);
+          .eq('id', editingSetting.id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
         if (error) throw error;
         toast.success('Setting updated');
       } else {
@@ -161,9 +171,10 @@ export function OvertimeNotificationSettings() {
 
     try {
       const { error } = await supabase
-        .from('overtime_notification_settings')
-        .delete()
-        .eq('id', id);
+          .from('overtime_notification_settings')
+          .delete()
+          .eq('id', id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
       if (error) throw error;
       toast.success('Setting deleted');
       fetchData();
@@ -176,9 +187,10 @@ export function OvertimeNotificationSettings() {
   const handleToggleEnabled = async (setting: OvertimeSetting) => {
     try {
       const { error } = await supabase
-        .from('overtime_notification_settings')
-        .update({ is_enabled: !setting.is_enabled })
-        .eq('id', setting.id);
+          .from('overtime_notification_settings')
+          .update({ is_enabled: !setting.is_enabled })
+          .eq('id', setting.id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
       if (error) throw error;
       
       setSettings(prev => prev.map(s => 

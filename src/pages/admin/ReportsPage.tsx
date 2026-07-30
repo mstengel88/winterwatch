@@ -33,6 +33,7 @@ import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useGoogleDriveExport } from '@/hooks/useGoogleDriveExport';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PdfExportSettings = lazy(async () => {
   const module = await import('@/components/reports/PdfExportSettings');
@@ -182,6 +183,7 @@ interface Equipment {
 }
 
 export default function ReportsPage() {
+  const { activeOrganizationId } = useAuth();
   const { isNative } = useNativePlatform();
   const isMobile = useIsMobile();
   const { isExporting, exportPdfToDrive } = useGoogleDriveExport();
@@ -326,6 +328,15 @@ export default function ReportsPage() {
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setTimeClockEntries([]);
+      setWorkLogs([]);
+      setAccounts([]);
+      setEmployees([]);
+      setEquipment([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       // Parse as local time (not UTC) by splitting the date string
       const [sy, sm, sd] = fromDate.split('-').map(Number);
@@ -344,24 +355,27 @@ export default function ReportsPage() {
         supabase
           .from('time_clock')
           .select('*, employee:employees(first_name, last_name)')
+          .filter('organization_id', 'eq', activeOrganizationId)
           .gte('clock_in_time', startDate.toISOString())
           .lte('clock_in_time', endDate.toISOString())
           .order('clock_in_time', { ascending: false }),
         supabase
           .from('work_logs')
           .select('*, account:accounts(name), employee:employees(first_name, last_name), equipment:equipment(name)')
+          .filter('organization_id', 'eq', activeOrganizationId)
           .gte('created_at', startDate.toISOString())
           .lte('created_at', endDate.toISOString())
           .order('created_at', { ascending: false }),
         supabase
           .from('shovel_work_logs')
           .select('*, account:accounts(name), employee:employees(first_name, last_name)')
+          .filter('organization_id', 'eq', activeOrganizationId)
           .gte('created_at', startDate.toISOString())
           .lte('created_at', endDate.toISOString())
           .order('created_at', { ascending: false }),
-        supabase.from('accounts').select('id, name').eq('is_active', true).order('name'),
-        supabase.from('employees').select('id, first_name, last_name, category').eq('is_active', true).order('first_name'),
-        supabase.from('equipment').select('id, name').eq('is_active', true).eq('status', 'available').order('name'),
+        supabase.from('accounts').select('id, name').filter('organization_id', 'eq', activeOrganizationId).eq('is_active', true).order('name'),
+        supabase.from('employees').select('id, first_name, last_name, category').filter('organization_id', 'eq', activeOrganizationId).eq('is_active', true).order('first_name'),
+        supabase.from('equipment').select('id, name').filter('organization_id', 'eq', activeOrganizationId).eq('is_active', true).eq('status', 'available').order('name'),
       ]);
 
       setTimeClockEntries((timeClockRes.data || []) as TimeClockEntry[]);
@@ -404,6 +418,7 @@ export default function ReportsPage() {
             const { data: teamMembers } = await supabase
               .from('employees')
               .select('first_name, last_name')
+              .filter('organization_id', 'eq', activeOrganizationId)
               .in('id', log.team_member_ids);
             teamMemberNames = ((teamMembers as EmployeeNameRow[] | null) || []).map((m) => `${m.first_name} ${m.last_name}`);
           }
@@ -443,7 +458,7 @@ export default function ReportsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [fromDate, toDate]);
+  }, [activeOrganizationId, fromDate, toDate]);
 
   useEffect(() => {
     fetchData();
@@ -1002,7 +1017,8 @@ export default function ReportsPage() {
             clock_in_time: clockInDateTime.toISOString(),
             clock_out_time: clockOutDateTime?.toISOString() || null,
           })
-          .eq('id', data.id);
+          .eq('id', data.id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
         if (error) throw error;
         toast.success('Shift updated successfully');
       } else {
@@ -1010,10 +1026,11 @@ export default function ReportsPage() {
         const { error } = await supabase
           .from('time_clock')
           .insert({
+            organization_id: activeOrganizationId,
             employee_id: data.employee_id,
             clock_in_time: clockInDateTime.toISOString(),
             clock_out_time: clockOutDateTime?.toISOString() || null,
-          });
+          } as never);
         if (error) throw error;
         toast.success('Shift created successfully');
       }
@@ -1060,11 +1077,11 @@ export default function ReportsPage() {
         };
 
         if (data.id) {
-          const { error } = await supabase.from('work_logs').update(payload).eq('id', data.id);
+          const { error } = await supabase.from('work_logs').update(payload).eq('id', data.id).filter('organization_id', 'eq', activeOrganizationId!);
           if (error) throw error;
           toast.success('Work log updated successfully');
         } else {
-          const { error } = await supabase.from('work_logs').insert(payload);
+          const { error } = await supabase.from('work_logs').insert({ ...payload, organization_id: activeOrganizationId } as never);
           if (error) throw error;
           toast.success('Work log created successfully');
         }
@@ -1084,11 +1101,11 @@ export default function ReportsPage() {
         };
 
         if (data.id) {
-          const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', data.id);
+          const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', data.id).filter('organization_id', 'eq', activeOrganizationId!);
           if (error) throw error;
           toast.success('Work log updated successfully');
         } else {
-          const { error } = await supabase.from('shovel_work_logs').insert(payload);
+          const { error } = await supabase.from('shovel_work_logs').insert({ ...payload, organization_id: activeOrganizationId } as never);
           if (error) throw error;
           toast.success('Work log created successfully');
         }
@@ -1110,7 +1127,7 @@ export default function ReportsPage() {
     setIsSaving(true);
     try {
       if (deleteTarget.type === 'shift') {
-        const { error } = await supabase.from('time_clock').delete().eq('id', deleteTarget.id);
+        const { error } = await supabase.from('time_clock').delete().eq('id', deleteTarget.id).filter('organization_id', 'eq', activeOrganizationId!);
         if (error) throw error;
         toast.success('Shift deleted successfully');
       } else {
@@ -1118,7 +1135,7 @@ export default function ReportsPage() {
         const workLog = workLogs.find(l => l.id === deleteTarget.id);
         if (workLog) {
           const table = workLog.type === 'plow' ? 'work_logs' : 'shovel_work_logs';
-          const { error } = await supabase.from(table).delete().eq('id', deleteTarget.id);
+          const { error } = await supabase.from(table).delete().eq('id', deleteTarget.id).filter('organization_id', 'eq', activeOrganizationId!);
           if (error) throw error;
           toast.success('Work log deleted successfully');
         }
@@ -1141,7 +1158,7 @@ export default function ReportsPage() {
       if (bulkDeleteType === 'shifts') {
         const ids = Array.from(selectedShifts);
         if (ids.length === 0) return;
-        const { error } = await supabase.from('time_clock').delete().in('id', ids);
+        const { error } = await supabase.from('time_clock').delete().filter('organization_id', 'eq', activeOrganizationId!).in('id', ids);
         if (error) throw error;
         toast.success(`${ids.length} shift(s) deleted successfully`);
         setSelectedShifts(new Set());
@@ -1154,11 +1171,11 @@ export default function ReportsPage() {
         const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
         
         if (plowIds.length > 0) {
-          const { error } = await supabase.from('work_logs').delete().in('id', plowIds);
+          const { error } = await supabase.from('work_logs').delete().filter('organization_id', 'eq', activeOrganizationId!).in('id', plowIds);
           if (error) throw error;
         }
         if (shovelIds.length > 0) {
-          const { error } = await supabase.from('shovel_work_logs').delete().in('id', shovelIds);
+          const { error } = await supabase.from('shovel_work_logs').delete().filter('organization_id', 'eq', activeOrganizationId!).in('id', shovelIds);
           if (error) throw error;
         }
         toast.success(`${ids.length} work log(s) deleted successfully`);
@@ -1199,11 +1216,11 @@ export default function ReportsPage() {
         : { billed: false, billing_status: 'billable' };
       
       if (plowIds.length > 0) {
-        const { error } = await supabase.from('work_logs').update(updateData).in('id', plowIds);
+        const { error } = await supabase.from('work_logs').update(updateData).filter('organization_id', 'eq', activeOrganizationId!).in('id', plowIds);
         if (error) throw error;
       }
       if (shovelIds.length > 0) {
-        const { error } = await supabase.from('shovel_work_logs').update(updateData).in('id', shovelIds);
+        const { error } = await supabase.from('shovel_work_logs').update(updateData).filter('organization_id', 'eq', activeOrganizationId!).in('id', shovelIds);
         if (error) throw error;
       }
       
@@ -1228,7 +1245,7 @@ export default function ReportsPage() {
         ? { billed: true, billing_status: 'completed' }
         : { billed: false, billing_status: 'billable' };
       
-      const { error } = await supabase.from(table).update(updateData).eq('id', log.id);
+      const { error } = await supabase.from(table).update(updateData).eq('id', log.id).filter('organization_id', 'eq', activeOrganizationId!);
       if (error) throw error;
       
       toast.success(`Work log marked as ${newBilled ? 'billed' : 'unbilled'}`);
@@ -1252,11 +1269,11 @@ export default function ReportsPage() {
       const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
       
       if (plowIds.length > 0) {
-        const { error } = await supabase.from('work_logs').update({ billing_status: 'current' }).in('id', plowIds);
+        const { error } = await supabase.from('work_logs').update({ billing_status: 'current' }).filter('organization_id', 'eq', activeOrganizationId!).in('id', plowIds);
         if (error) throw error;
       }
       if (shovelIds.length > 0) {
-        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'current' }).in('id', shovelIds);
+        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'current' }).filter('organization_id', 'eq', activeOrganizationId!).in('id', shovelIds);
         if (error) throw error;
       }
       
@@ -1282,11 +1299,11 @@ export default function ReportsPage() {
       const shovelIds = workLogs.filter(l => ids.includes(l.id) && l.type === 'shovel').map(l => l.id);
       
       if (plowIds.length > 0) {
-        const { error } = await supabase.from('work_logs').update({ billing_status: 'billable' }).in('id', plowIds);
+        const { error } = await supabase.from('work_logs').update({ billing_status: 'billable' }).filter('organization_id', 'eq', activeOrganizationId!).in('id', plowIds);
         if (error) throw error;
       }
       if (shovelIds.length > 0) {
-        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'billable' }).in('id', shovelIds);
+        const { error } = await supabase.from('shovel_work_logs').update({ billing_status: 'billable' }).filter('organization_id', 'eq', activeOrganizationId!).in('id', shovelIds);
         if (error) throw error;
       }
       
@@ -1308,7 +1325,7 @@ export default function ReportsPage() {
     
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('time_clock').update({ billing_status: 'current' }).in('id', ids);
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'current' }).filter('organization_id', 'eq', activeOrganizationId!).in('id', ids);
       if (error) throw error;
       
       toast.success(`${ids.length} shift(s) moved to current`);
@@ -1329,7 +1346,7 @@ export default function ReportsPage() {
     
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('time_clock').update({ billing_status: 'billable' }).in('id', ids);
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'billable' }).filter('organization_id', 'eq', activeOrganizationId!).in('id', ids);
       if (error) throw error;
       
       toast.success(`${ids.length} shift(s) moved to billable`);
@@ -1350,7 +1367,7 @@ export default function ReportsPage() {
     
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('time_clock').update({ billing_status: 'completed' }).in('id', ids);
+      const { error } = await supabase.from('time_clock').update({ billing_status: 'completed' }).filter('organization_id', 'eq', activeOrganizationId!).in('id', ids);
       if (error) throw error;
       
       toast.success(`${ids.length} shift(s) marked as completed`);
@@ -1460,7 +1477,7 @@ export default function ReportsPage() {
           }
           
           if (Object.keys(payload).length > 0) {
-            const { error } = await supabase.from('work_logs').update(payload).eq('id', logId);
+            const { error } = await supabase.from('work_logs').update(payload).eq('id', logId).filter('organization_id', 'eq', activeOrganizationId!);
             if (error) throw error;
           }
         }
@@ -1480,7 +1497,7 @@ export default function ReportsPage() {
           }
           
           if (Object.keys(payload).length > 0) {
-            const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', logId);
+            const { error } = await supabase.from('shovel_work_logs').update(payload).eq('id', logId).filter('organization_id', 'eq', activeOrganizationId!);
             if (error) throw error;
           }
         }
@@ -1490,11 +1507,11 @@ export default function ReportsPage() {
         const shovelPayload = buildShovelPayload();
 
         if (plowIds.length > 0 && Object.keys(plowPayload).length > 0) {
-          const { error } = await supabase.from('work_logs').update(plowPayload).in('id', plowIds);
+          const { error } = await supabase.from('work_logs').update(plowPayload).filter('organization_id', 'eq', activeOrganizationId!).in('id', plowIds);
           if (error) throw error;
         }
         if (shovelIds.length > 0 && Object.keys(shovelPayload).length > 0) {
-          const { error } = await supabase.from('shovel_work_logs').update(shovelPayload).in('id', shovelIds);
+          const { error } = await supabase.from('shovel_work_logs').update(shovelPayload).filter('organization_id', 'eq', activeOrganizationId!).in('id', shovelIds);
           if (error) throw error;
         }
       }

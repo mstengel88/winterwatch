@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from 'sonner';
 import { History, Loader2, RefreshCw, Clock, Users, Send, RotateCcw, ChevronDown, Zap } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationRecord {
   id: string;
@@ -35,6 +36,7 @@ interface OvertimeSetting {
 }
 
 export function OvertimeNotificationHistory() {
+  const { activeOrganizationId } = useAuth();
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [overtimeSettings, setOvertimeSettings] = useState<OvertimeSetting[]>([]);
@@ -45,6 +47,14 @@ export function OvertimeNotificationHistory() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('self');
 
   const fetchData = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setNotifications([]);
+      setEmployees([]);
+      setOvertimeSettings([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const [notificationsRes, employeesRes, settingsRes] = await Promise.all([
@@ -58,16 +68,19 @@ export function OvertimeNotificationHistory() {
             sent_at,
             employee:employees(first_name, last_name)
           `)
+          .filter('organization_id', 'eq', activeOrganizationId)
           .order('sent_at', { ascending: false })
           .limit(50),
         supabase
           .from('employees')
           .select('id, user_id, first_name, last_name')
+          .filter('organization_id', 'eq', activeOrganizationId)
           .eq('is_active', true)
           .order('last_name'),
         supabase
           .from('overtime_notification_settings')
           .select('id, threshold_hours, is_enabled')
+          .filter('organization_id', 'eq', activeOrganizationId)
           .eq('is_enabled', true)
           .order('threshold_hours'),
       ]);
@@ -91,7 +104,7 @@ export function OvertimeNotificationHistory() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   useEffect(() => {
     fetchData();

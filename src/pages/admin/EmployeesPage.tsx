@@ -18,7 +18,7 @@ import { employeeSchema, getValidationError } from '@/lib/validations';
 import { OvertimeNotificationSettings } from '@/components/admin/OvertimeNotificationSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getPublicWebAppUrl } from '@/lib/publicWebUrl';
+import { getCurrentWebAppUrl } from '@/lib/publicWebUrl';
 
 const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both', 'manager', 'trucker'];
 const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client', 'work_log_viewer'];
@@ -28,10 +28,34 @@ interface UserWithRoles extends Profile {
   roles: AppRole[];
 }
 
+type WorkspaceInviteForm = {
+  full_name: string;
+  email: string;
+  phone: string;
+  role: AppRole;
+  create_employee: boolean;
+  employee_category: EmployeeCategory;
+  employee_id: string;
+};
+
 type PreviewLinkState = {
   actionLink: string;
   targetName: string;
   targetEmail: string;
+};
+
+const getDefaultEmployeeCategoryForRole = (role: AppRole): EmployeeCategory => {
+  switch (role) {
+    case 'driver':
+    case 'dispatch_driver':
+      return 'plow';
+    case 'shovel_crew':
+      return 'shovel';
+    case 'trucker':
+      return 'trucker';
+    default:
+      return 'manager';
+  }
 };
 
 const getRoleIcon = (role: AppRole) => {
@@ -80,6 +104,17 @@ export default function EmployeesPage() {
   const [selectedRole, setSelectedRole] = useState<Record<string, AppRole>>({});
   const [creatingPreviewUserId, setCreatingPreviewUserId] = useState<string | null>(null);
   const [previewLink, setPreviewLink] = useState<PreviewLinkState | null>(null);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isInvitingUser, setIsInvitingUser] = useState(false);
+  const [workspaceInviteForm, setWorkspaceInviteForm] = useState<WorkspaceInviteForm>({
+    full_name: '',
+    email: '',
+    phone: '',
+    role: 'manager',
+    create_employee: true,
+    employee_category: 'manager',
+    employee_id: '',
+  });
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -93,23 +128,38 @@ export default function EmployeesPage() {
 
   const fetchData = async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setEmployees([]);
+      setProfiles([]);
+      setUserRolesByUserId({});
+      setIsLoading(false);
+      return;
+    }
     try {
-      const [employeesRes, profilesRes] = await Promise.all([
-        supabase.from('employees').select('*').order('last_name'),
-        supabase.from('profiles').select('*'),
+      const [employeesRes, rolesRes] = await Promise.all([
+        supabase.from('employees').select('*').filter('organization_id', 'eq', activeOrganizationId).order('last_name'),
+        supabase.from('user_roles').select('user_id, role').eq('organization_id', activeOrganizationId),
       ]);
-      const rolesQuery = activeOrganizationId
-        ? supabase.from('user_roles').select('user_id, role').eq('organization_id', activeOrganizationId)
-        : supabase.from('user_roles').select('user_id, role');
-      const { data: rolesData, error: rolesError } = await rolesQuery;
 
       if (employeesRes.error) throw employeesRes.error;
-      if (profilesRes.error) throw profilesRes.error;
-      if (rolesError) throw rolesError;
+      if (rolesRes.error) throw rolesRes.error;
 
-      setEmployees(employeesRes.data || []);
+      const employeeRows = employeesRes.data || [];
+      const roleRows = rolesRes.data || [];
+      const profileIds = Array.from(new Set([
+        ...employeeRows.map((employee) => employee.user_id).filter((value): value is string => Boolean(value)),
+        ...roleRows.map((row) => row.user_id),
+      ]));
+
+      const profilesRes = profileIds.length > 0
+        ? await supabase.from('profiles').select('*').in('id', profileIds)
+        : { data: [], error: null };
+
+      if (profilesRes.error) throw profilesRes.error;
+
+      setEmployees(employeeRows);
       setProfiles(profilesRes.data || []);
-      const groupedRoles = (rolesData || []).reduce<Record<string, AppRole[]>>((accumulator, row) => {
+      const groupedRoles = roleRows.reduce<Record<string, AppRole[]>>((accumulator, row) => {
         if (!accumulator[row.user_id]) {
           accumulator[row.user_id] = [];
         }
@@ -133,6 +183,26 @@ export default function EmployeesPage() {
   useEffect(() => {
     const tab = searchParams.get('tab');
     setActiveTab(tab === 'users' ? 'users' : 'employees');
+  }, [searchParams]);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'new-employee') {
+      openDialog();
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('action');
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+
+    if (action === 'invite-user') {
+      setActiveTab('users');
+      setIsInviteDialogOpen(true);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('tab', 'users');
+      nextParams.delete('action');
+      setSearchParams(nextParams, { replace: true });
+    }
   }, [searchParams]);
 
   const openDialog = (employee?: Employee) => {
@@ -187,6 +257,7 @@ export default function EmployeesPage() {
     try {
       const validated = validationResult.data;
       const employeeData = {
+        organization_id: activeOrganizationId,
         first_name: validated.first_name,
         last_name: validated.last_name,
         email: validated.email || null,
@@ -201,7 +272,8 @@ export default function EmployeesPage() {
         const { error } = await supabase
           .from('employees')
           .update(employeeData)
-          .eq('id', editingEmployee.id);
+          .eq('id', editingEmployee.id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
         if (error) throw error;
         toast.success('Employee updated');
       } else {
@@ -220,11 +292,106 @@ export default function EmployeesPage() {
     }
   };
 
+  const openInviteDialog = () => {
+    setWorkspaceInviteForm({
+      full_name: '',
+      email: '',
+      phone: '',
+      role: 'manager',
+      create_employee: true,
+      employee_category: 'manager',
+      employee_id: '',
+    });
+    setIsInviteDialogOpen(true);
+  };
+
+  const openInviteDialogForEmployee = (employee: Employee) => {
+    setTab('users');
+    setWorkspaceInviteForm({
+      full_name: `${employee.first_name} ${employee.last_name}`.trim(),
+      email: employee.email ?? '',
+      phone: employee.phone ?? '',
+      role: employee.category === 'shovel' ? 'shovel_crew' : employee.category === 'trucker' ? 'trucker' : employee.category === 'manager' ? 'manager' : 'driver',
+      create_employee: true,
+      employee_category: employee.category,
+      employee_id: employee.id,
+    });
+    setIsInviteDialogOpen(true);
+  };
+
+  const openDialogForUser = (user: UserWithRoles) => {
+    const [firstName = '', ...rest] = (user.full_name ?? '').trim().split(/\s+/);
+    const lastName = rest.join(' ');
+    const inferredRole = user.roles[0] ?? 'manager';
+
+    setEditingEmployee(null);
+    setFormData({
+      first_name: firstName || user.email?.split('@')[0] || '',
+      last_name: lastName,
+      email: user.email || '',
+      phone: user.phone || '',
+      category: getDefaultEmployeeCategoryForRole(inferredRole),
+      hourly_rate: '',
+      user_id: user.id,
+      is_active: true,
+    });
+    setTab('employees');
+    setIsDialogOpen(true);
+  };
+
+  const handleInviteWorkspaceUser = async () => {
+    if (!activeOrganizationId) {
+      toast.error('Select an organization first');
+      return;
+    }
+
+    if (!workspaceInviteForm.full_name.trim() || !workspaceInviteForm.email.trim()) {
+      toast.error('Full name and email are required');
+      return;
+    }
+
+    setIsInvitingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-workspace-user', {
+        body: {
+          organization_id: activeOrganizationId,
+          full_name: workspaceInviteForm.full_name.trim(),
+          email: workspaceInviteForm.email.trim(),
+          phone: workspaceInviteForm.phone.trim() || undefined,
+          role: workspaceInviteForm.role,
+          create_employee: workspaceInviteForm.create_employee,
+          employee_category: workspaceInviteForm.employee_category,
+          employee_id: workspaceInviteForm.employee_id || undefined,
+          invite_redirect_to: getCurrentWebAppUrl('/auth/callback'),
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success(
+        data?.invited
+          ? 'Workspace user invited'
+          : 'Workspace access linked to existing user',
+      );
+      setIsInviteDialogOpen(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Error inviting workspace user:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to invite workspace user');
+    } finally {
+      setIsInvitingUser(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this employee?')) return;
 
     try {
-      const { error } = await supabase.from('employees').delete().eq('id', id);
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', id)
+        .filter('organization_id', 'eq', activeOrganizationId!);
       if (error) throw error;
       toast.success('Employee deleted');
       fetchData();
@@ -243,7 +410,11 @@ export default function EmployeesPage() {
 
     setAddingRole({ userId, role });
     try {
-      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role });
+      const { error } = await supabase.from('user_roles').insert({
+        user_id: userId,
+        role,
+        organization_id: activeOrganizationId!,
+      });
       if (error) {
         if (error.code === '23505') {
           toast.error('User already has this role');
@@ -282,7 +453,8 @@ export default function EmployeesPage() {
         .from('user_roles')
         .delete()
         .eq('user_id', user.id)
-        .eq('role', role);
+        .eq('role', role)
+        .eq('organization_id', activeOrganizationId!);
 
       if (error) throw error;
 
@@ -307,7 +479,7 @@ export default function EmployeesPage() {
       const { data, error } = await supabase.functions.invoke('create-user-preview-link', {
         body: {
           target_user_id: user.id,
-          redirect_to: getPublicWebAppUrl('/auth/callback'),
+          redirect_to: getCurrentWebAppUrl('/auth/callback?preview=1'),
         },
       });
 
@@ -602,9 +774,18 @@ export default function EmployeesPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="space-y-1 text-sm text-muted-foreground">
+                            <div className="space-y-2 text-sm text-muted-foreground">
                               <p>No linked user account</p>
-                              <p className="text-xs">Link a user in the employee editor to manage app access here.</p>
+                              <p className="text-xs">Invite app access and link this employee in one step.</p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2"
+                                onClick={() => openInviteDialogForEmployee(employee)}
+                              >
+                                <Plus className="h-4 w-4" />
+                                Invite User
+                              </Button>
                             </div>
                           )}
                         </td>
@@ -672,6 +853,10 @@ export default function EmployeesPage() {
                     Everyone with access in this workspace, including linked employee accounts.
                   </p>
                 </div>
+                <Button className="gap-2" onClick={openInviteDialog}>
+                  <Plus className="h-4 w-4" />
+                  Invite User
+                </Button>
               </div>
               <div className="mt-6 overflow-x-auto">
                 <table className="w-full min-w-[860px]">
@@ -702,7 +887,18 @@ export default function EmployeesPage() {
                                 <p className="text-xs text-muted-foreground capitalize">{linkedEmployee.category}</p>
                               </div>
                             ) : (
-                              <span className="text-sm text-muted-foreground">No employee record</span>
+                              <div className="space-y-2">
+                                <span className="text-sm text-muted-foreground">No employee record</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-2"
+                                  onClick={() => openDialogForUser(user)}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Create Employee
+                                </Button>
+                              </div>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -933,6 +1129,125 @@ export default function EmployeesPage() {
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingEmployee ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Workspace User</DialogTitle>
+            <DialogDescription>
+              Create app access for this organization and optionally make the linked employee record in the same step.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="invite_full_name">Full Name *</Label>
+              <Input
+                id="invite_full_name"
+                value={workspaceInviteForm.full_name}
+                onChange={(e) => setWorkspaceInviteForm((current) => ({ ...current, full_name: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="invite_email">Email *</Label>
+                <Input
+                  id="invite_email"
+                  type="email"
+                  value={workspaceInviteForm.email}
+                  onChange={(e) => setWorkspaceInviteForm((current) => ({ ...current, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite_phone">Phone</Label>
+                <Input
+                  id="invite_phone"
+                  value={workspaceInviteForm.phone}
+                  onChange={(e) => setWorkspaceInviteForm((current) => ({ ...current, phone: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>App Role</Label>
+                <Select
+                  value={workspaceInviteForm.role}
+                  onValueChange={(value) =>
+                    setWorkspaceInviteForm((current) => ({
+                      ...current,
+                      role: value as AppRole,
+                      employee_category: current.employee_id
+                        ? current.employee_category
+                        : getDefaultEmployeeCategoryForRole(value as AppRole),
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[200] max-h-[220px]">
+                    {availableRoles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        <span className="capitalize">{role.replace('_', ' ')}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Employee Category</Label>
+                <Select
+                  value={workspaceInviteForm.employee_category}
+                  onValueChange={(value) =>
+                    setWorkspaceInviteForm((current) => ({ ...current, employee_category: value as EmployeeCategory }))
+                  }
+                  disabled={!workspaceInviteForm.create_employee}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-[200] max-h-[220px]">
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        <span className="capitalize">{cat}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {workspaceInviteForm.employee_id && (
+              <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm text-muted-foreground">
+                This invite will link to the existing employee record for <span className="font-medium text-foreground">{workspaceInviteForm.full_name}</span>.
+              </div>
+            )}
+            <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="invite_create_employee">Create linked employee</Label>
+                <p className="text-sm text-muted-foreground">
+                  Turn this on when the user also needs to clock in, work accounts, or appear on crews.
+                </p>
+              </div>
+              <Switch
+                id="invite_create_employee"
+                checked={workspaceInviteForm.create_employee}
+                disabled={Boolean(workspaceInviteForm.employee_id)}
+                onCheckedChange={(checked) =>
+                  setWorkspaceInviteForm((current) => ({ ...current, create_employee: checked }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleInviteWorkspaceUser} disabled={isInvitingUser}>
+              {isInvitingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Invite User
             </Button>
           </DialogFooter>
         </DialogContent>

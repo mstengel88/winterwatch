@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Loader2, Users, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Employee {
   id: string;
@@ -24,6 +25,7 @@ interface NotificationType {
 }
 
 export function SendNotificationForm() {
+  const { activeOrganizationId } = useAuth();
   const { toast } = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [notificationTypes, setNotificationTypes] = useState<NotificationType[]>([]);
@@ -38,11 +40,18 @@ export function SendNotificationForm() {
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setEmployees([]);
+      setNotificationTypes([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       const [employeesRes, typesRes] = await Promise.all([
         supabase
           .from('employees')
           .select('id, first_name, last_name, user_id')
+          .filter('organization_id', 'eq', activeOrganizationId)
           .eq('is_active', true)
           .not('user_id', 'is', null)
           .order('first_name'),
@@ -68,7 +77,7 @@ export function SendNotificationForm() {
     } finally {
       setIsLoading(false);
     }
-  }, [notificationType]);
+  }, [activeOrganizationId, notificationType]);
 
   useEffect(() => {
     fetchData();

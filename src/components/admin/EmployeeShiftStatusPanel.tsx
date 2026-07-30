@@ -35,6 +35,10 @@ interface EmployeeShiftRow {
   clock_in_time: string | null;
 }
 
+interface EmployeeShiftStatusPanelProps {
+  organizationId?: string | null;
+}
+
 // Real-time elapsed time component
 function ElapsedTime({ clockInTime }: { clockInTime: string }) {
   const [elapsed, setElapsed] = useState("");
@@ -57,19 +61,26 @@ function ElapsedTime({ clockInTime }: { clockInTime: string }) {
   return <span className="font-mono tabular-nums text-sm">{elapsed}</span>;
 }
 
-export function EmployeeShiftStatusPanel() {
+export function EmployeeShiftStatusPanel({ organizationId }: EmployeeShiftStatusPanelProps) {
   const [rows, setRows] = useState<EmployeeShiftRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [endingShift, setEndingShift] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<EmployeeShiftRow | null>(null);
 
   const fetchData = async () => {
+    if (!organizationId) {
+      setRows([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Fetch all active employees (exclude manager/trucker categories for field staff)
       const { data: employees, error: empError } = await supabase
         .from("employees")
         .select("id, first_name, last_name, category, is_active")
+        .eq("organization_id", organizationId)
         .eq("is_active", true)
         .order("first_name");
 
@@ -79,6 +90,7 @@ export function EmployeeShiftStatusPanel() {
       const { data: activeShifts, error: shiftError } = await supabase
         .from("time_clock")
         .select("id, employee_id, clock_in_time")
+        .eq("organization_id", organizationId)
         .is("clock_out_time", null);
 
       if (shiftError) throw shiftError;
@@ -118,10 +130,10 @@ export function EmployeeShiftStatusPanel() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [organizationId]);
 
   const handleForceEndShift = async () => {
-    if (!confirmTarget?.shift_id) return;
+    if (!confirmTarget?.shift_id || !organizationId) return;
     setEndingShift(confirmTarget.shift_id);
 
     try {
@@ -131,7 +143,8 @@ export function EmployeeShiftStatusPanel() {
           clock_out_time: new Date().toISOString(),
           notes: "Force ended by admin",
         })
-        .eq("id", confirmTarget.shift_id);
+        .eq("id", confirmTarget.shift_id)
+        .eq("organization_id", organizationId);
 
       if (error) throw error;
 

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Bell, Clock, MapPin, Megaphone, Search, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationLog {
   id: string;
@@ -32,40 +33,52 @@ const NOTIFICATION_TYPE_CONFIG = {
 };
 
 export function NotificationHistory() {
+  const { activeOrganizationId } = useAuth();
   const [notifications, setNotifications] = useState<NotificationLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   useEffect(() => {
+    if (!activeOrganizationId) {
+      setNotifications([]);
+      setIsLoading(false);
+      return;
+    }
+
     fetchNotifications();
-  }, []);
+  }, [activeOrganizationId]);
 
   const fetchNotifications = async () => {
+    if (!activeOrganizationId) {
+      setNotifications([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // First fetch notifications
       const { data: logsData, error: logsError } = await supabase
         .from('notifications_log')
         .select('*')
+        .filter('organization_id', 'eq', activeOrganizationId)
         .order('sent_at', { ascending: false })
         .limit(100);
 
       if (logsError) throw logsError;
 
-      // Then fetch profiles for all user_ids
       const userIds = [...new Set((logsData || []).map((log) => log.user_id))];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds);
+      const { data: profilesData } = userIds.length > 0
+        ? await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .in('id', userIds)
+        : { data: [] };
 
-      // Create a map of user_id to profile
       const profileMap = new Map(
         (profilesData || []).map((p) => [p.id, { full_name: p.full_name, email: p.email }])
       );
 
-      // Merge notifications with profiles
       const notificationsWithProfiles: NotificationLog[] = (logsData || []).map((log) => ({
         ...log,
         profile: profileMap.get(log.user_id) || null,

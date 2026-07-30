@@ -12,14 +12,25 @@ interface ActiveShift {
   employee: { first_name: string; last_name: string } | null;
 }
 
-export function ActiveShiftsFeed() {
+interface ActiveShiftsFeedProps {
+  organizationId?: string | null;
+}
+
+export function ActiveShiftsFeed({ organizationId }: ActiveShiftsFeedProps) {
   const [shifts, setShifts] = useState<ActiveShift[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchActiveShifts = async () => {
+    if (!organizationId) {
+      setShifts([]);
+      setLoading(false);
+      return;
+    }
+
     const { data } = await supabase
       .from('time_clock')
       .select('id, employee_id, clock_in_time, employee:employees(first_name, last_name)')
+      .eq('organization_id', organizationId)
       .is('clock_out_time', null)
       .order('clock_in_time', { ascending: false });
 
@@ -30,12 +41,16 @@ export function ActiveShiftsFeed() {
   useEffect(() => {
     fetchActiveShifts();
 
+    if (!organizationId) {
+      return;
+    }
+
     // Subscribe to real-time changes on time_clock
     const channel = supabase
-      .channel('active-shifts-feed')
+      .channel(`active-shifts-feed-${organizationId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'time_clock' },
+        { event: '*', schema: 'public', table: 'time_clock', filter: `organization_id=eq.${organizationId}` },
         () => {
           fetchActiveShifts();
         }
@@ -51,7 +66,7 @@ export function ActiveShiftsFeed() {
       supabase.removeChannel(channel);
       clearInterval(timer);
     };
-  }, []);
+  }, [organizationId]);
 
   return (
     <Card className="bg-card/50 border-border/50">

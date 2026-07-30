@@ -11,9 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw, FileText, Clock, Shovel, Trash2, Pencil, Archive, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AuditLog {
   id: string;
+  organization_id: string;
   table_name: string;
   record_id: string;
   action: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -63,18 +65,23 @@ const actionColors: Record<string, string> = {
 };
 
 export default function AuditLogPage() {
+  const { activeOrganizationId } = useAuth();
   const [tableFilter, setTableFilter] = useState<string>('all');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   const { data: logs, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['audit-logs', tableFilter, actionFilter],
+    queryKey: ['audit-logs', activeOrganizationId, tableFilter, actionFilter],
     queryFn: async () => {
-      // Use type assertion since audit_logs is a new table not yet in generated types
+      if (!activeOrganizationId) {
+        return [];
+      }
+
       let query = (supabase as unknown as AuditLogsQuery)
         .from('audit_logs')
         .select('*')
+        .eq('organization_id', activeOrganizationId)
         .order('created_at', { ascending: false })
         .limit(500);
 
@@ -89,6 +96,7 @@ export default function AuditLogPage() {
       if (error) throw error;
       return data as AuditLog[];
     },
+    enabled: Boolean(activeOrganizationId),
   });
 
   const filteredLogs = logs?.filter((log) => {

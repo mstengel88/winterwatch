@@ -49,24 +49,36 @@ interface ForceCheckoutUpdate {
   notes: string;
 }
 
-export function ForceCheckoutPanel() {
+interface ForceCheckoutPanelProps {
+  organizationId?: string | null;
+}
+
+export function ForceCheckoutPanel({ organizationId }: ForceCheckoutPanelProps) {
   const [activeLogs, setActiveLogs] = useState<ActiveLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [forceCheckingOut, setForceCheckingOut] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<ActiveLog | null>(null);
 
   const fetchActiveLogs = async () => {
+    if (!organizationId) {
+      setActiveLogs([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const [plowRes, shovelRes] = await Promise.all([
         supabase
           .from("work_logs")
           .select("id, check_in_time, employee_id, account:accounts(name), employee:employees(first_name, last_name)")
+          .eq("organization_id", organizationId)
           .eq("status", "in_progress")
           .order("check_in_time", { ascending: false }),
         supabase
           .from("shovel_work_logs")
           .select("id, check_in_time, employee_id, account:accounts(name), employee:employees(first_name, last_name)")
+          .eq("organization_id", organizationId)
           .eq("status", "in_progress")
           .order("check_in_time", { ascending: false }),
       ]);
@@ -101,10 +113,10 @@ export function ForceCheckoutPanel() {
 
   useEffect(() => {
     fetchActiveLogs();
-  }, []);
+  }, [organizationId]);
 
   const handleForceCheckout = async () => {
-    if (!confirmTarget) return;
+    if (!confirmTarget || !organizationId) return;
     setForceCheckingOut(confirmTarget.id);
 
     try {
@@ -118,7 +130,8 @@ export function ForceCheckoutPanel() {
           check_out_time: now,
           notes: "Force checked out by admin",
         } as ForceCheckoutUpdate)
-        .eq("id", confirmTarget.id);
+        .eq("id", confirmTarget.id)
+        .eq("organization_id", organizationId);
 
       if (error) throw error;
 

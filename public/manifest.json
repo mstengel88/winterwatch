@@ -4,7 +4,7 @@
   "description": "Snow removal service tracking for field crews",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
-  "display": "standalone",
+  "display": "browser",
   "orientation": "portrait",
   "scope": "/",
   "start_url": "/",

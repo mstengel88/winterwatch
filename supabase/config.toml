@@ -26,3 +26,6 @@ verify_jwt = true
 
 [functions.create-user-preview-link]
 verify_jwt = true
+
+[functions.invite-workspace-user]
+verify_jwt = true

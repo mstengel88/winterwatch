@@ -1024,7 +1024,7 @@ export default function CustomerOnboardingPage() {
                       size="sm"
                       variant="outline"
                       className="gap-2"
-                      onClick={() => handleOpenWorkspace("/admin/users")}
+                      onClick={() => handleOpenWorkspace("/admin/employees?tab=users&action=invite-user")}
                       disabled={isSwitchingWorkspace}
                     >
                       <Shield className="h-4 w-4" />
@@ -1034,7 +1034,7 @@ export default function CustomerOnboardingPage() {
                       size="sm"
                       variant="outline"
                       className="gap-2"
-                      onClick={() => handleOpenWorkspace("/admin/employees")}
+                      onClick={() => handleOpenWorkspace("/admin/employees?action=new-employee")}
                       disabled={isSwitchingWorkspace}
                     >
                       <Users className="h-4 w-4" />

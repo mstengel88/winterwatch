@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, Loader2, Save, Lock, Bell } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationType {
   id: string;
@@ -18,6 +19,7 @@ interface NotificationType {
 }
 
 export function NotificationMandatorySettings() {
+  const { activeOrganizationId } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -25,11 +27,19 @@ export function NotificationMandatorySettings() {
   const [settings, setSettings] = useState<Record<string, boolean>>({});
 
   const fetchNotificationTypes = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setTypes([]);
+      setSettings({});
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('notification_types')
         .select('id, name, label, is_system, is_mandatory, is_active')
+        .filter('organization_id', 'eq', activeOrganizationId)
         .eq('is_active', true)
         .order('is_system', { ascending: false })
         .order('label');
@@ -55,21 +65,30 @@ export function NotificationMandatorySettings() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [activeOrganizationId, toast]);
 
   useEffect(() => {
     fetchNotificationTypes();
   }, [fetchNotificationTypes]);
 
   const handleSave = async () => {
+    if (!activeOrganizationId) {
+      toast({
+        variant: 'destructive',
+        title: 'No organization selected',
+        description: 'Choose an organization before saving notification settings.',
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // Update each notification type's is_mandatory flag
       const updates = Object.entries(settings).map(([id, is_mandatory]) =>
         supabase
           .from('notification_types')
           .update({ is_mandatory })
           .eq('id', id)
+          .filter('organization_id', 'eq', activeOrganizationId)
       );
 
       const results = await Promise.all(updates);

@@ -303,9 +303,9 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
-      <ActiveShiftsFeed />
-      <EmployeeShiftStatusPanel />
-      <ForceCheckoutPanel />
+      <ActiveShiftsFeed organizationId={activeOrganizationId} />
+      <EmployeeShiftStatusPanel organizationId={activeOrganizationId} />
+      <ForceCheckoutPanel organizationId={activeOrganizationId} />
     </div>
   );
 }

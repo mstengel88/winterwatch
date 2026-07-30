@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AppRole } from '@/types/auth';
-const APP_VERSION = '3.0';
+const APP_VERSION = '4.2';
 const APP_ICON = '/favicon.png';
 
 interface NavItem {

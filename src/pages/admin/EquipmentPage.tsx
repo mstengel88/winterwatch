@@ -14,12 +14,14 @@ import { MaintenanceHistoryDialog } from '@/components/equipment/MaintenanceHist
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MaintenanceRequestsTab } from '@/components/equipment/MaintenanceRequestsTab';
 import { MaintenanceNotificationSettings } from '@/components/equipment/MaintenanceNotificationSettings';
+import { useAuth } from '@/contexts/AuthContext';
 
 type EquipmentWithServiceType = Equipment & {
   service_type?: 'plow' | 'salt' | 'both';
 };
 
 export default function EquipmentPage() {
+  const { activeOrganizationId } = useAuth();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -49,10 +51,16 @@ export default function EquipmentPage() {
 
   const fetchEquipment = async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setEquipment([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('equipment')
         .select('*')
+        .filter('organization_id', 'eq', activeOrganizationId)
         .order('name');
 
       if (error) throw error;
@@ -67,7 +75,7 @@ export default function EquipmentPage() {
 
   useEffect(() => {
     fetchEquipment();
-  }, []);
+  }, [activeOrganizationId]);
 
   const openDialog = (equip?: Equipment) => {
     if (equip) {
@@ -115,6 +123,7 @@ export default function EquipmentPage() {
     try {
       const validated = validationResult.data;
       const equipmentData = {
+        organization_id: activeOrganizationId,
         name: validated.name,
         type: validated.type,
         make: validated.make || null,
@@ -132,7 +141,8 @@ export default function EquipmentPage() {
         const { error } = await supabase
           .from('equipment')
           .update(equipmentData)
-          .eq('id', editingEquipment.id);
+          .eq('id', editingEquipment.id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
         if (error) throw error;
         toast.success('Equipment updated');
       } else {
@@ -155,7 +165,11 @@ export default function EquipmentPage() {
     if (!confirm('Are you sure you want to delete this equipment?')) return;
 
     try {
-      const { error } = await supabase.from('equipment').delete().eq('id', id);
+      const { error } = await supabase
+        .from('equipment')
+        .delete()
+        .eq('id', id)
+        .filter('organization_id', 'eq', activeOrganizationId!);
       if (error) throw error;
       toast.success('Equipment deleted');
       fetchEquipment();

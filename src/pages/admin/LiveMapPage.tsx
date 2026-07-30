@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, RefreshCw, Loader2, Users } from "lucide-react";
 import { format } from "date-fns";
+import { useAuth } from "@/contexts/AuthContext";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -63,6 +64,7 @@ function createColoredIcon(color: string) {
 }
 
 export default function LiveMapPage() {
+  const { activeOrganizationId } = useAuth();
   const [routes, setRoutes] = useState<EmployeeRoute[]>([]);
   const [noLocationEmployees, setNoLocationEmployees] = useState<{ employee_id: string; first_name: string; last_name: string; category: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,10 +75,18 @@ export default function LiveMapPage() {
 
   const fetchLocations = useCallback(async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setRoutes([]);
+      setNoLocationEmployees([]);
+      setTotalOnShift(0);
+      setIsLoading(false);
+      return;
+    }
     try {
       const { data: activeShifts, error: shiftErr } = await supabase
         .from("time_clock")
         .select("id, employee_id, clock_in_time")
+        .filter("organization_id", "eq", activeOrganizationId)
         .is("clock_out_time", null);
 
       if (shiftErr) throw shiftErr;
@@ -93,6 +103,7 @@ export default function LiveMapPage() {
       const { data: employees, error: empErr } = await supabase
         .from("employees")
         .select("id, first_name, last_name, category")
+        .filter("organization_id", "eq", activeOrganizationId)
         .in("id", employeeIds);
 
       if (empErr) throw empErr;
@@ -146,7 +157,7 @@ export default function LiveMapPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   // Initialize map
   useEffect(() => {
