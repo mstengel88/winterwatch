@@ -309,22 +309,18 @@ WHERE active_organization_id IS NULL;
 UPDATE public.user_roles ur
 SET organization_id = COALESCE(
   ur.organization_id,
-  p.active_organization_id,
+  (SELECT p.active_organization_id FROM public.profiles p WHERE p.id = ur.user_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.profiles p
-WHERE p.id = ur.user_id
-  AND ur.organization_id IS NULL;
+WHERE ur.organization_id IS NULL;
 
 UPDATE public.employees e
 SET organization_id = COALESCE(
   e.organization_id,
-  p.active_organization_id,
+  (SELECT p.active_organization_id FROM public.profiles p WHERE p.id = e.user_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.profiles p
-WHERE p.id = e.user_id
-  AND e.organization_id IS NULL;
+WHERE e.organization_id IS NULL;
 
 UPDATE public.accounts
 SET organization_id = COALESCE(
@@ -344,74 +340,56 @@ WHERE organization_id IS NULL;
 UPDATE public.work_logs wl
 SET organization_id = COALESCE(
   wl.organization_id,
-  a.organization_id,
-  e.organization_id,
-  eq.organization_id,
+  (SELECT a.organization_id FROM public.accounts a WHERE a.id = wl.account_id),
+  (SELECT e.organization_id FROM public.employees e WHERE e.id = wl.employee_id),
+  (SELECT eq.organization_id FROM public.equipment eq WHERE eq.id = wl.equipment_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.accounts a
-LEFT JOIN public.employees e ON e.id = wl.employee_id
-LEFT JOIN public.equipment eq ON eq.id = wl.equipment_id
-WHERE wl.account_id = a.id
-  AND wl.organization_id IS NULL;
+WHERE wl.organization_id IS NULL;
 
 UPDATE public.shovel_work_logs swl
 SET organization_id = COALESCE(
   swl.organization_id,
-  a.organization_id,
-  e.organization_id,
+  (SELECT a.organization_id FROM public.accounts a WHERE a.id = swl.account_id),
+  (SELECT e.organization_id FROM public.employees e WHERE e.id = swl.employee_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.accounts a
-LEFT JOIN public.employees e ON e.id = swl.employee_id
-WHERE swl.account_id = a.id
-  AND swl.organization_id IS NULL;
+WHERE swl.organization_id IS NULL;
 
 UPDATE public.time_clock tc
 SET organization_id = COALESCE(
   tc.organization_id,
-  e.organization_id,
+  (SELECT e.organization_id FROM public.employees e WHERE e.id = tc.employee_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.employees e
-WHERE tc.employee_id = e.id
-  AND tc.organization_id IS NULL;
+WHERE tc.organization_id IS NULL;
 
 UPDATE public.employee_locations el
 SET organization_id = COALESCE(
   el.organization_id,
-  tc.organization_id,
-  e.organization_id,
+  (SELECT tc.organization_id FROM public.time_clock tc WHERE tc.id = el.time_clock_id),
+  (SELECT e.organization_id FROM public.employees e WHERE e.id = el.employee_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.time_clock tc
-LEFT JOIN public.employees e ON e.id = el.employee_id
-WHERE el.time_clock_id = tc.id
-  AND el.organization_id IS NULL;
+WHERE el.organization_id IS NULL;
 
 UPDATE public.maintenance_requests mr
 SET organization_id = COALESCE(
   mr.organization_id,
-  eq.organization_id,
-  e.organization_id,
+  (SELECT eq.organization_id FROM public.equipment eq WHERE eq.id = mr.equipment_id),
+  (SELECT e.organization_id FROM public.employees e WHERE e.id = mr.employee_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.equipment eq
-LEFT JOIN public.employees e ON e.id = mr.employee_id
-WHERE mr.equipment_id = eq.id
-  AND mr.organization_id IS NULL;
+WHERE mr.organization_id IS NULL;
 
 UPDATE public.maintenance_logs ml
 SET organization_id = COALESCE(
   ml.organization_id,
-  eq.organization_id,
-  e.organization_id,
+  (SELECT eq.organization_id FROM public.equipment eq WHERE eq.id = ml.equipment_id),
+  (SELECT e.organization_id FROM public.employees e WHERE e.id = ml.performed_by_employee_id),
   (SELECT id FROM public.organizations ORDER BY created_at LIMIT 1)
 )
-FROM public.equipment eq
-LEFT JOIN public.employees e ON e.id = ml.performed_by_employee_id
-WHERE ml.equipment_id = eq.id
-  AND ml.organization_id IS NULL;
+WHERE ml.organization_id IS NULL;
 
 UPDATE public.push_device_tokens
 SET organization_id = COALESCE(
@@ -1143,6 +1121,7 @@ CREATE POLICY "Admins can manage organizations in their org scope"
 DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view profiles in their active organization" ON public.profiles;
 
 CREATE POLICY "Users can view profiles in their active organization"
   ON public.profiles
@@ -1185,6 +1164,10 @@ DROP POLICY IF EXISTS "Admins can delete roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Role insert restrictions" ON public.user_roles;
 DROP POLICY IF EXISTS "Role update restrictions" ON public.user_roles;
 DROP POLICY IF EXISTS "Role delete restrictions" ON public.user_roles;
+DROP POLICY IF EXISTS "Users can view roles in current organization" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can insert roles in current organization" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can update roles in current organization" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can delete roles in current organization" ON public.user_roles;
 
 CREATE POLICY "Users can view roles in current organization"
   ON public.user_roles
@@ -1227,6 +1210,7 @@ DROP POLICY IF EXISTS "Staff and managers can view employees" ON public.employee
 DROP POLICY IF EXISTS "Admins and managers can insert employees" ON public.employees;
 DROP POLICY IF EXISTS "Admins and managers can update employees" ON public.employees;
 DROP POLICY IF EXISTS "Admins and managers can delete employees" ON public.employees;
+DROP POLICY IF EXISTS "Users can view employees in current organization" ON public.employees;
 
 CREATE POLICY "Users can view employees in current organization"
   ON public.employees
@@ -1276,6 +1260,7 @@ DROP POLICY IF EXISTS "Staff and managers can view accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Admins and managers can insert accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Admins and managers can update accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Admins and managers can delete accounts" ON public.accounts;
+DROP POLICY IF EXISTS "Users can view accounts in current organization" ON public.accounts;
 
 CREATE POLICY "Users can view accounts in current organization"
   ON public.accounts
@@ -1325,6 +1310,7 @@ DROP POLICY IF EXISTS "Staff and managers can view equipment" ON public.equipmen
 DROP POLICY IF EXISTS "Admins and managers can insert equipment" ON public.equipment;
 DROP POLICY IF EXISTS "Admins and managers can update equipment" ON public.equipment;
 DROP POLICY IF EXISTS "Admins and managers can delete equipment" ON public.equipment;
+DROP POLICY IF EXISTS "Users can view equipment in current organization" ON public.equipment;
 
 CREATE POLICY "Users can view equipment in current organization"
   ON public.equipment
@@ -1619,6 +1605,7 @@ DROP POLICY IF EXISTS "Admins and managers can view settings" ON public.overtime
 DROP POLICY IF EXISTS "Admins and managers can insert overtime settings" ON public.overtime_notification_settings;
 DROP POLICY IF EXISTS "Admins and managers can update overtime settings" ON public.overtime_notification_settings;
 DROP POLICY IF EXISTS "Admins and managers can delete overtime settings" ON public.overtime_notification_settings;
+DROP POLICY IF EXISTS "Admins and managers can view overtime settings" ON public.overtime_notification_settings;
 
 CREATE POLICY "Admins and managers can view overtime settings"
   ON public.overtime_notification_settings
@@ -1846,6 +1833,8 @@ CREATE POLICY "Admins can delete settings"
 
 DROP POLICY IF EXISTS "Admins and managers can view settings" ON public.notification_types;
 DROP POLICY IF EXISTS "Admins and managers can manage settings" ON public.notification_types;
+DROP POLICY IF EXISTS "Admins and managers can view notification types" ON public.notification_types;
+DROP POLICY IF EXISTS "Admins and managers can manage notification types" ON public.notification_types;
 
 CREATE POLICY "Admins and managers can view notification types"
   ON public.notification_types
