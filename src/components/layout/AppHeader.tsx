@@ -42,8 +42,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'dispatch_driver', 'trucker', 'admin', 'manager'] },
-  { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
+  { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'dispatch_driver', 'trucker'] },
+  { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew'] },
   { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
   { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
@@ -156,7 +156,10 @@ export function AppHeader() {
 
   // Determine home route based on role
   const getHomeRoute = () => {
-    if (isAdminOrManager() || hasRole('driver') || hasRole('dispatch_driver') || hasRole('trucker')) {
+    if (isAdminOrManager()) {
+      return '/admin';
+    }
+    if (hasRole('driver') || hasRole('dispatch_driver') || hasRole('trucker')) {
       return '/dashboard';
     }
     if (hasRole('shovel_crew')) {
