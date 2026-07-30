@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import { ExternalLink, LocateFixed, MapPin, RefreshCcw, ShieldCheck, Truck } from "lucide-react";
@@ -14,6 +14,7 @@ import { DISPATCH_DRIVER_ROUTE_URL } from "@/lib/dispatchRouteConfig";
 import { cn } from "@/lib/utils";
 
 const TRACKING_ENABLED_KEY = "winterwatchDispatchTrackingEnabled";
+const TRACKING_HANDSHAKE_KEY = "winterwatchDispatchTrackingHandshakeComplete";
 
 function getSearchValue(search: URLSearchParams, key: string) {
   return search.get(key)?.trim() || "";
@@ -21,6 +22,7 @@ function getSearchValue(search: URLSearchParams, key: string) {
 
 export default function DispatchRoutePage() {
   const initialSearch = useMemo(() => new URLSearchParams(window.location.search), []);
+  const openedFromTrackingHandshake = getSearchValue(initialSearch, "track") === "1";
   const { employee } = useEmployee();
   const [routeId, setRouteId] = useState(getSearchValue(initialSearch, "route"));
   const [orderId, setOrderId] = useState(getSearchValue(initialSearch, "order"));
@@ -58,17 +60,31 @@ export default function DispatchRoutePage() {
     window.localStorage.setItem(TRACKING_ENABLED_KEY, String(nextEnabled));
   }
 
-  async function openDriverRoute() {
+  const openDriverRoute = useCallback(async () => {
     if (isNative) {
       await Browser.open({ url: driverRouteUrl, windowName: "_self" });
       return;
     }
 
     window.open(driverRouteUrl, "_blank", "noopener,noreferrer");
-  }
+  }, [driverRouteUrl, isNative]);
+
+  useEffect(() => {
+    if (!openedFromTrackingHandshake) return;
+
+    window.sessionStorage.removeItem(TRACKING_HANDSHAKE_KEY);
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("track");
+    window.history.replaceState({}, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+  }, [openedFromTrackingHandshake]);
 
   useEffect(() => {
     if (!isNative) return;
+    if (openedFromTrackingHandshake) return;
+    if (window.sessionStorage.getItem(TRACKING_HANDSHAKE_KEY) === "true") {
+      return;
+    }
 
     const autoOpenKey = `winterwatchDispatchRouteOpened:${driverRouteUrl}`;
     if (window.sessionStorage.getItem(autoOpenKey) === "true") return;
@@ -79,7 +95,7 @@ export default function DispatchRoutePage() {
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [driverRouteUrl, isNative]);
+  }, [driverRouteUrl, isNative, openDriverRoute, openedFromTrackingHandshake]);
 
   return (
     <AppLayout variant="wide">

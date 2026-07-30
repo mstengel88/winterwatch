@@ -9,6 +9,7 @@ import {
 
 const TRACKING_PING_MS = 10_000;
 const HEARTBEAT_PING_MS = 30_000;
+const TRACKING_STATUS_STORAGE_KEY = "winterwatchDispatchTrackingStatus";
 
 type DispatchRouteTrackingInput = {
   enabled: boolean;
@@ -46,6 +47,55 @@ export function useDispatchRouteTracking({
     heading?: number | null;
     speed?: number | null;
   } | null>(null);
+
+  const applyStoredNativeStatus = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(TRACKING_STATUS_STORAGE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw) as {
+        message?: string;
+        startedAt?: string;
+      };
+      setStatus("active");
+      setMessage(parsed.message || "Native dispatch GPS tracking active.");
+      if (parsed.startedAt) {
+        setLastPingAt(
+          new Date(parsed.startedAt).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+        );
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const syncNativeStatus = useCallback(async () => {
+    if (!Capacitor.isNativePlatform()) return false;
+
+    try {
+      const nativeStatus = await DispatchLocation.status();
+      if (!nativeStatus.active) return false;
+
+      setStatus("active");
+      setMessage(nativeStatus.message || "Native dispatch GPS tracking active.");
+      if (nativeStatus.lastPingAt) {
+        setLastPingAt(
+          new Date(nativeStatus.lastPingAt).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+        );
+      }
+      return true;
+    } catch {
+      return applyStoredNativeStatus();
+    }
+  }, [applyStoredNativeStatus]);
 
   const checkPermission = useCallback(async () => {
     try {
@@ -151,6 +201,21 @@ export function useDispatchRouteTracking({
   }, [checkPermission]);
 
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    void syncNativeStatus();
+
+    const handleDispatchTrackingStarted = () => {
+      void syncNativeStatus();
+    };
+
+    window.addEventListener("dispatchTrackingStarted", handleDispatchTrackingStarted);
+    return () => {
+      window.removeEventListener("dispatchTrackingStarted", handleDispatchTrackingStarted);
+    };
+  }, [syncNativeStatus]);
+
+  useEffect(() => {
     let cancelled = false;
     let heartbeatId: ReturnType<typeof window.setInterval> | null = null;
 
@@ -162,6 +227,7 @@ export function useDispatchRouteTracking({
       }
 
       if (!DISPATCH_DRIVER_TRACKING_TOKEN) {
+        if (await syncNativeStatus()) return;
         setStatus("idle");
         setMessage("Live GPS is handled by the dispatch driver page. Add a WinterWatch tracking token only if you want native background GPS from WinterWatch.");
         return;
@@ -289,7 +355,7 @@ export function useDispatchRouteTracking({
         void DispatchLocation.stopTracking().catch(() => undefined);
       }
     };
-  }, [driverId, driverName, enabled, orderId, requestPermission, routeId, sendPing, truck]);
+  }, [driverId, driverName, enabled, orderId, requestPermission, routeId, sendPing, syncNativeStatus, truck]);
 
   return {
     isNative: Capacitor.isNativePlatform(),

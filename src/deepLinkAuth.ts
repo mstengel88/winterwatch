@@ -5,6 +5,7 @@ import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 
 const CALLBACK_PREFIX = "winterwatch://auth/callback";
+const DISPATCH_TRACKING_PREFIX = "winterwatch://dispatch-tracking";
 
 function extractParamsFromUrl(urlString: string) {
   // For custom URL schemes, the URL constructor may not handle hash fragments correctly.
@@ -123,6 +124,79 @@ async function handleAuthCallbackUrl(url: string) {
   return false;
 }
 
+async function handleDispatchTrackingUrl(url: string) {
+  const normalized = url.trim();
+  if (!(normalized.startsWith(DISPATCH_TRACKING_PREFIX) || normalized.startsWith(`${DISPATCH_TRACKING_PREFIX}/`))) {
+    return false;
+  }
+
+  console.log("✅ DISPATCH TRACKING URL:", url);
+
+  window.sessionStorage.setItem("winterwatchDispatchTrackingHandshakeComplete", "true");
+
+  try {
+    const { Browser } = await import("@capacitor/browser");
+    await Browser.close();
+  } catch {
+    // ignore
+  }
+
+  const params = extractParamsFromUrl(normalized);
+  const endpoint = params.get("endpoint") || "";
+  const token = params.get("token") || "";
+  const routeId = params.get("routeId") || "";
+  const orderId = params.get("orderId") || null;
+  const driverId = params.get("driverId") || null;
+  const driverName = params.get("driverName") || "WinterWatch Driver";
+  const truck = params.get("truck") || "";
+
+  if (!endpoint || !token || !routeId) {
+    console.warn("⚠️ Dispatch tracking link missing endpoint, token, or routeId.");
+    return false;
+  }
+
+  const { default: DispatchLocation } = await import("@/plugins/DispatchLocation");
+  const result = await DispatchLocation.startTracking({
+    endpoint,
+    token,
+    routeId,
+    orderId,
+    driverId,
+    driverName,
+    truck,
+  });
+
+  window.localStorage.setItem("winterwatchDispatchTrackingEnabled", "true");
+  window.localStorage.setItem(
+    "winterwatchDispatchTrackingStatus",
+    JSON.stringify({
+      routeId,
+      orderId,
+      truck,
+      startedAt: new Date().toISOString(),
+      message: result.message || "Native dispatch GPS tracking active.",
+    }),
+  );
+
+  window.dispatchEvent(
+    new CustomEvent("dispatchTrackingStarted", {
+      detail: { routeId, orderId, truck, message: result.message },
+    }),
+  );
+
+  const routePath = `/dispatch-route?route=${encodeURIComponent(routeId)}${
+    orderId ? `&order=${encodeURIComponent(orderId)}` : ""
+  }${truck ? `&truck=${encodeURIComponent(truck)}` : ""}&track=1`;
+  window.sessionStorage.setItem("winterwatchDispatchTrackingHandshakeComplete", "true");
+  window.location.assign(routePath);
+  return true;
+}
+
+async function handleIncomingAppUrl(url: string) {
+  if (await handleDispatchTrackingUrl(url)) return true;
+  return handleAuthCallbackUrl(url);
+}
+
 export async function initDeepLinkAuth() {
   if (!Capacitor.isNativePlatform()) return;
 
@@ -142,7 +216,7 @@ export async function initDeepLinkAuth() {
   App.addListener("appUrlOpen", async ({ url }) => {
     try {
       if (!url) return;
-      await handleAuthCallbackUrl(url);
+      await handleIncomingAppUrl(url);
     } catch (e) {
       console.error("❌ appUrlOpen handler failed:", e);
     }
@@ -156,7 +230,7 @@ export async function initDeepLinkAuth() {
         const launch = await App.getLaunchUrl();
         if (launch?.url) {
           console.log("🚀 Launch URL:", launch.url);
-          await handleAuthCallbackUrl(launch.url);
+          await handleIncomingAppUrl(launch.url);
         }
       } catch (e) {
         console.error("❌ getLaunchUrl failed:", e);
