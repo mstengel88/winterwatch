@@ -160,6 +160,48 @@ export default function CustomerOnboardingPage() {
     };
   }, [users, employees, accounts]);
 
+  const resultWorkspaceSteps = useMemo(() => {
+    if (!result) {
+      return [];
+    }
+
+    const createdUserCount =
+      (result.primary_contact ? 1 : 0) +
+      (result.users_created?.length ?? 0);
+
+    return [
+      {
+        label: "Workspace created",
+        detail: result.organization.name,
+        complete: true,
+      },
+      {
+        label: "Users",
+        detail: createdUserCount > 0 ? `${createdUserCount} ready` : "Still needs logins",
+        complete: createdUserCount > 0,
+      },
+      {
+        label: "Employees",
+        detail: result.employees_created.length > 0 ? `${result.employees_created.length} created` : "Still needs employees",
+        complete: result.employees_created.length > 0,
+      },
+      {
+        label: "Accounts",
+        detail: result.accounts_created.length > 0 ? `${result.accounts_created.length} created` : "Still needs accounts",
+        complete: result.accounts_created.length > 0,
+      },
+      {
+        label: "Equipment",
+        detail: "Add trucks, plows, and gear in the workspace",
+        complete: false,
+      },
+    ];
+  }, [result]);
+
+  const nextWorkspaceStep = useMemo(() => {
+    return resultWorkspaceSteps.find((step) => !step.complete) ?? null;
+  }, [resultWorkspaceSteps]);
+
   const updateEmployee = (index: number, key: keyof EmployeeDraft, value: string) => {
     setEmployees((current) =>
       current.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)),
@@ -939,15 +981,44 @@ export default function CustomerOnboardingPage() {
                     <Badge variant="secondary">{result.employees_created.length} employees</Badge>
                     <Badge variant="secondary">{result.accounts_created.length} accounts</Badge>
                   </div>
+                  <div className="rounded-lg border border-border/50 bg-background/40 p-3 space-y-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Next workspace step</p>
+                      <p className="text-xs text-muted-foreground">
+                        {nextWorkspaceStep
+                          ? `${nextWorkspaceStep.label}: ${nextWorkspaceStep.detail}`
+                          : "Core setup is in place. Open the workspace and review readiness."}
+                      </p>
+                    </div>
+                    <div className="grid gap-2">
+                      {resultWorkspaceSteps.map((step) => (
+                        <div
+                          key={step.label}
+                          className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background/50 px-3 py-2"
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{step.label}</p>
+                            <p className="text-xs text-muted-foreground">{step.detail}</p>
+                          </div>
+                          <Badge
+                            variant={step.complete ? "secondary" : "outline"}
+                            className={step.complete ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300" : ""}
+                          >
+                            {step.complete ? "Ready" : "Next"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button
                       size="sm"
                       className="gap-2"
-                      onClick={() => handleOpenWorkspace("/admin/organizations")}
+                      onClick={() => handleOpenWorkspace("/admin")}
                       disabled={isSwitchingWorkspace}
                     >
                       {isSwitchingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-                      Open Workspace
+                      Open Admin Workspace
                     </Button>
                     <Button
                       size="sm"
@@ -958,6 +1029,16 @@ export default function CustomerOnboardingPage() {
                     >
                       <Shield className="h-4 w-4" />
                       Users & Roles
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => handleOpenWorkspace("/admin/employees")}
+                      disabled={isSwitchingWorkspace}
+                    >
+                      <Users className="h-4 w-4" />
+                      Employees
                     </Button>
                     <Button
                       size="sm"
