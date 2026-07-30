@@ -12,6 +12,33 @@ type LocationCoords = {
   accuracy: number;
 };
 
+function requestBrowserPosition(
+  options: PositionOptions,
+  unavailableMessage: string,
+): Promise<GeolocationPosition> {
+  return new Promise<GeolocationPosition>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      (error) => {
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            reject(new Error("Browser location access was denied. Allow location for this site to use nearby-account detection."));
+            return;
+          case error.POSITION_UNAVAILABLE:
+            reject(new Error(unavailableMessage));
+            return;
+          case error.TIMEOUT:
+            reject(new Error("Location lookup timed out. Try again in a spot with better signal."));
+            return;
+          default:
+            reject(new Error("Unable to get browser location right now."));
+        }
+      },
+      options,
+    );
+  });
+}
+
 async function getBrowserLocation(timeout: number, maximumAge: number): Promise<LocationCoords> {
   if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
     throw new Error("Browser location requires HTTPS. You can still use the app and select accounts manually.");
@@ -34,37 +61,45 @@ async function getBrowserLocation(timeout: number, maximumAge: number): Promise<
     throw new Error("Geolocation is not available on this device.");
   }
 
-  const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      resolve,
-      (error) => {
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            reject(new Error("Browser location access was denied. Allow location for this site to use nearby-account detection."));
-            return;
-          case error.POSITION_UNAVAILABLE:
-            reject(new Error("Location is temporarily unavailable in this browser. Check device location services and try again."));
-            return;
-          case error.TIMEOUT:
-            reject(new Error("Location lookup timed out. Try again in a spot with better signal."));
-            return;
-          default:
-            reject(new Error("Unable to get browser location right now."));
-        }
-      },
+  try {
+    const position = await requestBrowserPosition(
       {
         enableHighAccuracy: true,
         timeout,
         maximumAge,
       },
+      "Location is temporarily unavailable in this browser. Check device location services and try again.",
     );
-  });
 
-  return {
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
-    accuracy: position.coords.accuracy,
-  };
+    return {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const shouldRetryWithLowAccuracy =
+      message.includes("temporarily unavailable") || message.includes("timed out");
+
+    if (!shouldRetryWithLowAccuracy) {
+      throw error;
+    }
+
+    const fallbackPosition = await requestBrowserPosition(
+      {
+        enableHighAccuracy: false,
+        timeout: Math.max(8000, Math.floor(timeout / 2)),
+        maximumAge: Math.max(maximumAge, 5 * 60 * 1000),
+      },
+      "Location is unavailable in this browser right now. You can still select the account manually.",
+    );
+
+    return {
+      latitude: fallbackPosition.coords.latitude,
+      longitude: fallbackPosition.coords.longitude,
+      accuracy: fallbackPosition.coords.accuracy,
+    };
+  }
 }
 
 export function useGeolocation() {

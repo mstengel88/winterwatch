@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { Capacitor } from '@capacitor/core';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useWeather } from '@/hooks/useWeather';
 import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
@@ -64,7 +65,14 @@ interface AccountWithDistance {
 
 export default function ShovelDashboard() {
   const { profile } = useAuth();
-  const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
+  const {
+    employee,
+    activeShift,
+    isLoading: employeeLoading,
+    clockIn,
+    clockOut,
+    error: employeeError,
+  } = useEmployee();
   const { 
     accounts, 
     activeWorkLog, 
@@ -74,7 +82,7 @@ export default function ShovelDashboard() {
     checkOut,
     updateActiveWorkLog,
   } = useShovelWorkLogs();
-  const { location: geoLocation, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
+  const { location: geoLocation, error: geoError, getCurrentLocation, isLoading: geoLoading } = useGeolocation();
   
   // Fetch weather based on geolocation
   const { weather: weatherData, isLoading: weatherLoading } = useWeather(
@@ -281,6 +289,11 @@ export default function ShovelDashboard() {
   // Get location on mount and set up periodic refresh
   useEffect(() => {
     getCurrentLocation();
+
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
     const interval = setInterval(() => {
       getCurrentLocation();
     }, 30000); // Refresh location every 30 seconds
@@ -400,7 +413,11 @@ export default function ShovelDashboard() {
     if (success) {
       toast({ title: 'Shift started successfully!' });
     } else {
-      toast({ variant: 'destructive', title: 'Failed to start shift' });
+      toast({
+        variant: 'destructive',
+        title: 'Failed to start shift',
+        description: employeeError ?? 'Please verify your employee record and active organization.',
+      });
     }
   };
 
@@ -413,7 +430,11 @@ export default function ShovelDashboard() {
     if (success) {
       toast({ title: 'Shift ended successfully!' });
     } else {
-      toast({ variant: 'destructive', title: 'Failed to end shift' });
+      toast({
+        variant: 'destructive',
+        title: 'Failed to end shift',
+        description: employeeError ?? 'Please try again in a moment.',
+      });
     }
     return success;
   };
@@ -648,10 +669,12 @@ export default function ShovelDashboard() {
                   ) : (
                     <>
                       <p className="font-medium text-white">
-                        {geoLoading ? 'Getting location...' : 'Location unavailable'}
+                        {geoLoading ? 'Getting location...' : 'Auto-detect unavailable'}
                       </p>
                       <p className="text-sm text-purple-200">
-                        {geoLoading ? 'Please wait' : 'Enable GPS to find nearest account'}
+                        {geoLoading
+                          ? 'Please wait'
+                          : `${geoError ?? 'Enable location if you want nearest-account suggestions.'} You can still choose the account manually below.`}
                       </p>
                     </>
                   )}

@@ -75,7 +75,14 @@ interface EquipmentOption {
 export default function DriverDashboard() {
   const navigate = useNavigate();
   const { profile, isAdminOrManager } = useAuth();
-  const { employee, activeShift, isLoading: employeeLoading, clockIn, clockOut } = useEmployee();
+  const {
+    employee,
+    activeShift,
+    isLoading: employeeLoading,
+    clockIn,
+    clockOut,
+    error: employeeError,
+  } = useEmployee();
   const {
   location: geoLocation,
   isLoading: geoLoading,
@@ -86,8 +93,12 @@ export default function DriverDashboard() {
   useEffect(() => {
     refreshOnce(); // initial prompt + fetch
 
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
     const interval = setInterval(() => {
-      refreshOnce(); // keep it updated
+      refreshOnce(); // keep it updated on native where GPS is expected
     }, 30000);
 
     return () => clearInterval(interval);
@@ -584,7 +595,11 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
       // Refresh location after clocking in
       refreshOnce();
     } else {
-      toast({ variant: 'destructive', title: 'Failed to start shift' });
+      toast({
+        variant: 'destructive',
+        title: 'Failed to start shift',
+        description: employeeError ?? 'Please verify your employee record and active organization.',
+      });
     }
   };
 
@@ -597,7 +612,11 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
     if (success) {
       toast({ title: 'Shift ended!' });
     } else {
-      toast({ variant: 'destructive', title: 'Failed to end shift' });
+      toast({
+        variant: 'destructive',
+        title: 'Failed to end shift',
+        description: employeeError ?? 'Please try again in a moment.',
+      });
     }
     return success;
   };
@@ -833,9 +852,14 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                       Getting location...
                     </p>
                   ) : geoError ? (
-                    <p className="font-medium text-primary-foreground">
-                      {geoError}
-                    </p>
+                    <>
+                      <p className="font-medium text-primary-foreground">
+                        Auto-detect is unavailable right now.
+                      </p>
+                      <p className="text-sm text-primary-foreground/70">
+                        {geoError} You can still pick the account manually below.
+                      </p>
+                    </>
                   ) : nearestAccount ? (
                     <>
                       <p className="font-medium text-primary-foreground">
