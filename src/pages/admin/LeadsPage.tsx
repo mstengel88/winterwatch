@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Building2, CheckCircle2, Loader2, Mail, MapPin, MessageSquare, Phone, Snowflake, UserRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,12 +37,14 @@ const getStatusBadgeClass = (status: string) => {
 
 export default function LeadsPage() {
   const navigate = useNavigate();
+  const { organizations, switchOrganization } = useAuth();
   const { toast } = useToast();
   const [leads, setLeads] = useState<MarketingLead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<(typeof FILTER_OPTIONS)[number]>("all");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [jumpingLeadId, setJumpingLeadId] = useState<string | null>(null);
 
   const loadLeads = async () => {
     setIsLoading(true);
@@ -99,6 +102,18 @@ export default function LeadsPage() {
     };
   }, [leads]);
 
+  const convertedLeads = useMemo(
+    () =>
+      leads
+        .filter((lead) => Boolean(lead.converted_organization_id))
+        .sort((left, right) => {
+          const leftDate = left.converted_at ?? left.updated_at;
+          const rightDate = right.converted_at ?? right.updated_at;
+          return new Date(rightDate).getTime() - new Date(leftDate).getTime();
+        }),
+    [leads],
+  );
+
   const updateStatus = async (leadId: string, status: MarketingLead["status"]) => {
     setSavingId(leadId);
     try {
@@ -130,6 +145,35 @@ export default function LeadsPage() {
     }
 
     navigate(`/admin/customer-setup?lead=${lead.id}`);
+  };
+
+  const handleOpenConvertedWorkspace = async (lead: MarketingLead) => {
+    if (!lead.converted_organization_id) {
+      return;
+    }
+
+    setJumpingLeadId(lead.id);
+    try {
+      await switchOrganization(lead.converted_organization_id);
+      navigate("/admin");
+    } catch (error) {
+      console.error("Failed to open converted workspace:", error);
+      toast({
+        variant: "destructive",
+        title: "Workspace jump failed",
+        description: error instanceof Error ? error.message : "We could not switch into that customer workspace.",
+      });
+    } finally {
+      setJumpingLeadId(null);
+    }
+  };
+
+  const getOrganizationLabel = (organizationId: string | null) => {
+    if (!organizationId) {
+      return "Not linked yet";
+    }
+
+    return organizations.find((organization) => organization.id === organizationId)?.name ?? "Converted workspace";
   };
 
   if (isLoading) {
@@ -204,6 +248,63 @@ export default function LeadsPage() {
         </CardContent>
       </Card>
 
+      {convertedLeads.length > 0 && (
+        <Card className="border-emerald-500/20 bg-emerald-500/10">
+          <CardHeader>
+            <CardTitle>Converted Customers</CardTitle>
+            <CardDescription>
+              Leads that already became live customer workspaces. Jump straight into the converted workspace from here.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 lg:grid-cols-2">
+            {convertedLeads.slice(0, 6).map((lead) => (
+              <div
+                key={`converted-${lead.id}`}
+                className="rounded-2xl border border-emerald-500/20 bg-background/40 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{lead.company_name}</p>
+                    <p className="text-sm text-muted-foreground">{getOrganizationLabel(lead.converted_organization_id)}</p>
+                  </div>
+                  <Badge className="border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
+                    <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                    Converted
+                  </Badge>
+                </div>
+                <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                  <p>{lead.contact_name} · {lead.email}</p>
+                  <p>
+                    Converted{" "}
+                    {lead.converted_at
+                      ? formatDistanceToNow(new Date(lead.converted_at), { addSuffix: true })
+                      : formatDistanceToNow(new Date(lead.updated_at), { addSuffix: true })}
+                  </p>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => void handleOpenConvertedWorkspace(lead)}
+                    disabled={jumpingLeadId === lead.id}
+                  >
+                    {jumpingLeadId === lead.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                    Open Workspace
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/admin/customer-setup?lead=${lead.id}`)}
+                  >
+                    View Handoff
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-border/50 bg-card/50">
           <CardHeader>
@@ -258,10 +359,21 @@ export default function LeadsPage() {
                         size="sm"
                         variant={lead.converted_organization_id ? "secondary" : "outline"}
                         className="gap-2"
-                        onClick={() => void handleStartOnboarding(lead)}
+                        onClick={() =>
+                          lead.converted_organization_id
+                            ? void handleOpenConvertedWorkspace(lead)
+                            : void handleStartOnboarding(lead)
+                        }
+                        disabled={jumpingLeadId === lead.id}
                       >
-                        {lead.converted_organization_id ? <CheckCircle2 className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-                        {lead.converted_organization_id ? "View Handoff" : "Start Onboarding"}
+                        {jumpingLeadId === lead.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : lead.converted_organization_id ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                          <ArrowRight className="h-4 w-4" />
+                        )}
+                        {lead.converted_organization_id ? "Open Workspace" : "Start Onboarding"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -343,10 +455,21 @@ export default function LeadsPage() {
                 <Button
                   variant={lead.converted_organization_id ? "secondary" : "outline"}
                   className="w-full gap-2"
-                  onClick={() => void handleStartOnboarding(lead)}
+                  onClick={() =>
+                    lead.converted_organization_id
+                      ? void handleOpenConvertedWorkspace(lead)
+                      : void handleStartOnboarding(lead)
+                  }
+                  disabled={jumpingLeadId === lead.id}
                 >
-                  {lead.converted_organization_id ? <CheckCircle2 className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-                  {lead.converted_organization_id ? "Open Customer Setup" : "Start Onboarding"}
+                  {jumpingLeadId === lead.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : lead.converted_organization_id ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                  {lead.converted_organization_id ? "Open Converted Workspace" : "Start Onboarding"}
                 </Button>
               </CardContent>
             </Card>
