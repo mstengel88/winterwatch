@@ -21,9 +21,9 @@ export default function Pending() {
     window.location.reload();
   };
 
-  // If user now has roles, redirect to dashboard
+  // If user now has roles, let the role router choose the right workspace.
   if (roles.length > 0) {
-    navigate('/dashboard', { replace: true });
+    navigate('/', { replace: true });
     return null;
   }
 

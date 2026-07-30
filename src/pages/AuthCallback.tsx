@@ -18,7 +18,7 @@ export default function AuthCallback() {
         return;
       }
 
-      navigate(data.session ? "/dashboard" : "/auth", { replace: true });
+      navigate(data.session ? "/" : "/auth", { replace: true });
     };
 
     run();

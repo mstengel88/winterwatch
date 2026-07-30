@@ -123,7 +123,7 @@ const AppRoutes = () => (
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={["driver", "dispatch_driver", "trucker", "admin", "manager"]}>
+                  <ProtectedRoute allowedRoles={["driver", "dispatch_driver", "trucker"]}>
                     <DriverDashboard />
                   </ProtectedRoute>
                 }
@@ -132,7 +132,7 @@ const AppRoutes = () => (
               <Route
                 path="/shovel"
                 element={
-                  <ProtectedRoute allowedRoles={["shovel_crew", "admin", "manager"]}>
+                  <ProtectedRoute allowedRoles={["shovel_crew"]}>
                     <ShovelDashboard />
                   </ProtectedRoute>
                 }
