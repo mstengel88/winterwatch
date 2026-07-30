@@ -15,4 +15,8 @@ bun.lockb
 coverage
 tmp
 *.local
+.env
+.env.*
+!.env.example
+!.env.ghos.example
 ios/App/App/public

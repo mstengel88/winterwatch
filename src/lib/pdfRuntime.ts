@@ -1,5 +1,10 @@
-type JsPdfConstructor = new (options?: Record<string, unknown>) => Record<string, any>;
-type AutoTableFn = (doc: Record<string, any>, options: Record<string, unknown>) => void;
+import type { jsPDF as JsPdf } from "jspdf";
+import type { UserOptions } from "jspdf-autotable";
+
+type JsPdfConstructor = new (
+  options?: ConstructorParameters<typeof JsPdf>[0],
+) => JsPdf;
+type AutoTableFn = (doc: JsPdf, options: UserOptions) => void;
 
 declare global {
   interface Window {

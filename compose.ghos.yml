@@ -1,0 +1,42 @@
+name: winterwatch-pro
+
+services:
+  web:
+    image: ${WINTERWATCH_IMAGE:-ghos/winterwatch-pro:managed-supabase}
+    build:
+      context: .
+      target: production
+    container_name: winterwatch-pro-web
+    env_file:
+      - ${WINTERWATCH_ENV_FILE:-.env.ghos}
+    ports:
+      - "${WINTERWATCH_BIND_ADDRESS:-0.0.0.0}:${WINTERWATCH_HTTP_PORT:-8083}:80"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+      - /var/cache/nginx:size=16m,mode=0755
+      - /var/run:size=1m,mode=0755
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - ghos-internal
+
+networks:
+  ghos-internal:
+    external: true
+    name: ghos-internal

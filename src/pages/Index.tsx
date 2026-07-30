@@ -15,6 +15,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_URL,
+} from "@/integrations/supabase/client";
 
 type LeadForm = {
   company_name: string;
@@ -190,8 +194,8 @@ export default function Index() {
     setIsSubmitting(true);
     try {
       const composedMessage = `${form.message.trim() || "Requested website follow-up."}\n\nSelected plan: ${selectedPlan.name}`;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-      const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
+      const supabaseUrl = SUPABASE_URL;
+      const supabasePublishableKey = SUPABASE_PUBLISHABLE_KEY;
 
       if (!supabaseUrl || !supabasePublishableKey) {
         throw new Error("Website lead capture is not configured.");

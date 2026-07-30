@@ -6,9 +6,7 @@
     
     <!-- Critical Resource Hints for faster loading -->
     <link rel="preconnect" href="https://cdn.gpteng.co" crossorigin />
-    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <link rel="dns-prefetch" href="https://cdn.gpteng.co" />
-    <link rel="dns-prefetch" href="%VITE_SUPABASE_URL%" />
     
     <!-- App Meta Tags -->
     <title>WinterWatch-Pro</title>
@@ -52,7 +50,7 @@
       <!-- Initial loader shown before JS loads -->
       <div class="initial-loader"></div>
     </div>
-    <script src="/dispatch-config.js"></script>
+    <script src="/runtime-config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

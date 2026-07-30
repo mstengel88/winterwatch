@@ -4,7 +4,7 @@ services:
       context: .
       target: production
     env_file:
-      - .env.dispatch
+      - .env
     ports:
       - "8080:80"
     restart: unless-stopped

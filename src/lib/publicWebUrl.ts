@@ -1,3 +1,8 @@
+import {
+  resolveRuntimeValue,
+  winterWatchRuntimeConfig,
+} from "@/lib/runtimeConfig";
+
 const FALLBACK_PUBLIC_WEB_URL = "https://winterwatch-pro.info";
 
 function trimTrailingSlash(value: string) {
@@ -5,7 +10,12 @@ function trimTrailingSlash(value: string) {
 }
 
 export function getPublicWebUrl() {
-  const configuredUrl = trimTrailingSlash((import.meta.env.VITE_PUBLIC_WEB_URL ?? "").trim());
+  const configuredUrl = trimTrailingSlash(
+    resolveRuntimeValue(
+      winterWatchRuntimeConfig.VITE_PUBLIC_WEB_URL,
+      import.meta.env.VITE_PUBLIC_WEB_URL,
+    ),
+  );
 
   if (configuredUrl) {
     return configuredUrl;
