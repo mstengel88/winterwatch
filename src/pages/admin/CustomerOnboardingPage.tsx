@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Loader2, Mail, Plus, Trash2, UserPlus, Users } from "lucide-react";
+import { Building2, Loader2, Mail, Plus, Trash2, UserPlus, Users, ArrowRight, Briefcase, Shield, Wrench } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ContactRole = "manager" | "client" | "admin";
 type AppUserRole =
@@ -112,8 +114,11 @@ type OnboardingResult = {
 };
 
 export default function CustomerOnboardingPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { switchOrganization } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
+  const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
   const [result, setResult] = useState<OnboardingResult | null>(null);
 
   const [organizationName, setOrganizationName] = useState("");
@@ -288,6 +293,25 @@ export default function CustomerOnboardingPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleOpenWorkspace = async (path: string) => {
+    if (!result) return;
+
+    setIsSwitchingWorkspace(true);
+    try {
+      await switchOrganization(result.organization.id);
+      navigate(path);
+    } catch (error) {
+      console.error("Error switching to new workspace:", error);
+      toast({
+        variant: "destructive",
+        title: "Workspace switch failed",
+        description: error instanceof Error ? error.message : "The customer was created, but we could not switch into the new workspace yet.",
+      });
+    } finally {
+      setIsSwitchingWorkspace(false);
     }
   };
 
@@ -771,6 +795,47 @@ export default function CustomerOnboardingPage() {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">{result.employees_created.length} employees</Badge>
                     <Badge variant="secondary">{result.accounts_created.length} accounts</Badge>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => handleOpenWorkspace("/admin/organizations")}
+                      disabled={isSwitchingWorkspace}
+                    >
+                      {isSwitchingWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                      Open Workspace
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => handleOpenWorkspace("/admin/users")}
+                      disabled={isSwitchingWorkspace}
+                    >
+                      <Shield className="h-4 w-4" />
+                      Users & Roles
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => handleOpenWorkspace("/admin/accounts")}
+                      disabled={isSwitchingWorkspace}
+                    >
+                      <Briefcase className="h-4 w-4" />
+                      Accounts
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => handleOpenWorkspace("/admin/equipment")}
+                      disabled={isSwitchingWorkspace}
+                    >
+                      <Wrench className="h-4 w-4" />
+                      Equipment
+                    </Button>
                   </div>
                 </div>
               )}
