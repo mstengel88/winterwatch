@@ -26,7 +26,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, UserCog, History, MapPin } from 'lucide-react';
+import { Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, UserCog, History, MapPin, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
