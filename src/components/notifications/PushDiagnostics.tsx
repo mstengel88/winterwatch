@@ -46,7 +46,7 @@ async function takeSnapshot(): Promise<Snapshot> {
 
   const notes: string[] = [];
   
-  let capacitorBridgeStatus: 'checking' | 'available' | 'unavailable' = 'checking';
+  let capacitorBridgeStatus: 'available' | 'unavailable';
   let subscriptionId: string | null = null;
   let pushToken: string | null = null;
   let permissionGranted: boolean | null = null;

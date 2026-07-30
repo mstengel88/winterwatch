@@ -105,7 +105,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}) {
 
     // Read previews BEFORE updating state so callers can await and persist immediately
     // (iOS can background/suspend quickly after returning from the photo picker).
-    let newPreviews: string[] = [];
+    let newPreviews: string[];
     try {
       newPreviews = (await Promise.all(validFiles.map(readFileAsDataUrl))).filter(Boolean);
     } catch (error) {
