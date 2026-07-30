@@ -41,14 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userId: string,
     organizationId?: string | null,
   ): Promise<{ roles: AppRole[]; resolvedOrganizationId: string | null }> => {
-    let query = supabase
+    const query = supabase
       .from('user_roles')
       .select('role, organization_id')
       .eq('user_id', userId);
-
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
-    }
 
     const { data, error } = await query;
 
@@ -58,7 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const roleRows = (data as RoleRow[] | null) ?? [];
-    const fallbackOrganizationId = organizationId ?? roleRows[0]?.organization_id ?? null;
+    const preferredOrganizationId = organizationId ?? null;
+    const preferredRoleRows = preferredOrganizationId
+      ? roleRows.filter((row) => row.organization_id === preferredOrganizationId)
+      : roleRows;
+    const fallbackOrganizationId =
+      preferredRoleRows.length > 0
+        ? preferredOrganizationId
+        : roleRows[0]?.organization_id ?? null;
 
     const scopedRoles = fallbackOrganizationId
       ? roleRows.filter((row) => row.organization_id === fallbackOrganizationId)
@@ -80,14 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('id, name, slug, plan, status')
       .order('name');
 
-    if (!nextOrganizationId && resolvedOrganizationId) {
+    if (resolvedOrganizationId && nextOrganizationId !== resolvedOrganizationId) {
       const { error } = await supabase
         .from('profiles')
         .update({ active_organization_id: resolvedOrganizationId })
         .eq('id', userId);
 
       if (error) {
-        console.warn('Failed to backfill active organization:', error.message);
+        console.warn('Failed to repair active organization:', error.message);
       } else if (nextProfile) {
         nextProfile.active_organization_id = resolvedOrganizationId;
       }
@@ -95,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setProfile(nextProfile);
     setRoles(nextRoles);
-    setActiveOrganizationId(finalOrganizationId);
+    setActiveOrganizationId(resolvedOrganizationId ?? finalOrganizationId);
     if (organizationsError) {
       console.warn('Failed to load organizations:', organizationsError.message);
       setOrganizations([]);

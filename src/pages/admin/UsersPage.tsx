@@ -14,6 +14,7 @@ interface UserWithRoles extends Profile {
 }
 
 const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client', 'work_log_viewer'];
+const PROTECTED_ADMIN_EMAILS = ['matthewstengel69@gmail.com'];
 
 const getRoleIcon = (role: string) => {
   switch (role) {
@@ -193,13 +194,22 @@ export default function UsersPage() {
                   <div className="flex flex-wrap gap-1">
                     {user.roles.length > 0 ? (
                       user.roles.map((role) => {
-                        const canRemove = isAdmin || role !== 'admin';
+                        const isProtectedOwnerAdmin =
+                          role === 'admin' &&
+                          PROTECTED_ADMIN_EMAILS.includes((user.email ?? '').toLowerCase());
+                        const canRemove = !isProtectedOwnerAdmin && (isAdmin || role !== 'admin');
                         return (
                           <Badge
                             key={role}
                             className={`${getRoleColor(role)} ${canRemove ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}
                             onClick={() => canRemove && removeRole(user.id, role)}
-                            title={!canRemove ? 'Only admins can remove admin role' : undefined}
+                            title={
+                              isProtectedOwnerAdmin
+                                ? 'This owner admin role is permanently protected'
+                                : !canRemove
+                                  ? 'Only admins can remove admin role'
+                                  : undefined
+                            }
                           >
                             {getRoleIcon(role)}
                             <span className="ml-1 capitalize">{role.replace('_', ' ')}</span>
