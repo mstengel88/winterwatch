@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
+import { getPublicWebAppUrl } from '@/lib/publicWebUrl';
 
 const emailSchema = z.object({
   email: z.string().trim().email({ message: 'Please enter a valid email address' }),
@@ -37,7 +38,7 @@ export default function ForgotPassword() {
 
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: getPublicWebAppUrl('/reset-password'),
       });
 
       if (resetError) {

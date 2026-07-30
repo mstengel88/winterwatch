@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Loader2, Mail, Plus, Trash2, UserPlus, Users, ArrowRight, Briefcase, Shield, Wrench } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getPublicWebAppUrl } from "@/lib/publicWebUrl";
 
 type ContactRole = "manager" | "client" | "admin";
 type AppUserRole =
@@ -266,7 +267,7 @@ export default function CustomerOnboardingPage() {
           })),
         options: {
           assign_primary_contact_to_accounts: canAssignPrimaryToAccounts && assignPrimaryToAccounts,
-          invite_redirect_to: `${window.location.origin}/auth/callback`,
+          invite_redirect_to: getPublicWebAppUrl("/auth/callback"),
         },
       };
 

@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, ReactNode, use
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType, AppRole, OrganizationSummary, Profile } from '@/types/auth';
+import { getPublicWebAppUrl } from '@/lib/publicWebUrl';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -190,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp: AuthContextType['signUp'] = async (email, password, fullName) => {
-    const emailRedirectTo = `${window.location.origin}/auth/callback`;
+    const emailRedirectTo = getPublicWebAppUrl('/auth/callback');
 
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
