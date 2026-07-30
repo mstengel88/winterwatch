@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Download, Share } from 'lucide-react';
-import logo from '@/assets/logo.png';
+const APP_ICON = '/favicon.png';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -70,7 +70,7 @@ export function InstallPrompt() {
       <div className="mx-auto max-w-md rounded-2xl border border-border/50 bg-card/95 backdrop-blur-lg shadow-2xl">
         <div className="flex items-start gap-3 p-4">
           <img 
-            src={logo} 
+            src={APP_ICON} 
             alt="WinterWatch-Pro" 
             className="h-14 w-14 rounded-xl object-cover flex-shrink-0"
           />

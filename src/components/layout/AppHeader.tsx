@@ -24,9 +24,8 @@ import { cn } from '@/lib/utils';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AppRole } from '@/types/auth';
-import logo from '@/assets/logo.png';
-
 const APP_VERSION = '3.0';
+const APP_ICON = '/favicon.png';
 
 interface NavItem {
   href: string;
@@ -163,7 +162,7 @@ export function AppHeader() {
             <SheetContent side="left" className="w-[86vw] max-w-80 p-0">
               <SheetHeader className="border-b border-border/40 px-4 pb-4 pt-6 text-left">
                 <SheetTitle className="flex items-center gap-2">
-                  <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
+                  <img src={APP_ICON} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
                   <div className="flex flex-col">
                     <span className="font-semibold">WinterWatch-Pro</span>
                     <span className="text-xs font-normal text-muted-foreground">Quick navigation</span>
@@ -239,7 +238,7 @@ export function AppHeader() {
             className="flex items-center gap-2 cursor-pointer" 
             onClick={() => navigate(getHomeRoute())}
           >
-            <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
+            <img src={APP_ICON} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
             <div className="flex flex-col">
               <span className="font-semibold text-foreground leading-none hidden sm:inline">WinterWatch-Pro</span>
               <span className={cn(

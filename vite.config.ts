@@ -86,27 +86,63 @@ export default defineConfig(({ mode }) => {
     rollupOptions: {
       external: ["onesignal-cordova-plugin"],
       output: {
-        // Manual chunks for better caching
-        manualChunks: {
-          // Core React dependencies
-          "react-vendor": ["react", "react-dom"],
-          // Router
-          "router": ["react-router-dom"],
-          // UI components (loaded together)
-          "ui": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-select",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-toast",
-            "@radix-ui/react-tooltip",
-          ],
-          // Data fetching
-          "query": ["@tanstack/react-query"],
-          // Supabase client
-          "supabase": ["@supabase/supabase-js"],
-          // Date utilities
-          "date": ["date-fns"],
+        // Split larger libraries by feature so iOS only downloads what the current screen needs.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/scheduler/")
+          ) {
+            return "react-vendor";
+          }
+
+          if (id.includes("/react-router-dom/")) {
+            return "router";
+          }
+
+          if (id.includes("/@tanstack/react-query/")) {
+            return "query";
+          }
+
+          if (id.includes("/@supabase/supabase-js/")) {
+            return "supabase";
+          }
+
+          if (
+            id.includes("/jspdf/") ||
+            id.includes("/jspdf-autotable/") ||
+            id.includes("/html2canvas/")
+          ) {
+            return "pdf-vendor";
+          }
+
+          if (id.includes("/leaflet/")) {
+            return "map-vendor";
+          }
+
+          if (id.includes("/recharts/")) {
+            return "charts-vendor";
+          }
+
+          if (id.includes("/date-fns/")) {
+            return "date";
+          }
+
+          if (
+            id.includes("/@radix-ui/") ||
+            id.includes("/cmdk/") ||
+            id.includes("/embla-carousel-react/") ||
+            id.includes("/input-otp/") ||
+            id.includes("/react-day-picker/") ||
+            id.includes("/react-resizable-panels/") ||
+            id.includes("/vaul/")
+          ) {
+            return "ui-vendor";
+          }
+
+          return undefined;
         },
       },
     },
@@ -128,5 +164,4 @@ export default defineConfig(({ mode }) => {
   },
   };
 });
-
 
