@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 type MarketingLead = Database["public"]["Tables"]["marketing_leads"]["Row"];
+type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 const LEAD_STATUSES = ["new", "contacted", "demo_scheduled", "onboarding", "closed"] as const;
 const FILTER_OPTIONS = ["all", ...LEAD_STATUSES] as const;
@@ -45,6 +47,8 @@ export default function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState<(typeof FILTER_OPTIONS)[number]>("all");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [jumpingLeadId, setJumpingLeadId] = useState<string | null>(null);
+  const [organizationDetails, setOrganizationDetails] = useState<Record<string, Pick<OrganizationRow, "id" | "name" | "created_at">>>({});
+  const [profileDetails, setProfileDetails] = useState<Record<string, Pick<ProfileRow, "id" | "full_name" | "email">>>({});
 
   const loadLeads = async () => {
     setIsLoading(true);
@@ -71,6 +75,53 @@ export default function LeadsPage() {
   useEffect(() => {
     void loadLeads();
   }, []);
+
+  useEffect(() => {
+    const convertedOrganizationIds = Array.from(
+      new Set(leads.map((lead) => lead.converted_organization_id).filter((value): value is string => Boolean(value))),
+    );
+    const convertedByIds = Array.from(
+      new Set(leads.map((lead) => lead.converted_by).filter((value): value is string => Boolean(value))),
+    );
+
+    const loadSupportData = async () => {
+      try {
+        if (convertedOrganizationIds.length > 0) {
+          const { data: organizationsData, error: organizationsError } = await supabase
+            .from("organizations")
+            .select("id, name, created_at")
+            .in("id", convertedOrganizationIds);
+
+          if (organizationsError) throw organizationsError;
+
+          setOrganizationDetails(
+            Object.fromEntries((organizationsData ?? []).map((organization) => [organization.id, organization])),
+          );
+        } else {
+          setOrganizationDetails({});
+        }
+
+        if (convertedByIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from("profiles")
+            .select("id, full_name, email")
+            .in("id", convertedByIds);
+
+          if (profilesError) throw profilesError;
+
+          setProfileDetails(
+            Object.fromEntries((profilesData ?? []).map((profile) => [profile.id, profile])),
+          );
+        } else {
+          setProfileDetails({});
+        }
+      } catch (error) {
+        console.error("Failed to load lead support data:", error);
+      }
+    };
+
+    void loadSupportData();
+  }, [leads]);
 
   const filteredLeads = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -140,8 +191,46 @@ export default function LeadsPage() {
   };
 
   const handleStartOnboarding = async (lead: MarketingLead) => {
-    if (!lead.converted_organization_id && lead.status !== "onboarding") {
-      await updateStatus(lead.id, "onboarding");
+    if (!lead.converted_organization_id) {
+      const updates: Database["public"]["Tables"]["marketing_leads"]["Update"] = {};
+
+      if (lead.status !== "onboarding") {
+        updates.status = "onboarding";
+      }
+
+      if (!lead.onboarding_started_at) {
+        updates.onboarding_started_at = new Date().toISOString();
+      }
+
+      if (Object.keys(updates).length > 0) {
+        setSavingId(lead.id);
+        try {
+          const { error } = await supabase.from("marketing_leads").update(updates).eq("id", lead.id);
+          if (error) throw error;
+
+          setLeads((current) =>
+            current.map((entry) =>
+              entry.id === lead.id
+                ? {
+                    ...entry,
+                    ...updates,
+                    updated_at: new Date().toISOString(),
+                  }
+                : entry,
+            ),
+          );
+        } catch (error) {
+          console.error("Failed to start onboarding handoff:", error);
+          toast({
+            variant: "destructive",
+            title: "Onboarding handoff failed",
+            description: error instanceof Error ? error.message : "Please try again in a moment.",
+          });
+          return;
+        } finally {
+          setSavingId(null);
+        }
+      }
     }
 
     navigate(`/admin/customer-setup?lead=${lead.id}`);
@@ -173,7 +262,20 @@ export default function LeadsPage() {
       return "Not linked yet";
     }
 
-    return organizations.find((organization) => organization.id === organizationId)?.name ?? "Converted workspace";
+    return (
+      organizationDetails[organizationId]?.name ??
+      organizations.find((organization) => organization.id === organizationId)?.name ??
+      "Converted workspace"
+    );
+  };
+
+  const getConvertedByLabel = (convertedBy: string | null) => {
+    if (!convertedBy) {
+      return "Unknown";
+    }
+
+    const profile = profileDetails[convertedBy];
+    return profile?.full_name?.trim() || profile?.email || "Unknown";
   };
 
   if (isLoading) {
@@ -280,6 +382,30 @@ export default function LeadsPage() {
                       ? formatDistanceToNow(new Date(lead.converted_at), { addSuffix: true })
                       : formatDistanceToNow(new Date(lead.updated_at), { addSuffix: true })}
                   </p>
+                </div>
+                <div className="mt-3 rounded-xl border border-border/50 bg-background/50 p-3 text-sm">
+                  <div className="grid gap-2 text-muted-foreground">
+                    <p>
+                      Lead came in: <span className="text-foreground">{format(new Date(lead.created_at), "MMM d, yyyy h:mm a")}</span>
+                    </p>
+                    <p>
+                      Onboarding started:{" "}
+                      <span className="text-foreground">
+                        {lead.onboarding_started_at ? format(new Date(lead.onboarding_started_at), "MMM d, yyyy h:mm a") : "Not started"}
+                      </span>
+                    </p>
+                    <p>
+                      Org created:{" "}
+                      <span className="text-foreground">
+                        {lead.converted_organization_id && organizationDetails[lead.converted_organization_id]?.created_at
+                          ? format(new Date(organizationDetails[lead.converted_organization_id].created_at), "MMM d, yyyy h:mm a")
+                          : "Not linked"}
+                      </span>
+                    </p>
+                    <p>
+                      Converted by: <span className="text-foreground">{getConvertedByLabel(lead.converted_by)}</span>
+                    </p>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
@@ -452,6 +578,30 @@ export default function LeadsPage() {
                     <p className="whitespace-pre-wrap">{lead.message}</p>
                   </div>
                 ) : null}
+                <div className="rounded-xl border border-border/50 bg-background/40 p-3 text-sm text-muted-foreground">
+                  <div className="space-y-2">
+                    <p>
+                      Lead came in: <span className="text-foreground">{format(new Date(lead.created_at), "MMM d, yyyy h:mm a")}</span>
+                    </p>
+                    <p>
+                      Onboarding started:{" "}
+                      <span className="text-foreground">
+                        {lead.onboarding_started_at ? format(new Date(lead.onboarding_started_at), "MMM d, yyyy h:mm a") : "Not started"}
+                      </span>
+                    </p>
+                    <p>
+                      Org created:{" "}
+                      <span className="text-foreground">
+                        {lead.converted_organization_id && organizationDetails[lead.converted_organization_id]?.created_at
+                          ? format(new Date(organizationDetails[lead.converted_organization_id].created_at), "MMM d, yyyy h:mm a")
+                          : "Not linked"}
+                      </span>
+                    </p>
+                    <p>
+                      Converted by: <span className="text-foreground">{getConvertedByLabel(lead.converted_by)}</span>
+                    </p>
+                  </div>
+                </div>
                 <Button
                   variant={lead.converted_organization_id ? "secondary" : "outline"}
                   className="w-full gap-2"

@@ -417,6 +417,7 @@ export type Database = {
           fleet_size: string | null
           id: string
           message: string | null
+          onboarding_started_at: string | null
           phone: string | null
           service_area: string | null
           source: string
@@ -435,6 +436,7 @@ export type Database = {
           fleet_size?: string | null
           id?: string
           message?: string | null
+          onboarding_started_at?: string | null
           phone?: string | null
           service_area?: string | null
           source?: string
@@ -453,6 +455,7 @@ export type Database = {
           fleet_size?: string | null
           id?: string
           message?: string | null
+          onboarding_started_at?: string | null
           phone?: string | null
           service_area?: string | null
           source?: string
