@@ -251,6 +251,11 @@ export default function EmployeesPage() {
   };
 
   const handleSave = async () => {
+    if (!activeOrganizationId) {
+      toast.error('Select an organization before creating an employee');
+      return;
+    }
+
     // Validate form data with zod schema
     const validationResult = validateEmployeeForm(formData);
     if (!validationResult.success) {
@@ -261,6 +266,22 @@ export default function EmployeesPage() {
     setIsSaving(true);
     try {
       const validated = validationResult.data;
+
+      if (validated.user_id) {
+        const duplicateLinkedEmployee = employees.find(
+          (employee) =>
+            employee.user_id === validated.user_id &&
+            employee.id !== editingEmployee?.id,
+        );
+
+        if (duplicateLinkedEmployee) {
+          toast.error(
+            `${duplicateLinkedEmployee.first_name} ${duplicateLinkedEmployee.last_name} is already linked to that user account.`,
+          );
+          return;
+        }
+      }
+
       const employeeData = {
         organization_id: activeOrganizationId,
         first_name: validated.first_name,
@@ -291,7 +312,15 @@ export default function EmployeesPage() {
       fetchData();
     } catch (error) {
       console.error('Error saving employee:', error);
-      toast.error('Failed to save employee');
+      const description =
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as { message?: string }).message === 'string'
+          ? (error as { message: string }).message
+          : 'Failed to save employee';
+
+      toast.error(description);
     } finally {
       setIsSaving(false);
     }
@@ -530,6 +559,16 @@ export default function EmployeesPage() {
   const employeeProfilesById = useMemo(
     () => Object.fromEntries(profiles.map((profile) => [profile.id, profile])),
     [profiles],
+  );
+
+  const availableProfilesForDialog = useMemo(
+    () =>
+      profiles.filter((profile) => {
+        const linkedEmployee = employees.find((employee) => employee.user_id === profile.id);
+        if (!linkedEmployee) return true;
+        return linkedEmployee.id === editingEmployee?.id;
+      }),
+    [profiles, employees, editingEmployee?.id],
   );
 
   const usersWithRoles = useMemo<UserWithRoles[]>(() => {
@@ -1028,15 +1067,15 @@ export default function EmployeesPage() {
 
       <Suspense fallback={dialogFallback}>
         <EmployeeEditorDialog
-          categories={CATEGORIES}
-          editingEmployee={editingEmployee}
-          formData={formData}
-          isOpen={isDialogOpen}
-          isSaving={isSaving}
-          profiles={profiles}
-          onClose={() => setIsDialogOpen(false)}
-          onOpenChange={setIsDialogOpen}
-          onSave={handleSave}
+              categories={CATEGORIES}
+              editingEmployee={editingEmployee}
+              formData={formData}
+              isOpen={isDialogOpen}
+              isSaving={isSaving}
+              profiles={availableProfilesForDialog}
+              onClose={() => setIsDialogOpen(false)}
+              onOpenChange={setIsDialogOpen}
+              onSave={handleSave}
           onFormDataChange={setFormData}
         />
         <WorkspaceInviteDialog
