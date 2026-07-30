@@ -29,3 +29,4 @@ dist-ssr
 *.resolved
 *.xcworkspace/
 **/xcshareddata/swiftpm/Package.resolved
+supabase/.temp/
