@@ -427,6 +427,10 @@ export function AppHeader() {
                     <Building2 className="mr-2 h-4 w-4" />
                     Organizations
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/leads')}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Website Leads
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/admin/employees')}>
                     <Users className="mr-2 h-4 w-4" />
                     Employees

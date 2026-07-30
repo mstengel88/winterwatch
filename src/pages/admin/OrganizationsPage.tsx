@@ -113,6 +113,10 @@ export default function OrganizationsPage() {
                 <Users className="h-4 w-4" />
                 Users & Roles
               </Button>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/leads')}>
+                <Building2 className="h-4 w-4" />
+                Website Leads
+              </Button>
               <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/employees')}>
                 <Users className="h-4 w-4" />
                 Employees

@@ -71,6 +71,9 @@ export default function AdminDashboardPage() {
                 <Link to="/admin/users">Users & Roles</Link>
               </Button>
               <Button asChild variant="outline">
+                <Link to="/admin/leads">Website Leads</Link>
+              </Button>
+              <Button asChild variant="outline">
                 <Link to="/admin/employees">Employees</Link>
               </Button>
             </div>
@@ -91,6 +94,9 @@ export default function AdminDashboardPage() {
             </div>
             <div className="rounded-xl border border-border/50 bg-background/40 p-3">
               3. Assign roles so the customer can log in without getting stuck on approval screens.
+            </div>
+            <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+              4. Review website leads and move qualified customers into onboarding.
             </div>
           </CardContent>
         </Card>
