@@ -43,6 +43,7 @@ export interface Equipment {
 
 export interface Employee {
   id: string;
+  organization_id: string;
   user_id: string | null;
   first_name: string;
   last_name: string;
@@ -109,6 +110,7 @@ export interface ShovelWorkLog {
 
 export interface TimeClockEntry {
   id: string;
+  organization_id: string;
   employee_id: string;
   clock_in_time: string;
   clock_out_time: string | null;

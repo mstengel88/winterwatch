@@ -16,7 +16,7 @@ interface UseEmployeeReturn {
 }
 
 export function useEmployee(): UseEmployeeReturn {
-  const { user } = useAuth();
+  const { user, activeOrganizationId } = useAuth();
   const { getCurrentLocation } = useGeolocation();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [activeShift, setActiveShift] = useState<TimeClockEntry | null>(null);
@@ -34,24 +34,33 @@ export function useEmployee(): UseEmployeeReturn {
     }
 
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('employees')
         .select('*')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
+
+      if (activeOrganizationId) {
+        query = query.eq('organization_id', activeOrganizationId);
+      }
+
+      const { data, error: fetchError } = await query
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw fetchError;
       }
 
       setEmployee(data as Employee | null);
+      setError(null);
     } catch (err) {
       console.error('Error fetching employee:', err);
       setError('Failed to fetch employee data');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [activeOrganizationId, user]);
 
   const fetchActiveShift = useCallback(async () => {
     if (!employee) {
@@ -60,14 +69,20 @@ export function useEmployee(): UseEmployeeReturn {
     }
 
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('time_clock')
         .select('*')
         .eq('employee_id', employee.id)
-        .is('clock_out_time', null)
+        .is('clock_out_time', null);
+
+      if (activeOrganizationId) {
+        query = query.eq('organization_id', activeOrganizationId);
+      }
+
+      const { data, error: fetchError } = await query
         .order('clock_in_time', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw fetchError;
@@ -77,7 +92,7 @@ export function useEmployee(): UseEmployeeReturn {
     } catch (err) {
       console.error('Error fetching active shift:', err);
     }
-  }, [employee]);
+  }, [activeOrganizationId, employee]);
 
   useEffect(() => {
     fetchEmployee();
@@ -93,12 +108,19 @@ export function useEmployee(): UseEmployeeReturn {
       return false;
     }
 
+    const organizationId = activeOrganizationId ?? employee.organization_id;
+    if (!organizationId) {
+      setError('No active organization selected');
+      return false;
+    }
+
     const location = await getCurrentLocation();
 
     try {
       const { data, error: insertError } = await supabase
         .from('time_clock')
         .insert({
+          organization_id: organizationId,
           employee_id: employee.id,
           clock_in_time: new Date().toISOString(),
           clock_in_latitude: location?.latitude ?? null,
@@ -110,6 +132,7 @@ export function useEmployee(): UseEmployeeReturn {
       if (insertError) throw insertError;
 
       setActiveShift(data as TimeClockEntry);
+      setError(null);
       return true;
     } catch (err) {
       console.error('Error clocking in:', err);
