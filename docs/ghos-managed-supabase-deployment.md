@@ -29,11 +29,11 @@ It refuses to start if the project ID and URL do not match.
 
 ## Prepare on GHOS
 
-Install the source at `/opt/winterwatch-pro`, then create its private runtime
-file:
+Install the source at `/opt/ghos/apps/winterwatch-pro`, then create its private
+runtime file:
 
 ```bash
-cd /opt/winterwatch-pro
+cd /opt/ghos/apps/winterwatch-pro
 cp .env.ghos.example .env.ghos
 chmod 600 .env.ghos
 nano .env.ghos
@@ -51,7 +51,7 @@ docker network inspect ghos-internal >/dev/null
 ## Build and verify
 
 ```bash
-cd /opt/winterwatch-pro
+cd /opt/ghos/apps/winterwatch-pro
 ./scripts/verify-ghos-package.sh
 ```
 
@@ -77,7 +77,7 @@ reverse proxy before changing public DNS.
 ## Routine deployment
 
 ```bash
-cd /opt/winterwatch-pro
+cd /opt/ghos/apps/winterwatch-pro
 git pull --ff-only
 docker compose --env-file .env.ghos -f compose.ghos.yml up -d --build web
 docker compose --env-file .env.ghos -f compose.ghos.yml ps
@@ -92,7 +92,7 @@ Record the known-good Git commit before each deployment. To roll back the web
 application:
 
 ```bash
-cd /opt/winterwatch-pro
+cd /opt/ghos/apps/winterwatch-pro
 git switch --detach KNOWN_GOOD_COMMIT
 docker compose --env-file .env.ghos -f compose.ghos.yml up -d --build web
 ```
