@@ -12,29 +12,19 @@ window.addEventListener("error", (e) => {
 });
 
 // PWA service worker note:
-// On iOS Safari, a stale SW can serve outdated Vite chunks and cause:
-// "TypeError: Importing a module script failed" (blank screen).
-// To keep Lovable preview stable, we disable SW on preview domains.
+// On web, stale service worker caches have repeatedly served outdated chunks
+// after deploys. For now we prefer a cache-safe web experience over offline
+// behavior, and keep SW usage limited to native packaging instead.
 if (!Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
-  const host = window.location.hostname;
-  const isLovablePreview = host.endsWith("lovable.app") || host.endsWith("lovableproject.com");
-
   window.addEventListener("load", async () => {
     try {
-      if (isLovablePreview) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((r) => r.unregister()));
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((r) => r.unregister()));
 
-        if ("caches" in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map((k) => caches.delete(k)));
-        }
-
-        return;
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
       }
-
-      // Production web: register SW
-      await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     } catch {
       // ignore
     }
