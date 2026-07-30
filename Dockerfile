@@ -17,11 +17,7 @@ LABEL org.opencontainers.image.title="WinterWatch-Pro"
 LABEL org.opencontainers.image.description="WinterWatch-Pro web application"
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker/runtime-config.template.js /opt/winterwatch/runtime-config.template.js
-COPY docker/40-winterwatch-runtime-config.sh /docker-entrypoint.d/40-winterwatch-runtime-config.sh
 COPY --from=build /app/dist ./
-
-RUN chmod 0555 /docker-entrypoint.d/40-winterwatch-runtime-config.sh
 
 EXPOSE 80
 

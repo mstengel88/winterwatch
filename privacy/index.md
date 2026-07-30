@@ -110,7 +110,7 @@ Depending on your location, you may have the right to:
 * Request correction or deletion of your data
 * Withdraw consent for location tracking (via device settings)
 
-To make a request, contact us at: **[your contact email]**
+To make a request, contact us at: **matthewstengel69@gmail.com**
 
 ---
 

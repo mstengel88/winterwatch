@@ -44,7 +44,7 @@
 		<string></string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>We us the camera to attach photos to work logs.</string>
+	<string>We use the camera to attach photos to work logs.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>WinterWatch-Pro uses your location to record job site check-ins and track work activity while you are using the app.</string>
 	<key>NSLocationUsageDescription</key>
