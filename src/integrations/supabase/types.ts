@@ -408,6 +408,9 @@ export type Database = {
         Row: {
           company_name: string
           contact_name: string
+          converted_at: string | null
+          converted_by: string | null
+          converted_organization_id: string | null
           created_at: string
           customer_type: string
           email: string
@@ -423,6 +426,9 @@ export type Database = {
         Insert: {
           company_name: string
           contact_name: string
+          converted_at?: string | null
+          converted_by?: string | null
+          converted_organization_id?: string | null
           created_at?: string
           customer_type?: string
           email: string
@@ -438,6 +444,9 @@ export type Database = {
         Update: {
           company_name?: string
           contact_name?: string
+          converted_at?: string | null
+          converted_by?: string | null
+          converted_organization_id?: string | null
           created_at?: string
           customer_type?: string
           email?: string
@@ -450,7 +459,15 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "marketing_leads_converted_organization_id_fkey"
+            columns: ["converted_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_preferences: {
         Row: {

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import type { Database } from "@/integrations/supabase/types";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -114,12 +115,18 @@ type OnboardingResult = {
   accounts_created: Array<{ id: string; name: string; service_type: string }>;
 };
 
+type MarketingLead = Database["public"]["Tables"]["marketing_leads"]["Row"];
+
 export default function CustomerOnboardingPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { switchOrganization } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
+  const [isLoadingLead, setIsLoadingLead] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<MarketingLead | null>(null);
+  const [hydratedLeadId, setHydratedLeadId] = useState<string | null>(null);
   const [result, setResult] = useState<OnboardingResult | null>(null);
 
   const [organizationName, setOrganizationName] = useState("");
@@ -140,6 +147,7 @@ export default function CustomerOnboardingPage() {
   const [accounts, setAccounts] = useState<AccountDraft[]>([createAccountDraft()]);
 
   const canAssignPrimaryToAccounts = includePrimaryContact && primaryContactRole === "client";
+  const leadId = searchParams.get("lead");
 
   const summary = useMemo(() => {
     const employeeCount = employees.filter((row) => row.first_name.trim() && row.last_name.trim()).length;
@@ -185,6 +193,94 @@ export default function CustomerOnboardingPage() {
     setUsers([]);
     setEmployees([]);
     setAccounts([createAccountDraft()]);
+  };
+
+  useEffect(() => {
+    if (!leadId) {
+      setSelectedLead(null);
+      setHydratedLeadId(null);
+      return;
+    }
+
+    let ignore = false;
+
+    const loadLead = async () => {
+      setIsLoadingLead(true);
+      try {
+        const { data, error } = await supabase
+          .from("marketing_leads")
+          .select("*")
+          .eq("id", leadId)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!ignore) {
+          setSelectedLead(data ?? null);
+        }
+      } catch (error) {
+        console.error("Error loading lead:", error);
+        if (!ignore) {
+          toast({
+            variant: "destructive",
+            title: "Lead not available",
+            description: error instanceof Error ? error.message : "We could not load that lead.",
+          });
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoadingLead(false);
+        }
+      }
+    };
+
+    void loadLead();
+
+    return () => {
+      ignore = true;
+    };
+  }, [leadId, toast]);
+
+  useEffect(() => {
+    if (!selectedLead || hydratedLeadId === selectedLead.id) {
+      return;
+    }
+
+    const inferredRole: ContactRole = selectedLead.customer_type === "property_manager" ? "client" : "manager";
+    const defaultAccount = createAccountDraft();
+    defaultAccount.name = selectedLead.company_name;
+    defaultAccount.contact_name = selectedLead.contact_name;
+    defaultAccount.contact_email = selectedLead.email;
+    defaultAccount.contact_phone = selectedLead.phone ?? "";
+    defaultAccount.notes = [
+      selectedLead.service_area ? `Service area: ${selectedLead.service_area}` : null,
+      selectedLead.fleet_size ? `Fleet size: ${selectedLead.fleet_size}` : null,
+      selectedLead.message ? `Lead notes: ${selectedLead.message}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    setOrganizationName(selectedLead.company_name);
+    setOrganizationSlug("");
+    setIncludePrimaryContact(true);
+    setPrimaryContactName(selectedLead.contact_name);
+    setPrimaryContactEmail(selectedLead.email);
+    setPrimaryContactPhone(selectedLead.phone ?? "");
+    setPrimaryContactRole(inferredRole);
+    setCreatePrimaryEmployee(inferredRole !== "client");
+    setPrimaryEmployeeCategory(inferredRole === "client" ? "manager" : "manager");
+    setAssignPrimaryToAccounts(inferredRole === "client");
+    setUsers([]);
+    setEmployees([]);
+    setAccounts([defaultAccount]);
+    setHydratedLeadId(selectedLead.id);
+  }, [hydratedLeadId, selectedLead]);
+
+  const clearLeadHandoff = () => {
+    setSelectedLead(null);
+    setHydratedLeadId(null);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("lead");
+    setSearchParams(nextParams, { replace: true });
   };
 
   const handleSubmit = async () => {
@@ -268,6 +364,7 @@ export default function CustomerOnboardingPage() {
         options: {
           assign_primary_contact_to_accounts: canAssignPrimaryToAccounts && assignPrimaryToAccounts,
           invite_redirect_to: getPublicWebAppUrl("/auth/callback"),
+          marketing_lead_id: selectedLead?.id,
         },
       };
 
@@ -280,6 +377,21 @@ export default function CustomerOnboardingPage() {
       }
 
       setResult(data as OnboardingResult);
+      if (selectedLead) {
+        setSelectedLead((current) =>
+          current
+            ? {
+                ...current,
+                status: "closed",
+                converted_at: new Date().toISOString(),
+                converted_organization_id: (data as OnboardingResult).organization.id,
+              }
+            : current,
+        );
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete("lead");
+        setSearchParams(nextParams, { replace: true });
+      }
       toast({
         title: "Customer created",
         description: "The organization, starter records, and contact setup are ready.",
@@ -327,6 +439,36 @@ export default function CustomerOnboardingPage() {
           </p>
         </div>
       </div>
+
+      {isLoadingLead ? (
+        <Card className="border-border/50 bg-card/50">
+          <CardContent className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading lead handoff...
+          </CardContent>
+        </Card>
+      ) : selectedLead ? (
+        <Card className="border-emerald-500/20 bg-emerald-500/10">
+          <CardHeader>
+            <CardTitle className="text-lg">Lead Handoff Active</CardTitle>
+            <CardDescription>
+              {selectedLead.company_name} is prefilled from the website lead so you can move straight into onboarding.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>
+                Contact: <span className="font-medium text-foreground">{selectedLead.contact_name}</span> · {selectedLead.email}
+              </p>
+              {selectedLead.service_area ? <p>Service area: {selectedLead.service_area}</p> : null}
+              {selectedLead.message ? <p className="line-clamp-2">Lead notes: {selectedLead.message}</p> : null}
+            </div>
+            <Button variant="outline" onClick={clearLeadHandoff}>
+              Clear Lead Handoff
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
         <div className="space-y-6">

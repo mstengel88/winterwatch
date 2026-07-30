@@ -76,6 +76,7 @@ interface OnboardCustomerPayload {
   options?: {
     assign_primary_contact_to_accounts?: boolean;
     invite_redirect_to?: string;
+    marketing_lead_id?: string;
   };
 }
 
@@ -467,6 +468,22 @@ Deno.serve(async (req) => {
         name: createdAccount.name,
         service_type: createdAccount.service_type ?? "both",
       });
+    }
+
+    if (payload.options?.marketing_lead_id?.trim()) {
+      const { error: marketingLeadUpdateError } = await supabase
+        .from("marketing_leads")
+        .update({
+          status: "closed",
+          converted_organization_id: organization.id,
+          converted_at: new Date().toISOString(),
+          converted_by: user.id,
+        })
+        .eq("id", payload.options.marketing_lead_id.trim());
+
+      if (marketingLeadUpdateError) {
+        throw marketingLeadUpdateError;
+      }
     }
 
     return new Response(

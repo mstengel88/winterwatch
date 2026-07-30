@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
-import { Building2, Loader2, Mail, MapPin, MessageSquare, Phone, Snowflake, UserRound } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Building2, CheckCircle2, Loader2, Mail, MapPin, MessageSquare, Phone, Snowflake, UserRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,7 @@ const getStatusBadgeClass = (status: string) => {
 };
 
 export default function LeadsPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [leads, setLeads] = useState<MarketingLead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +124,14 @@ export default function LeadsPage() {
     }
   };
 
+  const handleStartOnboarding = async (lead: MarketingLead) => {
+    if (!lead.converted_organization_id && lead.status !== "onboarding") {
+      await updateStatus(lead.id, "onboarding");
+    }
+
+    navigate(`/admin/customer-setup?lead=${lead.id}`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -208,6 +218,7 @@ export default function LeadsPage() {
                   <TableHead>Contact</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Submitted</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -242,11 +253,22 @@ export default function LeadsPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant={lead.converted_organization_id ? "secondary" : "outline"}
+                        className="gap-2"
+                        onClick={() => void handleStartOnboarding(lead)}
+                      >
+                        {lead.converted_organization_id ? <CheckCircle2 className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                        {lead.converted_organization_id ? "View Handoff" : "Start Onboarding"}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filteredLeads.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                       No leads match this filter yet.
                     </TableCell>
                   </TableRow>
@@ -274,6 +296,12 @@ export default function LeadsPage() {
                     <Snowflake className="h-3 w-3" />
                     {lead.customer_type.replaceAll("_", " ")}
                   </Badge>
+                  {lead.converted_organization_id ? (
+                    <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Converted
+                    </Badge>
+                  ) : null}
                   {lead.fleet_size ? <Badge variant="outline">{lead.fleet_size}</Badge> : null}
                   <Badge variant="outline">{format(new Date(lead.created_at), "MMM d, yyyy h:mm a")}</Badge>
                 </div>
@@ -312,6 +340,14 @@ export default function LeadsPage() {
                     <p className="whitespace-pre-wrap">{lead.message}</p>
                   </div>
                 ) : null}
+                <Button
+                  variant={lead.converted_organization_id ? "secondary" : "outline"}
+                  className="w-full gap-2"
+                  onClick={() => void handleStartOnboarding(lead)}
+                >
+                  {lead.converted_organization_id ? <CheckCircle2 className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                  {lead.converted_organization_id ? "Open Customer Setup" : "Start Onboarding"}
+                </Button>
               </CardContent>
             </Card>
           ))}
