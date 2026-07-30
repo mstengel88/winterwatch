@@ -404,6 +404,54 @@ export type Database = {
           },
         ]
       }
+      marketing_leads: {
+        Row: {
+          company_name: string
+          contact_name: string
+          created_at: string
+          customer_type: string
+          email: string
+          fleet_size: string | null
+          id: string
+          message: string | null
+          phone: string | null
+          service_area: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_name: string
+          contact_name: string
+          created_at?: string
+          customer_type?: string
+          email: string
+          fleet_size?: string | null
+          id?: string
+          message?: string | null
+          phone?: string | null
+          service_area?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string
+          contact_name?: string
+          created_at?: string
+          customer_type?: string
+          email?: string
+          fleet_size?: string | null
+          id?: string
+          message?: string | null
+          phone?: string | null
+          service_area?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           admin_announcements_enabled: boolean

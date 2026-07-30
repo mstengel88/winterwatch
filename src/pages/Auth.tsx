@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ const authSchema = z.object({
 });
 
 export default function Auth() {
+  const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
   const [portalType, setPortalType] = useState<'staff' | 'client'>('staff');
   const [email, setEmail] = useState('');
@@ -39,7 +40,7 @@ export default function Auth() {
   const { toast } = useToast();
   
 
-  const from = location.state?.from?.pathname || '/';
+  const from = location.state?.from?.pathname || '/app';
 
 
   // Redirect when authenticated
@@ -49,14 +50,23 @@ export default function Auth() {
     }
   }, [user, isLoading, navigate, from]);
 
+  useEffect(() => {
+    const portal = searchParams.get('portal');
+    if (portal === 'client' || portal === 'staff') {
+      setPortalType(portal);
+    }
+    if (searchParams.get('mode') === 'signup') {
+      setIsLogin(false);
+    }
+  }, [searchParams]);
+
   // Listen for native OAuth success event (from deepLinkAuth.ts)
   useEffect(() => {
     const handleNativeAuthSuccess = () => {
       console.log("📱 Native auth success event received, navigating...");
-      // Navigate to "/" which uses RoleBasedRedirect to determine the correct destination
-      // This ensures users without roles go to /pending instead of /dashboard
+      // Navigate to "/app" which uses RoleBasedRedirect to determine the correct destination.
       setTimeout(() => {
-        navigate("/", { replace: true });
+        navigate("/app", { replace: true });
       }, 100);
     };
 

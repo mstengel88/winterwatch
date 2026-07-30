@@ -23,7 +23,7 @@ export default function Pending() {
 
   // If user now has roles, let the role router choose the right workspace.
   if (roles.length > 0) {
-    navigate('/', { replace: true });
+    navigate('/app', { replace: true });
     return null;
   }
 
