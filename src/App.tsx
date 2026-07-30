@@ -58,6 +58,18 @@ const PageLoader = memo(() => (
 ));
 PageLoader.displayName = 'PageLoader';
 
+function RootEntry() {
+  const hostname = typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "";
+  const isMarketingHost =
+    hostname === "winterwatch-pro.store" || hostname === "www.winterwatch-pro.store";
+
+  if (Capacitor.isNativePlatform() || !isMarketingHost) {
+    return <Navigate to="/app" replace />;
+  }
+
+  return <IndexPage />;
+}
+
 const AppRoutes = ({ showDeferredShell }: { showDeferredShell: boolean }) => (
   <BrowserRouter>
     <Suspense fallback={null}>
@@ -67,7 +79,7 @@ const AppRoutes = ({ showDeferredShell }: { showDeferredShell: boolean }) => (
 
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/" element={<IndexPage />} />
+        <Route path="/" element={<RootEntry />} />
         <Route path="/docs" element={<DocsPage />} />
 
         <Route path="/auth" element={<Auth />} />
