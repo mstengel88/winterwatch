@@ -123,7 +123,7 @@ const AppRoutes = () => (
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={["driver", "dispatch_driver", "trucker"]}>
+                  <ProtectedRoute allowedRoles={["admin", "manager", "driver", "dispatch_driver", "trucker"]}>
                     <DriverDashboard />
                   </ProtectedRoute>
                 }
@@ -132,7 +132,7 @@ const AppRoutes = () => (
               <Route
                 path="/shovel"
                 element={
-                  <ProtectedRoute allowedRoles={["shovel_crew"]}>
+                  <ProtectedRoute allowedRoles={["admin", "manager", "shovel_crew"]}>
                     <ShovelDashboard />
                   </ProtectedRoute>
                 }
@@ -191,11 +191,10 @@ const AppRoutes = () => (
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="organizations" replace />} />
+                <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="customer-setup" element={<CustomerOnboardingPage />} />
                 <Route path="organizations" element={<OrganizationsPage />} />
-                <Route path="overview" element={<AdminDashboardPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="equipment" element={<EquipmentPage />} />
