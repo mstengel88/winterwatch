@@ -3,15 +3,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User, FileText, Route } from 'lucide-react';
+import { Plus, Trash2, Loader2, Shield, Users, Truck, Shovel, User, FileText, Route, ExternalLink, Copy, Eye } from 'lucide-react';
 import { AppRole, Profile } from '@/types/auth';
 import { useAuth } from '@/contexts/AuthContext';
+import { getPublicWebAppUrl } from '@/lib/publicWebUrl';
 
 interface UserWithRoles extends Profile {
   roles: AppRole[];
 }
+
+type PreviewLinkState = {
+  actionLink: string;
+  targetName: string;
+  targetEmail: string;
+};
 
 const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client', 'work_log_viewer'];
 const PROTECTED_ADMIN_EMAILS = ['matthewstengel69@gmail.com'];
@@ -54,6 +62,8 @@ export default function UsersPage() {
   const [addingRole, setAddingRole] = useState<{ userId: string; role: AppRole } | null>(null);
   const [removingRole, setRemovingRole] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<Record<string, AppRole>>({});
+  const [creatingPreviewUserId, setCreatingPreviewUserId] = useState<string | null>(null);
+  const [previewLink, setPreviewLink] = useState<PreviewLinkState | null>(null);
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -155,6 +165,42 @@ export default function UsersPage() {
     }
   };
 
+  const createPreviewLink = async (user: UserWithRoles) => {
+    if (!isAdmin) {
+      toast.error('Only admins can create preview links');
+      return;
+    }
+
+    setCreatingPreviewUserId(user.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-user-preview-link', {
+        body: {
+          target_user_id: user.id,
+          redirect_to: getPublicWebAppUrl('/auth/callback'),
+        },
+      });
+
+      if (error) throw error;
+
+      setPreviewLink({
+        actionLink: data.action_link,
+        targetName: data.target_user?.full_name || user.full_name || 'Unknown user',
+        targetEmail: data.target_user?.email || user.email || 'No email',
+      });
+    } catch (error) {
+      console.error('Error creating preview link:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create preview link');
+    } finally {
+      setCreatingPreviewUserId(null);
+    }
+  };
+
+  const copyPreviewLink = async () => {
+    if (!previewLink) return;
+    await navigator.clipboard.writeText(previewLink.actionLink);
+    toast.success('Preview link copied');
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -179,6 +225,7 @@ export default function UsersPage() {
               <TableHead>User</TableHead>
               <TableHead>Current Roles</TableHead>
               <TableHead>Add Role</TableHead>
+              <TableHead>Preview</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -260,11 +307,66 @@ export default function UsersPage() {
                     </Button>
                   </div>
                 </TableCell>
+                <TableCell>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    disabled={!isAdmin || !user.email || creatingPreviewUserId === user.id}
+                    onClick={() => createPreviewLink(user)}
+                  >
+                    {creatingPreviewUserId === user.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    Preview
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={Boolean(previewLink)} onOpenChange={(open) => !open && setPreviewLink(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Preview User Account</DialogTitle>
+            <DialogDescription>
+              Use this one-time sign-in link to test the app as <span className="font-medium text-foreground">{previewLink?.targetName}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-100">
+              Recommended: open this link in an incognito window or a different browser profile.
+              Opening it in your current browser session will switch you out of your admin account.
+            </div>
+            <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+              <p className="font-medium text-foreground">{previewLink?.targetName}</p>
+              <p className="text-muted-foreground">{previewLink?.targetEmail}</p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background/50 p-3">
+              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">One-time preview link</p>
+              <p className="break-all text-xs text-muted-foreground">{previewLink?.actionLink}</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button type="button" variant="outline" className="gap-2" onClick={copyPreviewLink}>
+              <Copy className="h-4 w-4" />
+              Copy Link
+            </Button>
+            <Button
+              type="button"
+              className="gap-2"
+              onClick={() => previewLink && window.open(previewLink.actionLink, '_blank', 'noopener,noreferrer')}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open Preview Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

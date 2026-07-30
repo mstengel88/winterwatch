@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.onboard-customer]
 verify_jwt = true
+
+[functions.create-user-preview-link]
+verify_jwt = true
