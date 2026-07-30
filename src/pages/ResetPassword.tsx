@@ -1,23 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
+import { PublicButton, PublicLabel } from '@/components/public/PublicUI';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, ArrowLeft, KeyRound } from 'lucide-react';
-import { z } from 'zod';
 import { Link } from 'react-router-dom';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
-
-const passwordSchema = z.object({
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-});
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -91,22 +81,22 @@ export default function ResetPassword() {
   }, []);
 
   const validateForm = () => {
-    try {
-      passwordSchema.parse({ password, confirmPassword });
-      setErrors({});
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors: { password?: string; confirmPassword?: string } = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as keyof typeof fieldErrors] = err.message;
-          }
-        });
-        setErrors(fieldErrors);
-      }
-      return false;
+    const nextErrors: { password?: string; confirmPassword?: string } = {};
+
+    if (!password) {
+      nextErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      nextErrors.password = 'Password must be at least 6 characters';
     }
+
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      nextErrors.confirmPassword = "Passwords don't match";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -171,15 +161,15 @@ export default function ResetPassword() {
               This password reset link is invalid or has expired. Please request a new one.
             </p>
             <Link to="/forgot-password">
-              <Button className="w-full mb-3">
+              <PublicButton className="w-full mb-3">
                 Request New Link
-              </Button>
+              </PublicButton>
             </Link>
             <Link to="/auth">
-              <Button variant="outline" className="w-full">
+              <PublicButton variant="outline" className="w-full">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Sign In
-              </Button>
+              </PublicButton>
             </Link>
           </CardContent>
         </Card>
@@ -202,7 +192,7 @@ export default function ResetPassword() {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">New Password</Label>
+              <PublicLabel htmlFor="password" className="text-foreground">New Password</PublicLabel>
               <div className="relative">
                 <Input
                   id="password"
@@ -215,7 +205,7 @@ export default function ResetPassword() {
                   autoComplete="new-password"
                   className="bg-muted/50 border-border/50 pr-10"
                 />
-                <Button
+                <PublicButton
                   type="button"
                   variant="ghost"
                   size="sm"
@@ -228,7 +218,7 @@ export default function ResetPassword() {
                   ) : (
                     <Eye className="h-4 w-4 text-muted-foreground" />
                   )}
-                </Button>
+                </PublicButton>
               </div>
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
@@ -237,7 +227,7 @@ export default function ResetPassword() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
+              <PublicLabel htmlFor="confirmPassword" className="text-foreground">Confirm Password</PublicLabel>
               <div className="relative">
                 <Input
                   id="confirmPassword"
@@ -250,7 +240,7 @@ export default function ResetPassword() {
                   autoComplete="new-password"
                   className="bg-muted/50 border-border/50 pr-10"
                 />
-                <Button
+                <PublicButton
                   type="button"
                   variant="ghost"
                   size="sm"
@@ -263,19 +253,19 @@ export default function ResetPassword() {
                   ) : (
                     <Eye className="h-4 w-4 text-muted-foreground" />
                   )}
-                </Button>
+                </PublicButton>
               </div>
               {errors.confirmPassword && (
                 <p className="text-sm text-destructive">{errors.confirmPassword}</p>
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <PublicButton type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
               Reset Password
-            </Button>
+            </PublicButton>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">

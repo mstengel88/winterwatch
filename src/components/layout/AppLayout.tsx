@@ -1,8 +1,11 @@
-import { ReactNode } from "react";
-import { AppHeader } from "./AppHeader";
-import { LocationBootstrap } from "@/components/LocationBootstrap";
+import { lazy, ReactNode, Suspense } from "react";
 import { useNativePlatform } from "@/hooks/useNativePlatform";
 import { cn } from "@/lib/utils";
+
+const AppHeader = lazy(async () => {
+  const module = await import("./AppHeader");
+  return { default: module.AppHeader };
+});
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -12,6 +15,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, variant = "default" }: AppLayoutProps) {
   const { isNative, isIOS } = useNativePlatform();
+  const headerFallback = <div className="h-16 border-b border-border/40 bg-card/95 md:h-14" />;
 
   return (
     <div
@@ -23,8 +27,9 @@ export function AppLayout({ children, variant = "default" }: AppLayoutProps) {
           "[padding-left:env(safe-area-inset-left)] [padding-right:env(safe-area-inset-right)] ios-page"
       )}
     >
-      <LocationBootstrap />
-      <AppHeader />
+      <Suspense fallback={headerFallback}>
+        <AppHeader />
+      </Suspense>
 
       <main
         className={cn(

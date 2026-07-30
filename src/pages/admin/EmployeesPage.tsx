@@ -1,24 +1,29 @@
-import { useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Users, Plus, Loader2, Truck, Shovel, Search, Upload, MoreHorizontal, Pencil, Trash2, Clock, Shield, User, FileText, Route, Eye, Copy, ExternalLink } from 'lucide-react';
+import { Users, Plus, Loader2, Truck, Shovel, Search, Upload, MoreHorizontal, Pencil, Trash2, Clock, Shield, User, FileText, Route, Eye } from 'lucide-react';
 import { Employee, EmployeeCategory } from '@/types/database';
 import { AppRole, Profile } from '@/types/auth';
-import { employeeSchema, getValidationError } from '@/lib/validations';
-import { OvertimeNotificationSettings } from '@/components/admin/OvertimeNotificationSettings';
+import { validateEmployeeForm } from '@/lib/validation/employee';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getCurrentWebAppUrl } from '@/lib/publicWebUrl';
+
+const OvertimeNotificationSettings = lazy(async () => {
+  const module = await import('@/components/admin/OvertimeNotificationSettings');
+  return { default: module.OvertimeNotificationSettings };
+});
+
+const EmployeeEditorDialog = lazy(() => import('@/components/admin/team-management/EmployeeEditorDialog'));
+const WorkspaceInviteDialog = lazy(() => import('@/components/admin/team-management/WorkspaceInviteDialog'));
+const PreviewLinkDialog = lazy(() => import('@/components/admin/team-management/PreviewLinkDialog'));
 
 const CATEGORIES: EmployeeCategory[] = ['plow', 'shovel', 'both', 'manager', 'trucker'];
 const ALL_ROLES: AppRole[] = ['admin', 'manager', 'driver', 'shovel_crew', 'client', 'work_log_viewer'];
@@ -247,9 +252,9 @@ export default function EmployeesPage() {
 
   const handleSave = async () => {
     // Validate form data with zod schema
-    const validationResult = employeeSchema.safeParse(formData);
+    const validationResult = validateEmployeeForm(formData);
     if (!validationResult.success) {
-      toast.error(getValidationError(validationResult.error));
+      toast.error(validationResult.error);
       return;
     }
 
@@ -549,6 +554,13 @@ export default function EmployeesPage() {
       </div>
     );
   }
+
+  const dialogFallback = (
+    <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      Loading…
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -1008,289 +1020,43 @@ export default function EmployeesPage() {
         </TabsContent>
 
         <TabsContent value="overtime" className="mt-6">
-          <OvertimeNotificationSettings />
+          <Suspense fallback={dialogFallback}>
+            <OvertimeNotificationSettings />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingEmployee ? 'Edit Employee' : 'Add Employee'}</DialogTitle>
-            <DialogDescription>
-              {editingEmployee ? 'Update employee information' : 'Create a new employee record'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">First Name *</Label>
-                <Input
-                  id="first_name"
-                  value={formData.first_name}
-                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Last Name *</Label>
-                <Input
-                  id="last_name"
-                  value={formData.last_name}
-                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value as EmployeeCategory })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[200] max-h-[200px]">
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        <span className="capitalize">{cat}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
-                <Input
-                  id="hourly_rate"
-                  type="number"
-                  step="0.01"
-                  value={formData.hourly_rate}
-                  onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Link to User Account</Label>
-              <Select
-                value={formData.user_id || "none"}
-                onValueChange={(value) => setFormData({ ...formData, user_id: value === "none" ? "" : value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select user account (optional)" />
-                </SelectTrigger>
-                <SelectContent position="popper" className="z-[200] max-h-[200px]">
-                  <SelectItem value="none">None</SelectItem>
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.full_name || profile.email || profile.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="is_active">Active Status</Label>
-                <p className="text-sm text-muted-foreground">
-                  Inactive employees won't appear in work log selections
-                </p>
-              </div>
-              <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingEmployee ? 'Update' : 'Create'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Invite Workspace User</DialogTitle>
-            <DialogDescription>
-              Create app access for this organization and optionally make the linked employee record in the same step.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="invite_full_name">Full Name *</Label>
-              <Input
-                id="invite_full_name"
-                value={workspaceInviteForm.full_name}
-                onChange={(e) => setWorkspaceInviteForm((current) => ({ ...current, full_name: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="invite_email">Email *</Label>
-                <Input
-                  id="invite_email"
-                  type="email"
-                  value={workspaceInviteForm.email}
-                  onChange={(e) => setWorkspaceInviteForm((current) => ({ ...current, email: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="invite_phone">Phone</Label>
-                <Input
-                  id="invite_phone"
-                  value={workspaceInviteForm.phone}
-                  onChange={(e) => setWorkspaceInviteForm((current) => ({ ...current, phone: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>App Role</Label>
-                <Select
-                  value={workspaceInviteForm.role}
-                  onValueChange={(value) =>
-                    setWorkspaceInviteForm((current) => ({
-                      ...current,
-                      role: value as AppRole,
-                      employee_category: current.employee_id
-                        ? current.employee_category
-                        : getDefaultEmployeeCategoryForRole(value as AppRole),
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[200] max-h-[220px]">
-                    {availableRoles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        <span className="capitalize">{role.replace('_', ' ')}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Employee Category</Label>
-                <Select
-                  value={workspaceInviteForm.employee_category}
-                  onValueChange={(value) =>
-                    setWorkspaceInviteForm((current) => ({ ...current, employee_category: value as EmployeeCategory }))
-                  }
-                  disabled={!workspaceInviteForm.create_employee}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[200] max-h-[220px]">
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        <span className="capitalize">{cat}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {workspaceInviteForm.employee_id && (
-              <div className="rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm text-muted-foreground">
-                This invite will link to the existing employee record for <span className="font-medium text-foreground">{workspaceInviteForm.full_name}</span>.
-              </div>
-            )}
-            <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="invite_create_employee">Create linked employee</Label>
-                <p className="text-sm text-muted-foreground">
-                  Turn this on when the user also needs to clock in, work accounts, or appear on crews.
-                </p>
-              </div>
-              <Switch
-                id="invite_create_employee"
-                checked={workspaceInviteForm.create_employee}
-                disabled={Boolean(workspaceInviteForm.employee_id)}
-                onCheckedChange={(checked) =>
-                  setWorkspaceInviteForm((current) => ({ ...current, create_employee: checked }))
-                }
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleInviteWorkspaceUser} disabled={isInvitingUser}>
-              {isInvitingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Invite User
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={Boolean(previewLink)} onOpenChange={(open) => !open && setPreviewLink(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Preview User Account</DialogTitle>
-            <DialogDescription>
-              Use this one-time sign-in link to test the app as <span className="font-medium text-foreground">{previewLink?.targetName}</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
-            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-100">
-              Recommended: open this link in an incognito window or a different browser profile.
-              Opening it in your current browser session will switch you out of your admin account.
-            </div>
-            <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
-              <p className="font-medium text-foreground">{previewLink?.targetName}</p>
-              <p className="text-muted-foreground">{previewLink?.targetEmail}</p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-background/50 p-3">
-              <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">One-time preview link</p>
-              <p className="break-all text-xs text-muted-foreground">{previewLink?.actionLink}</p>
-            </div>
-          </div>
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button type="button" variant="outline" className="gap-2" onClick={copyPreviewLink}>
-              <Copy className="h-4 w-4" />
-              Copy Link
-            </Button>
-            <Button
-              type="button"
-              className="gap-2"
-              onClick={() => previewLink && window.open(previewLink.actionLink, '_blank', 'noopener,noreferrer')}
-            >
-              <ExternalLink className="h-4 w-4" />
-              Open Preview Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Suspense fallback={dialogFallback}>
+        <EmployeeEditorDialog
+          categories={CATEGORIES}
+          editingEmployee={editingEmployee}
+          formData={formData}
+          isOpen={isDialogOpen}
+          isSaving={isSaving}
+          profiles={profiles}
+          onClose={() => setIsDialogOpen(false)}
+          onOpenChange={setIsDialogOpen}
+          onSave={handleSave}
+          onFormDataChange={setFormData}
+        />
+        <WorkspaceInviteDialog
+          availableRoles={availableRoles}
+          categories={CATEGORIES}
+          form={workspaceInviteForm}
+          isInvitingUser={isInvitingUser}
+          isOpen={isInviteDialogOpen}
+          onClose={() => setIsInviteDialogOpen(false)}
+          onInvite={handleInviteWorkspaceUser}
+          onOpenChange={setIsInviteDialogOpen}
+          onRoleCategorySync={getDefaultEmployeeCategoryForRole}
+          onFormChange={setWorkspaceInviteForm}
+        />
+        <PreviewLinkDialog
+          previewLink={previewLink}
+          onCopy={copyPreviewLink}
+          onClose={() => setPreviewLink(null)}
+        />
+      </Suspense>
     </div>
   );
 }

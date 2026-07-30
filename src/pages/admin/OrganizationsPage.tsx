@@ -24,6 +24,21 @@ type ConvertedLeadSummary = {
   converted_at: string | null;
 };
 
+const getWorkspaceSetupHref = (label: string) => {
+  switch (label) {
+    case 'Users':
+      return '/admin/employees?tab=users&action=invite-user';
+    case 'Employees':
+      return '/admin/employees?action=new-employee';
+    case 'Accounts':
+      return '/admin/accounts?action=new-account';
+    case 'Equipment':
+      return '/admin/equipment?action=new-equipment';
+    default:
+      return `/admin/${label.toLowerCase()}`;
+  }
+};
+
 export default function OrganizationsPage() {
   const navigate = useNavigate();
   const { organizations, activeOrganizationId, switchOrganization, isLoading } = useAuth();
@@ -164,10 +179,10 @@ export default function OrganizationsPage() {
   const getWorkspaceProgress = (organizationId: string) => {
     const counts = getWorkspaceCounts(organizationId);
     const steps = [
-      { label: 'Users', count: counts.users, href: '/admin/users' },
-      { label: 'Employees', count: counts.employees, href: '/admin/employees' },
-      { label: 'Accounts', count: counts.accounts, href: '/admin/accounts' },
-      { label: 'Equipment', count: counts.equipment, href: '/admin/equipment' },
+      { label: 'Users', count: counts.users, href: getWorkspaceSetupHref('Users') },
+      { label: 'Employees', count: counts.employees, href: getWorkspaceSetupHref('Employees') },
+      { label: 'Accounts', count: counts.accounts, href: getWorkspaceSetupHref('Accounts') },
+      { label: 'Equipment', count: counts.equipment, href: getWorkspaceSetupHref('Equipment') },
     ];
     const readyCount = steps.filter((step) => step.count > 0).length;
     const nextStep = steps.find((step) => step.count === 0) ?? null;
@@ -291,7 +306,7 @@ export default function OrganizationsPage() {
                 <Shield className="h-4 w-4" />
                 Admin Overview
               </Button>
-              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/users')}>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/employees?tab=users')}>
                 <Users className="h-4 w-4" />
                 Users & Roles
               </Button>

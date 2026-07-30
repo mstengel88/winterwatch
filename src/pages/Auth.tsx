@@ -1,25 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
+import { PublicButton, PublicLabel } from '@/components/public/PublicUI';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, Users, Building2 } from 'lucide-react';
-import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
-import { getOAuthRedirectTo } from '@/Auth/redirect';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
-
-const authSchema = z.object({
-  email: z.string().trim().email({ message: 'Please enter a valid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  fullName: z.string().trim().optional(),
-});
+import { getPublicWebAppUrl } from '@/lib/publicWebUrl';
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
@@ -34,10 +23,11 @@ export default function Auth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
 
-  const { signIn, signUp, user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
   
 
   const from = location.state?.from?.pathname || '/app';
@@ -45,10 +35,41 @@ export default function Auth() {
 
   // Redirect when authenticated
   useEffect(() => {
-    if (user && !isLoading) {
+    if (hasSession && !isCheckingSession) {
       navigate(from, { replace: true });
     }
-  }, [user, isLoading, navigate, from]);
+  }, [hasSession, isCheckingSession, navigate, from]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (error) {
+        console.error('Failed to check auth session:', error);
+        setHasSession(false);
+      } else {
+        setHasSession(Boolean(data.session));
+      }
+
+      setIsCheckingSession(false);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setHasSession(Boolean(session));
+      setIsCheckingSession(false);
+    });
+
+    void checkSession();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const portal = searchParams.get('portal');
@@ -75,26 +96,28 @@ export default function Auth() {
   }, [navigate, from]);
 
   const validateForm = () => {
-    try {
-      authSchema.parse({ 
-        email, 
-        password,
-        fullName: !isLogin ? fullName : undefined 
-      });
-      setErrors({});
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors: { email?: string; password?: string; fullName?: string } = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as keyof typeof fieldErrors] = err.message;
-          }
-        });
-        setErrors(fieldErrors);
-      }
-      return false;
+    const nextErrors: { email?: string; password?: string; fullName?: string } = {};
+    const trimmedEmail = email.trim();
+    const trimmedFullName = fullName.trim();
+
+    if (!trimmedEmail) {
+      nextErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      nextErrors.email = 'Please enter a valid email address';
     }
+
+    if (!password) {
+      nextErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      nextErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!isLogin && !trimmedFullName) {
+      nextErrors.fullName = 'Full name is required';
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,7 +129,10 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await signIn(email, password);
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             toast({
@@ -125,7 +151,14 @@ export default function Auth() {
           navigate(from, { replace: true });
         }
       } else {
-        const { error } = await signUp(email, password, fullName);
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            emailRedirectTo: getPublicWebAppUrl('/auth/callback'),
+            data: fullName ? { full_name: fullName.trim() } : undefined,
+          },
+        });
         if (error) {
           if (error.message.includes('already registered')) {
             toast({
@@ -154,7 +187,9 @@ export default function Auth() {
   };
 
   const handleGoogleSignIn = async () => {
-    const redirectTo = getOAuthRedirectTo();
+    const redirectTo = Capacitor.isNativePlatform()
+      ? 'winterwatch://auth/callback'
+      : getPublicWebAppUrl('/auth/callback');
     const isNative = Capacitor.isNativePlatform();
 
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -179,7 +214,9 @@ export default function Auth() {
   };
 
   const handleAppleSignIn = async () => {
-    const redirectTo = getOAuthRedirectTo();
+    const redirectTo = Capacitor.isNativePlatform()
+      ? 'winterwatch://auth/callback'
+      : getPublicWebAppUrl('/auth/callback');
     const isNative = Capacitor.isNativePlatform();
 
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -203,7 +240,7 @@ export default function Auth() {
     }
   };
 
-  if (isLoading) {
+  if (isCheckingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -232,21 +269,32 @@ export default function Auth() {
       </div>
 
       {/* Portal Type Tabs */}
-      <Tabs value={portalType} onValueChange={(v) => setPortalType(v as 'staff' | 'client')} className="mb-6 w-full max-w-md">
-        <TabsList className="grid w-full grid-cols-2 bg-muted/50">
-          <TabsTrigger value="staff" className="gap-2 data-[state=active]:bg-secondary">
-            <Users className="h-4 w-4" />
-            Staff Login
-          </TabsTrigger>
-          <TabsTrigger value="client" className="gap-2 data-[state=active]:bg-secondary">
-            <Building2 className="h-4 w-4" />
-            Client Portal
-          </TabsTrigger>
-        </TabsList>
-        {/* Hidden TabsContent elements required for valid ARIA attributes */}
-        <TabsContent value="staff" className="hidden" />
-        <TabsContent value="client" className="hidden" />
-      </Tabs>
+      <div className="mb-6 grid w-full max-w-md grid-cols-2 rounded-lg bg-muted/50 p-1" role="tablist" aria-label="Portal type">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={portalType === 'staff'}
+          onClick={() => setPortalType('staff')}
+          className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${
+            portalType === 'staff' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          Staff Login
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={portalType === 'client'}
+          onClick={() => setPortalType('client')}
+          className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${
+            portalType === 'client' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Building2 className="h-4 w-4" />
+          Client Portal
+        </button>
+      </div>
 
       {/* Login Card */}
       <Card className="w-full max-w-md bg-card/50 border-border/50">
@@ -268,7 +316,7 @@ export default function Auth() {
           >
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-foreground">Full Name</Label>
+                <PublicLabel htmlFor="fullName" className="text-foreground">Full Name</PublicLabel>
                 <Input
                   id="fullName"
                   name="fullName"
@@ -287,7 +335,7 @@ export default function Auth() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">Email</Label>
+                <PublicLabel htmlFor="email" className="text-foreground">Email</PublicLabel>
               <Input
                 id="email"
                 name="email"
@@ -305,7 +353,7 @@ export default function Auth() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">Password</Label>
+                <PublicLabel htmlFor="password" className="text-foreground">Password</PublicLabel>
               <div className="relative">
                 <Input
                   id="password"
@@ -318,7 +366,7 @@ export default function Auth() {
                   autoComplete={isLogin ? 'current-password' : 'new-password'}
                   className="bg-muted/50 border-border/50 pr-10"
                 />
-                <Button
+                <PublicButton
                   type="button"
                   variant="ghost"
                   size="sm"
@@ -331,7 +379,7 @@ export default function Auth() {
                   ) : (
                     <Eye className="h-4 w-4 text-muted-foreground" />
                   )}
-                </Button>
+                </PublicButton>
               </div>
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
@@ -342,17 +390,19 @@ export default function Auth() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Checkbox
+                    <input
                       id="stayLoggedIn"
+                      type="checkbox"
                       checked={stayLoggedIn}
-                      onCheckedChange={(checked) => setStayLoggedIn(checked === true)}
+                      onChange={(event) => setStayLoggedIn(event.target.checked)}
+                      className="h-4 w-4 rounded border border-input bg-background accent-primary"
                     />
-                    <Label
+                    <PublicLabel
                       htmlFor="stayLoggedIn"
                       className="text-sm font-normal text-muted-foreground cursor-pointer"
                     >
                       Stay logged in
-                    </Label>
+                    </PublicLabel>
                   </div>
                   <Link 
                     to="/forgot-password" 
@@ -365,12 +415,12 @@ export default function Auth() {
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <PublicButton type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
               {isLogin ? 'Sign In' : 'Create account'}
-            </Button>
+            </PublicButton>
 
           </form>
 
@@ -386,7 +436,7 @@ export default function Auth() {
 
           {/* Social Sign In Buttons */}
           <div className="space-y-3">
-            <Button 
+            <PublicButton
               variant="outline" 
               className="w-full gap-2 bg-muted/30 border-border/50" 
               onClick={handleGoogleSignIn}
@@ -411,9 +461,9 @@ export default function Auth() {
                 />
               </svg>
               Continue with Google
-            </Button>
+            </PublicButton>
 
-            <Button 
+            <PublicButton
               variant="outline" 
               className="w-full gap-2 bg-muted/30 border-border/50" 
               onClick={handleAppleSignIn}
@@ -423,7 +473,7 @@ export default function Auth() {
                 <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
               </svg>
               Continue with Apple
-            </Button>
+            </PublicButton>
           </div>
 
           {/* Toggle Login/Signup */}

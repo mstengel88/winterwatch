@@ -8,13 +8,9 @@ import {
   ClipboardCheck,
   MapPin,
   Snowflake,
-  Users,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
+import { PublicButton, PublicLabel, publicButtonClass } from "@/components/public/PublicUI";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -128,7 +124,6 @@ const pricingPlans = [
 type PricingPlanId = (typeof pricingPlans)[number]["id"];
 
 export default function Index() {
-  const { user, roles, isAdminOrManager } = useAuth();
   const { toast } = useToast();
   const contactSectionRef = useRef<HTMLElement | null>(null);
   const contactNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -151,21 +146,10 @@ export default function Index() {
     [selectedPlanId],
   );
 
-  const appCta = useMemo(() => {
-    if (!user) {
-      return { href: "/auth", label: "Customer Login" };
-    }
-
-    if (isAdminOrManager()) {
-      return { href: "/admin", label: "Open Admin Workspace" };
-    }
-
-    if (roles.includes("shovel_crew")) {
-      return { href: "/shovel", label: "Open Crew Dashboard" };
-    }
-
-    return { href: "/dashboard", label: "Open WinterWatch App" };
-  }, [user, roles, isAdminOrManager]);
+  const appCta = useMemo(
+    () => ({ href: "/auth", label: "Customer Login" }),
+    [],
+  );
 
   const updateField = (key: keyof LeadForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -206,20 +190,36 @@ export default function Index() {
     setIsSubmitting(true);
     try {
       const composedMessage = `${form.message.trim() || "Requested website follow-up."}\n\nSelected plan: ${selectedPlan.name}`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+      const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
 
-      const { error } = await supabase.from("marketing_leads").insert({
-        company_name: form.company_name.trim(),
-        contact_name: form.contact_name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim() || null,
-        service_area: form.service_area.trim() || null,
-        fleet_size: form.fleet_size.trim() || null,
-        customer_type: form.customer_type,
-        message: composedMessage,
+      if (!supabaseUrl || !supabasePublishableKey) {
+        throw new Error("Website lead capture is not configured.");
+      }
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/marketing_leads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabasePublishableKey,
+          Authorization: `Bearer ${supabasePublishableKey}`,
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          company_name: form.company_name.trim(),
+          contact_name: form.contact_name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim() || null,
+          service_area: form.service_area.trim() || null,
+          fleet_size: form.fleet_size.trim() || null,
+          customer_type: form.customer_type,
+          message: composedMessage,
+        }),
       });
 
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || "Lead submission failed.");
       }
 
       setSubmitted(true);
@@ -267,12 +267,12 @@ export default function Index() {
             <button type="button" onClick={focusContactForm} className="transition hover:text-white">Contact</button>
           </div>
           <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" className="text-slate-200 hover:text-white">
-              <Link to="/auth?portal=client">Existing Customer</Link>
-            </Button>
-            <Button asChild className="bg-sky-500 text-slate-950 hover:bg-sky-400">
-              <Link to={appCta.href}>{appCta.label}</Link>
-            </Button>
+            <Link to="/auth?portal=client" className={publicButtonClass({ variant: "ghost", className: "text-slate-200 hover:text-white" })}>
+              Existing Customer
+            </Link>
+            <Link to={appCta.href} className={publicButtonClass({ className: "bg-sky-500 text-slate-950 hover:bg-sky-400" })}>
+              {appCta.label}
+            </Link>
           </div>
         </div>
       </section>
@@ -292,7 +292,7 @@ export default function Index() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button
+            <PublicButton
               type="button"
               size="lg"
               className="gap-2 bg-sky-500 text-slate-950 hover:bg-sky-400"
@@ -300,10 +300,17 @@ export default function Index() {
             >
               Request Demo
               <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button asChild size="lg" variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10">
-              <Link to="/auth?mode=signup&portal=client">Create Customer Account</Link>
-            </Button>
+            </PublicButton>
+            <Link
+              to="/auth?mode=signup&portal=client"
+              className={publicButtonClass({
+                size: "lg",
+                variant: "outline",
+                className: "border-white/15 bg-white/5 text-white hover:bg-white/10",
+              })}
+            >
+              Create Customer Account
+            </Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <Card className="border-white/10 bg-white/5">
@@ -347,13 +354,13 @@ export default function Index() {
               <p className="mt-2 text-2xl font-semibold text-white">{selectedPlan.name}</p>
               <p className="mt-1 text-slate-200">{selectedPlan.price} · {selectedPlan.setup}</p>
             </div>
-            <Button
+            <PublicButton
               type="button"
               className="w-full bg-sky-500 text-slate-950 hover:bg-sky-400"
               onClick={() => handleRequestDemo(selectedPlan.id)}
             >
               {selectedPlan.ctaLabel}
-            </Button>
+            </PublicButton>
           </CardContent>
         </Card>
       </section>
@@ -458,12 +465,12 @@ export default function Index() {
               ))}
             </div>
             <div className="flex flex-col gap-3 lg:min-w-56">
-              <Button type="button" size="lg" className="bg-sky-500 text-slate-950 hover:bg-sky-400" onClick={() => handleRequestDemo(selectedPlan.id)}>
+              <PublicButton type="button" size="lg" className="bg-sky-500 text-slate-950 hover:bg-sky-400" onClick={() => handleRequestDemo(selectedPlan.id)}>
                 {selectedPlan.ctaLabel}
-              </Button>
-              <Button type="button" size="lg" variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={focusContactForm}>
+              </PublicButton>
+              <PublicButton type="button" size="lg" variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={focusContactForm}>
                 Contact Sales
-              </Button>
+              </PublicButton>
             </div>
           </CardContent>
         </Card>
@@ -484,12 +491,19 @@ export default function Index() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button type="button" size="lg" className="bg-sky-500 text-slate-950 hover:bg-sky-400" onClick={() => handleRequestDemo(selectedPlan.id)}>
+              <PublicButton type="button" size="lg" className="bg-sky-500 text-slate-950 hover:bg-sky-400" onClick={() => handleRequestDemo(selectedPlan.id)}>
                 Request Demo
-              </Button>
-              <Button asChild size="lg" variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10">
-                <Link to="/auth?portal=client">Existing Customer Login</Link>
-              </Button>
+              </PublicButton>
+              <Link
+                to="/auth?portal=client"
+                className={publicButtonClass({
+                  size: "lg",
+                  variant: "outline",
+                  className: "border-white/15 bg-white/5 text-white hover:bg-white/10",
+                })}
+              >
+                Existing Customer Login
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -513,50 +527,50 @@ export default function Index() {
                     <p className="text-sm text-slate-300">We received your request and can follow up with onboarding, pricing, or a demo.</p>
                   </div>
                 </div>
-                <Button variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10" onClick={() => setSubmitted(false)}>
+                <PublicButton variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10" onClick={() => setSubmitted(false)}>
                   Submit Another Request
-                </Button>
+                </PublicButton>
               </div>
             ) : (
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="company_name">Company</Label>
+                    <PublicLabel htmlFor="company_name">Company</PublicLabel>
                     <Input id="company_name" value={form.company_name} onChange={(event) => updateField("company_name", event.target.value)} placeholder="North Ridge Snow Services" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="contact_name">Contact Name</Label>
+                    <PublicLabel htmlFor="contact_name">Contact Name</PublicLabel>
                     <Input ref={contactNameInputRef} id="contact_name" value={form.contact_name} onChange={(event) => updateField("contact_name", event.target.value)} placeholder="Morgan Lee" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <PublicLabel htmlFor="email">Email</PublicLabel>
                     <Input id="email" type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} placeholder="morgan@example.com" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <PublicLabel htmlFor="phone">Phone</PublicLabel>
                     <Input id="phone" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} placeholder="(555) 555-1212" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="service_area">Service Area</Label>
+                    <PublicLabel htmlFor="service_area">Service Area</PublicLabel>
                     <Input id="service_area" value={form.service_area} onChange={(event) => updateField("service_area", event.target.value)} placeholder="Milwaukee, Madison, Green Bay" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="fleet_size">Fleet / Crew Size</Label>
+                    <PublicLabel htmlFor="fleet_size">Fleet / Crew Size</PublicLabel>
                     <Input id="fleet_size" value={form.fleet_size} onChange={(event) => updateField("fleet_size", event.target.value)} placeholder="12 trucks, 35 staff" />
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="customer_type">Customer Type</Label>
+                    <PublicLabel htmlFor="customer_type">Customer Type</PublicLabel>
                     <Input id="customer_type" value={form.customer_type} onChange={(event) => updateField("customer_type", event.target.value)} placeholder="contractor, property manager, facilities team" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="selected_plan">Plan Interest</Label>
+                    <PublicLabel htmlFor="selected_plan">Plan Interest</PublicLabel>
                     <Input id="selected_plan" value={selectedPlan.name} readOnly className="bg-white/5 text-white" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="message">What do you need?</Label>
+                  <PublicLabel htmlFor="message">What do you need?</PublicLabel>
                   <Textarea
                     id="message"
                     rows={5}
@@ -565,9 +579,9 @@ export default function Index() {
                     placeholder="Tell us about your customers, crews, accounts, or what you want WinterWatch-Pro to handle."
                   />
                 </div>
-                <Button type="submit" className="w-full bg-sky-500 text-slate-950 hover:bg-sky-400" disabled={isSubmitting}>
+                <PublicButton type="submit" className="w-full bg-sky-500 text-slate-950 hover:bg-sky-400" disabled={isSubmitting}>
                   {isSubmitting ? "Sending..." : "Request Setup / Demo"}
-                </Button>
+                </PublicButton>
               </form>
             )}
           </CardContent>

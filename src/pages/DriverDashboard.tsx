@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
@@ -18,10 +18,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
-import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
-import { PersistenceDebugPanel } from '@/components/debug/PersistenceDebugPanel';
-import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
 import { loadCheckoutPhotoPreviews } from '@/lib/checkoutPhotoPreviewStore';
 import { 
   Snowflake, 
@@ -40,6 +36,26 @@ import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Account, Employee } from '@/types/database';
 import { calculateDistance, formatDistance } from '@/lib/distance';
+
+const PhotoUpload = lazy(async () => {
+  const module = await import('@/components/dashboard/PhotoUpload');
+  return { default: module.PhotoUpload };
+});
+
+const SaveStatusIndicator = lazy(async () => {
+  const module = await import('@/components/dashboard/SaveStatusIndicator');
+  return { default: module.SaveStatusIndicator };
+});
+
+const PersistenceDebugPanel = lazy(async () => {
+  const module = await import('@/components/debug/PersistenceDebugPanel');
+  return { default: module.PersistenceDebugPanel };
+});
+
+const ClockOutConfirmDialog = lazy(async () => {
+  const module = await import('@/components/ClockOutConfirmDialog');
+  return { default: module.ClockOutConfirmDialog };
+});
 
 // Format time with leading zeros
 function formatTime(value: number): string {
@@ -114,6 +130,12 @@ export default function DriverDashboard() {
   const [shiftTimer, setShiftTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const dashboardFallback = (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Loading…
+    </div>
+  );
 
   // Auto-populate weather fields when weather data is fetched
   useEffect(() => {
@@ -779,11 +801,15 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 </Button>
               )}
               
-              <ClockOutConfirmDialog
-                open={showClockOutConfirm}
-                onOpenChange={setShowClockOutConfirm}
-                onConfirm={handleClockOutConfirm}
-              />
+              <Suspense fallback={showClockOutConfirm ? dashboardFallback : null}>
+                {showClockOutConfirm ? (
+                  <ClockOutConfirmDialog
+                    open={showClockOutConfirm}
+                    onOpenChange={setShowClockOutConfirm}
+                    onConfirm={handleClockOutConfirm}
+                  />
+                ) : null}
+              </Suspense>
             </div>
           </CardContent>
         </Card>
@@ -1073,19 +1099,23 @@ if (Number.isFinite(lat) && Number.isFinite(lng)) {
 
             {/* Photo Upload */}
             <div className="mb-4">
-              <PhotoUpload
-                photos={photos}
-                previews={previews}
-                isUploading={isUploading}
-                uploadProgress={uploadProgress}
-                canAddMore={canAddMore}
-                onAddPhotos={handleAddPhotos}
-                onRemovePhoto={handleRemovePhoto}
-              />
-              <SaveStatusIndicator status={saveStatus} />
+              <Suspense fallback={dashboardFallback}>
+                <PhotoUpload
+                  photos={photos}
+                  previews={previews}
+                  isUploading={isUploading}
+                  uploadProgress={uploadProgress}
+                  canAddMore={canAddMore}
+                  onAddPhotos={handleAddPhotos}
+                  onRemovePhoto={handleRemovePhoto}
+                />
+                <SaveStatusIndicator status={saveStatus} />
+              </Suspense>
             </div>
 
-            <PersistenceDebugPanel storageKey={storageKey} />
+            <Suspense fallback={null}>
+              <PersistenceDebugPanel storageKey={storageKey} />
+            </Suspense>
 
             {/* Submit Button */}
             {activeWorkLog ? (

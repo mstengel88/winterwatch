@@ -1,18 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
+import { PublicButton, PublicLabel } from '@/components/public/PublicUI';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
-import { z } from 'zod';
 import { getPublicWebAppUrl } from '@/lib/publicWebUrl';
-
-const emailSchema = z.object({
-  email: z.string().trim().email({ message: 'Please enter a valid email address' }),
-});
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -25,19 +19,21 @@ export default function ForgotPassword() {
     e.preventDefault();
     setError(null);
 
-    try {
-      emailSchema.parse({ email });
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        setError(err.errors[0].message);
-        return;
-      }
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Email is required');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address');
+      return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
         redirectTo: getPublicWebAppUrl('/reset-password'),
       });
 
@@ -84,10 +80,10 @@ export default function ForgotPassword() {
               </button>
             </p>
             <Link to="/auth">
-              <Button variant="outline" className="w-full">
+              <PublicButton variant="outline" className="w-full">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Sign In
-              </Button>
+              </PublicButton>
             </Link>
           </CardContent>
         </Card>
@@ -110,7 +106,7 @@ export default function ForgotPassword() {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">Email Address</Label>
+              <PublicLabel htmlFor="email" className="text-foreground">Email Address</PublicLabel>
               <Input
                 id="email"
                 name="email"
@@ -127,14 +123,14 @@ export default function ForgotPassword() {
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <PublicButton type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Mail className="mr-2 h-4 w-4" />
               )}
               Send Reset Link
-            </Button>
+            </PublicButton>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">

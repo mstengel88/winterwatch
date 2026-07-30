@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,15 +6,36 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Truck, Plus, Loader2, Search, Settings } from 'lucide-react';
 import { Equipment } from '@/types/database';
-import { equipmentSchema, getValidationError } from '@/lib/validations';
+import { validateEquipmentForm } from '@/lib/validation/equipment';
 import { EquipmentCard } from '@/components/equipment/EquipmentCard';
-import { EquipmentDialog } from '@/components/equipment/EquipmentDialog';
-import { LogMaintenanceDialog } from '@/components/equipment/LogMaintenanceDialog';
-import { MaintenanceHistoryDialog } from '@/components/equipment/MaintenanceHistoryDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MaintenanceRequestsTab } from '@/components/equipment/MaintenanceRequestsTab';
-import { MaintenanceNotificationSettings } from '@/components/equipment/MaintenanceNotificationSettings';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
+
+const EquipmentDialog = lazy(async () => {
+  const module = await import('@/components/equipment/EquipmentDialog');
+  return { default: module.EquipmentDialog };
+});
+
+const LogMaintenanceDialog = lazy(async () => {
+  const module = await import('@/components/equipment/LogMaintenanceDialog');
+  return { default: module.LogMaintenanceDialog };
+});
+
+const MaintenanceHistoryDialog = lazy(async () => {
+  const module = await import('@/components/equipment/MaintenanceHistoryDialog');
+  return { default: module.MaintenanceHistoryDialog };
+});
+
+const MaintenanceRequestsTab = lazy(async () => {
+  const module = await import('@/components/equipment/MaintenanceRequestsTab');
+  return { default: module.MaintenanceRequestsTab };
+});
+
+const MaintenanceNotificationSettings = lazy(async () => {
+  const module = await import('@/components/equipment/MaintenanceNotificationSettings');
+  return { default: module.MaintenanceNotificationSettings };
+});
 
 type EquipmentWithServiceType = Equipment & {
   service_type?: 'plow' | 'salt' | 'both';
@@ -22,6 +43,7 @@ type EquipmentWithServiceType = Equipment & {
 
 export default function EquipmentPage() {
   const { activeOrganizationId } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -77,6 +99,18 @@ export default function EquipmentPage() {
     fetchEquipment();
   }, [activeOrganizationId]);
 
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action !== 'new-equipment') {
+      return;
+    }
+
+    openDialog();
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('action');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const openDialog = (equip?: Equipment) => {
     if (equip) {
       setEditingEquipment(equip);
@@ -113,9 +147,9 @@ export default function EquipmentPage() {
   };
 
   const handleSave = async () => {
-    const validationResult = equipmentSchema.safeParse(formData);
+    const validationResult = validateEquipmentForm(formData);
     if (!validationResult.success) {
-      toast.error(getValidationError(validationResult.error));
+      toast.error(validationResult.error);
       return;
     }
 
@@ -208,6 +242,13 @@ export default function EquipmentPage() {
     const overdue = equipment.filter(e => e.status === 'out_of_service').length;
     return { total: equipment.length, active, maintenance, overdue };
   }, [equipment]);
+
+  const equipmentDialogFallback = (
+    <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      Loading…
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -320,35 +361,49 @@ export default function EquipmentPage() {
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-6">
-          <MaintenanceRequestsTab />
-          <MaintenanceNotificationSettings />
+          <Suspense fallback={equipmentDialogFallback}>
+            <MaintenanceRequestsTab />
+            <MaintenanceNotificationSettings />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
       {/* Dialogs */}
-      <EquipmentDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        formData={formData}
-        setFormData={setFormData}
-        onSave={handleSave}
-        isSaving={isSaving}
-        isEditing={!!editingEquipment}
-      />
+      <Suspense fallback={isDialogOpen ? equipmentDialogFallback : null}>
+        {isDialogOpen ? (
+          <EquipmentDialog
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            formData={formData}
+            setFormData={setFormData}
+            onSave={handleSave}
+            isSaving={isSaving}
+            isEditing={!!editingEquipment}
+          />
+        ) : null}
+      </Suspense>
 
-      <LogMaintenanceDialog
-        equipment={maintenanceEquipment}
-        open={isMaintenanceDialogOpen}
-        onOpenChange={setIsMaintenanceDialogOpen}
-        onSuccess={fetchEquipment}
-      />
+      <Suspense fallback={isMaintenanceDialogOpen ? equipmentDialogFallback : null}>
+        {isMaintenanceDialogOpen ? (
+          <LogMaintenanceDialog
+            equipment={maintenanceEquipment}
+            open={isMaintenanceDialogOpen}
+            onOpenChange={setIsMaintenanceDialogOpen}
+            onSuccess={fetchEquipment}
+          />
+        ) : null}
+      </Suspense>
 
-      <MaintenanceHistoryDialog
-        equipment={historyEquipment}
-        open={isHistoryDialogOpen}
-        onOpenChange={setIsHistoryDialogOpen}
-        onUpdate={fetchEquipment}
-      />
+      <Suspense fallback={isHistoryDialogOpen ? equipmentDialogFallback : null}>
+        {isHistoryDialogOpen ? (
+          <MaintenanceHistoryDialog
+            equipment={historyEquipment}
+            open={isHistoryDialogOpen}
+            onOpenChange={setIsHistoryDialogOpen}
+            onUpdate={fetchEquipment}
+          />
+        ) : null}
+      </Suspense>
     </div>
   );
 }

@@ -1,24 +1,6 @@
-import { lazy, Suspense, useEffect, memo } from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { InstallPrompt } from "@/components/pwa/InstallPrompt";
-import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
-import { OfflineSyncIndicator } from "@/components/pwa/OfflineSyncIndicator";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import RoleBasedRedirect from "./components/auth/RoleBasedRedirect";
-import { LocationBootstrap } from "@/components/LocationBootstrap";
-import { IosInputFocusFix } from "@/components/ios/IosInputFocusFix";
+import { lazy, Suspense, useEffect, memo, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import AuthCallback from "./pages/AuthCallback";
-import { PostLoginNotificationPrompt } from "@/components/notifications/PostLoginNotificationPrompt";
-import { NotificationActionHandler } from "@/components/notifications/NotificationActionHandler";
-import { AppVersionCheck } from "@/components/ios/AppVersionCheck";
 
 // Lazy load ALL pages for faster initial bundle
 // DriverDashboard is the most common landing page - preload after initial render
@@ -29,9 +11,21 @@ const TimeClockPage = lazy(() => import("./pages/TimeClockPage"));
 const Pending = lazy(() => import("./pages/Pending"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const Auth = lazy(() => import("./pages/Auth"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const IndexPage = lazy(() => import("./pages/Index"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const RoleBasedRedirect = lazy(() => import("./components/auth/RoleBasedRedirect"));
+const AppAuthShell = lazy(async () => {
+  const module = await import("./components/auth/AppAuthShell");
+  return { default: module.AppAuthShell };
+});
+const ProtectedAppRoute = lazy(async () => {
+  const module = await import("./components/auth/AppAuthShell");
+  return { default: module.ProtectedAppRoute };
+});
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
@@ -47,37 +41,13 @@ const NotificationTypesPage = lazy(() => import("./pages/admin/NotificationTypes
 const AuditLogPage = lazy(() => import("./pages/admin/AuditLogPage"));
 const LiveMapPage = lazy(() => import("./pages/admin/LiveMapPage"));
 const DocsPage = lazy(() => import("./pages/DocsPage"));
-
-// Preload common routes after initial render for smoother navigation
-const preloadCommonRoutes = () => {
-  // Use requestIdleCallback for non-blocking preload
-  const idleCallback = 'requestIdleCallback' in window 
-    ? window.requestIdleCallback 
-    : (cb: () => void) => setTimeout(cb, 200);
-  
-  idleCallback(() => {
-    // Preload DriverDashboard (most common destination after login)
-    import("./pages/DriverDashboard");
-    // Preload ShovelDashboard (second most common)
-    import("./pages/ShovelDashboard");
-  });
-};
-
-// Optimized QueryClient with iOS-specific settings
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Reduce refetching on iOS to save battery and network
-      staleTime: 1000 * 60 * 2, // 2 minutes
-      gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
-      retry: 2,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-      // Don't refetch on window focus on mobile (saves battery)
-      refetchOnWindowFocus: !Capacitor.isNativePlatform(),
-      // Prevent refetching when reconnecting on mobile
-      refetchOnReconnect: !Capacitor.isNativePlatform(),
-    },
-  },
+const Sonner = lazy(async () => {
+  const module = await import("@/components/ui/sonner");
+  return { default: module.Toaster };
+});
+const OfflineIndicator = lazy(async () => {
+  const module = await import("@/components/pwa/OfflineIndicator");
+  return { default: module.OfflineIndicator };
 });
 
 // Memoized PageLoader to prevent unnecessary re-renders
@@ -88,142 +58,133 @@ const PageLoader = memo(() => (
 ));
 PageLoader.displayName = 'PageLoader';
 
-const AppRoutes = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <TooltipProvider>
-        <AuthProvider>
-          
-          {/* Location and input helpers - enabled on all platforms */}
-          <LocationBootstrap />
-          <IosInputFocusFix />
+const AppRoutes = ({ showDeferredShell }: { showDeferredShell: boolean }) => (
+  <BrowserRouter>
+    <Suspense fallback={null}>
+      <Sonner />
+      <OfflineIndicator />
+    </Suspense>
 
-          <Toaster />
-          <Sonner />
-          <OfflineIndicator />
-          <OfflineSyncIndicator className="fixed bottom-20 left-4 z-40" />
-          <InstallPrompt />
-          <PostLoginNotificationPrompt />
-          <NotificationActionHandler />
-          <AppVersionCheck />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<IndexPage />} />
+        <Route path="/docs" element={<DocsPage />} />
 
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/" element={<IndexPage />} />
-              <Route
-                path="/app"
-                element={
-                  <ProtectedRoute>
-                    <RoleBasedRedirect />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager", "driver", "dispatch_driver", "trucker"]}>
-                    <DriverDashboard />
-                  </ProtectedRoute>
-                }
-              />
+        <Route element={<AppAuthShell showDeferredShell={showDeferredShell} />}>
+          <Route
+            path="/app"
+            element={
+              <ProtectedAppRoute>
+                <RoleBasedRedirect />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route
-                path="/shovel"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager", "shovel_crew"]}>
-                    <ShovelDashboard />
-                  </ProtectedRoute>
-                }
-              />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedAppRoute allowedRoles={["admin", "manager", "driver", "dispatch_driver", "trucker"]}>
+                <DriverDashboard />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route
-                path="/work-logs"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager", "work_log_viewer"]}>
-                    <WorkLogsPage />
-                  </ProtectedRoute>
-                }
-              />
+          <Route
+            path="/shovel"
+            element={
+              <ProtectedAppRoute allowedRoles={["admin", "manager", "shovel_crew"]}>
+                <ShovelDashboard />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route
-                path="/time-clock"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                    <TimeClockPage />
-                  </ProtectedRoute>
-                }
-              />
+          <Route
+            path="/work-logs"
+            element={
+              <ProtectedAppRoute allowedRoles={["admin", "manager", "work_log_viewer"]}>
+                <WorkLogsPage />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                }
-              />
+          <Route
+            path="/time-clock"
+            element={
+              <ProtectedAppRoute allowedRoles={["admin", "manager"]}>
+                <TimeClockPage />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <SettingsPage />
-                  </ProtectedRoute>
-                }
-              />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedAppRoute>
+                <ProfilePage />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route
-                path="/pending"
-                element={
-                  <ProtectedRoute>
-                    <Pending />
-                  </ProtectedRoute>
-                }
-              />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedAppRoute>
+                <SettingsPage />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute allowedRoles={["admin", "manager"]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<AdminDashboardPage />} />
-                <Route path="users" element={<UsersPage />} />
-                <Route path="customer-setup" element={<CustomerOnboardingPage />} />
-                <Route path="organizations" element={<OrganizationsPage />} />
-                <Route path="leads" element={<LeadsPage />} />
-                <Route path="employees" element={<EmployeesPage />} />
-                <Route path="accounts" element={<AccountsPage />} />
-                <Route path="equipment" element={<EquipmentPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-                <Route path="notifications" element={<NotificationsPage />} />
-                <Route path="notification-types" element={<NotificationTypesPage />} />
-                <Route path="audit-log" element={<AuditLogPage />} />
-                <Route path="map" element={<LiveMapPage />} />
-              </Route>
+          <Route
+            path="/pending"
+            element={
+              <ProtectedAppRoute>
+                <Pending />
+              </ProtectedAppRoute>
+            }
+          />
 
-              <Route path="/docs" element={<DocsPage />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedAppRoute allowedRoles={["admin", "manager"]}>
+                <AdminLayout />
+              </ProtectedAppRoute>
+            }
+          >
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="customer-setup" element={<CustomerOnboardingPage />} />
+            <Route path="organizations" element={<OrganizationsPage />} />
+            <Route path="leads" element={<LeadsPage />} />
+            <Route path="employees" element={<EmployeesPage />} />
+            <Route path="accounts" element={<AccountsPage />} />
+            <Route path="equipment" element={<EquipmentPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="notification-types" element={<NotificationTypesPage />} />
+            <Route path="audit-log" element={<AuditLogPage />} />
+            <Route path="map" element={<LiveMapPage />} />
+          </Route>
+        </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </AuthProvider>
-      </TooltipProvider>
-    </BrowserRouter>
-  </QueryClientProvider>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  </BrowserRouter>
 );
 
 function App() {
+  const [showDeferredShell, setShowDeferredShell] = useState(false);
+
   useEffect(() => {
-    // Preload common routes after initial render for faster navigation
-    preloadCommonRoutes();
+    const deferId = window.setTimeout(() => {
+      setShowDeferredShell(true);
+    }, 0);
     
     (async () => {
       if (Capacitor.isNativePlatform()) {
@@ -248,9 +209,13 @@ function App() {
         }
       }
     })();
+
+    return () => {
+      window.clearTimeout(deferId);
+    };
   }, []);
 
-  return <AppRoutes />;
+  return <AppRoutes showDeferredShell={showDeferredShell} />;
 }
 
 export default App;

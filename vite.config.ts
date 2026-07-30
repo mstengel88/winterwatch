@@ -34,6 +34,10 @@ export default defineConfig(({ mode }) => {
     target: "es2020",
     minify: "esbuild",
     cssMinify: true,
+    modulePreload: {
+      resolveDependencies: (_filename, dependencies) =>
+        dependencies.filter((dependency) => !dependency.includes("supabase-")),
+    },
     // Better code splitting for faster initial load
     rollupOptions: {
       external: ["onesignal-cordova-plugin"],

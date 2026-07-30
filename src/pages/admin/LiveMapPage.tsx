@@ -6,20 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, RefreshCw, Loader2, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-
-// Fix default marker icons for leaflet + bundlers
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-delete (L.Icon.Default.prototype as L.Icon.Default["prototype"] & { _getIconUrl?: unknown })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
+import type * as LeafletType from "leaflet";
 
 interface LocationPing {
   latitude: number;
@@ -45,7 +32,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   manager: "#10b981",
 };
 
-function createColoredIcon(color: string) {
+function createColoredIcon(L: typeof LeafletType, color: string) {
   return L.divIcon({
     className: "custom-marker",
     html: `<div style="
@@ -69,9 +56,11 @@ export default function LiveMapPage() {
   const [noLocationEmployees, setNoLocationEmployees] = useState<{ employee_id: string; first_name: string; last_name: string; category: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalOnShift, setTotalOnShift] = useState(0);
-  const mapRef = useRef<L.Map | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const leafletRef = useRef<typeof LeafletType | null>(null);
+  const mapRef = useRef<LeafletType.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<L.LayerGroup | null>(null);
+  const markersRef = useRef<LeafletType.LayerGroup | null>(null);
 
   const fetchLocations = useCallback(async () => {
     setIsLoading(true);
@@ -163,25 +152,45 @@ export default function LiveMapPage() {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const map = L.map(mapContainerRef.current).setView([42.5, -83.5], 10); // Default: Michigan area
+    let cancelled = false;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(map);
+    const initMap = async () => {
+      const [{ default: L }] = await Promise.all([
+        import("leaflet"),
+        import("leaflet/dist/leaflet.css"),
+      ]);
 
-    markersRef.current = L.layerGroup().addTo(map);
-    mapRef.current = map;
+      if (cancelled || !mapContainerRef.current || mapRef.current) return;
+
+      leafletRef.current = L;
+      const map = L.map(mapContainerRef.current).setView([42.5, -83.5], 10);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(map);
+
+      markersRef.current = L.layerGroup().addTo(map);
+      mapRef.current = map;
+      setIsMapReady(true);
+    };
+
+    void initMap();
 
     return () => {
-      map.remove();
+      cancelled = true;
+      mapRef.current?.remove();
       mapRef.current = null;
+      markersRef.current = null;
+      leafletRef.current = null;
+      setIsMapReady(false);
     };
   }, []);
 
   // Update markers and routes when data changes
   useEffect(() => {
-    if (!mapRef.current || !markersRef.current) return;
+    const L = leafletRef.current;
+    if (!L || !mapRef.current || !markersRef.current || !isMapReady) return;
 
     markersRef.current.clearLayers();
 
@@ -191,7 +200,7 @@ export default function LiveMapPage() {
 
     routes.forEach((route) => {
       const color = CATEGORY_COLORS[route.category] || "#6b7280";
-      const latLngs: L.LatLngExpression[] = route.pings.map((p) => [p.latitude, p.longitude]);
+      const latLngs: LeafletType.LatLngExpression[] = route.pings.map((p) => [p.latitude, p.longitude]);
 
       // Draw route polyline
       if (latLngs.length > 1) {
@@ -206,7 +215,7 @@ export default function LiveMapPage() {
 
       // Place marker at the latest ping (last in array)
       const latest = route.pings[route.pings.length - 1];
-      const icon = createColoredIcon(color);
+      const icon = createColoredIcon(L, color);
       const marker = L.marker([latest.latitude, latest.longitude], { icon });
 
       const timeSince = format(new Date(latest.recorded_at), "h:mm:ss a");
@@ -230,7 +239,7 @@ export default function LiveMapPage() {
     });
 
     mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-  }, [routes]);
+  }, [isMapReady, routes]);
 
   // Fetch on mount + auto-refresh every 2 min
   useEffect(() => {

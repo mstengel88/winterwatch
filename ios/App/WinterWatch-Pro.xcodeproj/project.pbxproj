@@ -54,7 +54,7 @@
 		0D0858E22F2508E300C67C7F /* OneSignalNotificationServiceExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OneSignalNotificationServiceExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
-		504EC3041FED79650016851F /* WinterWatch Pro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "WinterWatch Pro.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		504EC3041FED79650016851F /* WinterWatch-Pro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "WinterWatch-Pro.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -118,7 +118,7 @@
 		504EC3051FED79650016851F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				504EC3041FED79650016851F /* WinterWatch Pro.app */,
+				504EC3041FED79650016851F /* WinterWatch-Pro.app */,
 				0D0858E22F2508E300C67C7F /* OneSignalNotificationServiceExtension.appex */,
 			);
 			name = Products;
@@ -189,8 +189,8 @@
 				0D0858F52F250AF000C67C7F /* OneSignalInAppMessages */,
 				0D0858F82F25137F00C67C7F /* Algorithms */,
 			);
-			productName = App;
-			productReference = 504EC3041FED79650016851F /* WinterWatch Pro.app */;
+			productName = "WinterWatch-Pro";
+			productReference = 504EC3041FED79650016851F /* WinterWatch-Pro.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -213,7 +213,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
+			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "WinterWatch-Pro" */;
 			compatibilityVersion = "Xcode 8.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -519,7 +519,7 @@
 				MARKETING_VERSION = 4.2;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.winterwatchapp;
-				PRODUCT_NAME = "WinterWatch Pro";
+				PRODUCT_NAME = "WinterWatch-Pro";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -541,7 +541,7 @@
 				);
 				MARKETING_VERSION = 4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.winterwatchapp;
-				PRODUCT_NAME = "WinterWatch Pro";
+				PRODUCT_NAME = "WinterWatch-Pro";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -560,7 +560,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */ = {
+		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "WinterWatch-Pro" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				504EC3141FED79650016851F /* Debug */,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from '@/hooks/useEmployee';
 import { useShovelWorkLogs } from '@/hooks/useShovelWorkLogs';
@@ -7,9 +7,6 @@ import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useWeather } from '@/hooks/useWeather';
 import { useCheckoutFormPersistence } from '@/hooks/useCheckoutFormPersistence';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { PhotoUpload } from '@/components/dashboard/PhotoUpload';
-import { SaveStatusIndicator } from '@/components/dashboard/SaveStatusIndicator';
-import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +41,21 @@ import {
 import { format, differenceInSeconds } from 'date-fns';
 import { Account, Employee } from '@/types/database';
 import { calculateDistance, formatDistance } from '@/lib/distance';
+
+const PhotoUpload = lazy(async () => {
+  const module = await import('@/components/dashboard/PhotoUpload');
+  return { default: module.PhotoUpload };
+});
+
+const SaveStatusIndicator = lazy(async () => {
+  const module = await import('@/components/dashboard/SaveStatusIndicator');
+  return { default: module.SaveStatusIndicator };
+});
+
+const ClockOutConfirmDialog = lazy(async () => {
+  const module = await import('@/components/ClockOutConfirmDialog');
+  return { default: module.ClockOutConfirmDialog };
+});
 
 interface AccountWithDistance {
   account: Account;
@@ -110,6 +122,12 @@ export default function ShovelDashboard() {
   const [workTimer, setWorkTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [shovelEmployees, setShovelEmployees] = useState<Employee[]>([]);
   const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
+  const dashboardFallback = (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Loading…
+    </div>
+  );
 
   // Track if we've restored the service type to avoid overwriting
   const hasRestoredServiceTypeRef = useRef(false);
@@ -587,11 +605,15 @@ export default function ShovelDashboard() {
                 </Button>
               )}
               
-              <ClockOutConfirmDialog
-                open={showClockOutConfirm}
-                onOpenChange={setShowClockOutConfirm}
-                onConfirm={handleClockOutConfirm}
-              />
+              <Suspense fallback={showClockOutConfirm ? dashboardFallback : null}>
+                {showClockOutConfirm ? (
+                  <ClockOutConfirmDialog
+                    open={showClockOutConfirm}
+                    onOpenChange={setShowClockOutConfirm}
+                    onConfirm={handleClockOutConfirm}
+                  />
+                ) : null}
+              </Suspense>
             </div>
           </CardContent>
         </Card>
@@ -878,20 +900,24 @@ export default function ShovelDashboard() {
             {/* Photo Upload */}
             <div className="space-y-2">
               <Label className="text-sm">Photo (Optional)</Label>
-              <PhotoUpload
-                photos={photos}
-                previews={previews}
-                isUploading={isUploading}
-                uploadProgress={uploadProgress}
-                canAddMore={canAddMore}
-                onAddPhotos={addPhotos}
-                onRemovePhoto={removePhoto}
-                hasRestoredPreviews={hasRestoredPreviews}
-              />
+              <Suspense fallback={dashboardFallback}>
+                <PhotoUpload
+                  photos={photos}
+                  previews={previews}
+                  isUploading={isUploading}
+                  uploadProgress={uploadProgress}
+                  canAddMore={canAddMore}
+                  onAddPhotos={addPhotos}
+                  onRemovePhoto={removePhoto}
+                  hasRestoredPreviews={hasRestoredPreviews}
+                />
+              </Suspense>
             </div>
             
             {/* Save Status */}
-            <SaveStatusIndicator status={saveStatus} />
+            <Suspense fallback={null}>
+              <SaveStatusIndicator status={saveStatus} />
+            </Suspense>
 
             {/* Log Service Button */}
             <Button

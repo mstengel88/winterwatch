@@ -1,20 +1,47 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, CheckCircle2, Loader2, ShieldCheck, UserCog, Users, Wrench, Briefcase, ArrowRight } from 'lucide-react';
-import { ForceCheckoutPanel } from '@/components/admin/ForceCheckoutPanel';
-import { EmployeeShiftStatusPanel } from '@/components/admin/EmployeeShiftStatusPanel';
-import { ActiveShiftsFeed } from '@/components/dashboard/ActiveShiftsFeed';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+const ActiveShiftsFeed = lazy(async () => {
+  const module = await import('@/components/dashboard/ActiveShiftsFeed');
+  return { default: module.ActiveShiftsFeed };
+});
+
+const EmployeeShiftStatusPanel = lazy(async () => {
+  const module = await import('@/components/admin/EmployeeShiftStatusPanel');
+  return { default: module.EmployeeShiftStatusPanel };
+});
+
+const ForceCheckoutPanel = lazy(async () => {
+  const module = await import('@/components/admin/ForceCheckoutPanel');
+  return { default: module.ForceCheckoutPanel };
+});
+
 type WorkspaceCounts = {
   users: number;
   employees: number;
   accounts: number;
   equipment: number;
+};
+
+const getWorkspaceSetupHref = (label: string) => {
+  switch (label) {
+    case 'Users':
+      return '/admin/employees?tab=users&action=invite-user';
+    case 'Employees':
+      return '/admin/employees?action=new-employee';
+    case 'Accounts':
+      return '/admin/accounts?action=new-account';
+    case 'Equipment':
+      return '/admin/equipment?action=new-equipment';
+    default:
+      return `/admin/${label.toLowerCase()}`;
+  }
 };
 
 export default function AdminDashboardPage() {
@@ -99,28 +126,28 @@ export default function AdminDashboardPage() {
         label: 'Users',
         count: counts.users,
         ready: counts.users > 0,
-        href: '/admin/users',
+        href: getWorkspaceSetupHref('Users'),
         icon: Users,
       },
       {
         label: 'Employees',
         count: counts.employees,
         ready: counts.employees > 0,
-        href: '/admin/employees',
+        href: getWorkspaceSetupHref('Employees'),
         icon: Users,
       },
       {
         label: 'Accounts',
         count: counts.accounts,
         ready: counts.accounts > 0,
-        href: '/admin/accounts',
+        href: getWorkspaceSetupHref('Accounts'),
         icon: Briefcase,
       },
       {
         label: 'Equipment',
         count: counts.equipment,
         ready: counts.equipment > 0,
-        href: '/admin/equipment',
+        href: getWorkspaceSetupHref('Equipment'),
         icon: Wrench,
       },
     ];
@@ -144,6 +171,13 @@ export default function AdminDashboardPage() {
       cta: `Open ${nextMissing.label}`,
     };
   }, [readinessItems]);
+
+  const dashboardPanelFallback = (
+    <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-4 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Loading workspace activity...
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -196,7 +230,7 @@ export default function AdminDashboardPage() {
                 <Link to="/admin/organizations">Manage Organizations</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link to="/admin/users">Users & Roles</Link>
+                <Link to="/admin/employees?tab=users">Users & Roles</Link>
               </Button>
               <Button asChild variant="outline">
                 <Link to="/admin/leads">Website Leads</Link>
@@ -303,9 +337,15 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
-      <ActiveShiftsFeed organizationId={activeOrganizationId} />
-      <EmployeeShiftStatusPanel organizationId={activeOrganizationId} />
-      <ForceCheckoutPanel organizationId={activeOrganizationId} />
+      <Suspense fallback={dashboardPanelFallback}>
+        <ActiveShiftsFeed organizationId={activeOrganizationId} />
+      </Suspense>
+      <Suspense fallback={dashboardPanelFallback}>
+        <EmployeeShiftStatusPanel organizationId={activeOrganizationId} />
+      </Suspense>
+      <Suspense fallback={dashboardPanelFallback}>
+        <ForceCheckoutPanel organizationId={activeOrganizationId} />
+      </Suspense>
     </div>
   );
 }

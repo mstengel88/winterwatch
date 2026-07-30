@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { toast } from 'sonner';
 import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Pencil, Trash2, CheckSquare, Square } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Account } from '@/types/database';
-import { accountSchema, getValidationError } from '@/lib/validations';
+import { validateAccountForm } from '@/lib/validation/account';
 import { useAuth } from '@/contexts/AuthContext';
 
 const SERVICE_TYPE_OPTIONS = ['plow', 'shovel', 'both'];
@@ -31,6 +32,7 @@ type BulkAccountUpdates = {
 
 export default function AccountsPage() {
   const { activeOrganizationId } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -91,6 +93,18 @@ export default function AccountsPage() {
     fetchAccounts();
   }, [activeOrganizationId]);
 
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action !== 'new-account') {
+      return;
+    }
+
+    openDialog();
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('action');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const openDialog = (account?: Account) => {
     if (account) {
       setEditingAccount(account);
@@ -135,10 +149,9 @@ export default function AccountsPage() {
   };
 
   const handleSave = async () => {
-    // Validate form data with zod schema
-    const validationResult = accountSchema.safeParse(formData);
+    const validationResult = validateAccountForm(formData);
     if (!validationResult.success) {
-      toast.error(getValidationError(validationResult.error));
+      toast.error(validationResult.error);
       return;
     }
 

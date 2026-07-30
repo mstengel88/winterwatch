@@ -1044,7 +1044,7 @@ export default function CustomerOnboardingPage() {
                       size="sm"
                       variant="outline"
                       className="gap-2"
-                      onClick={() => handleOpenWorkspace("/admin/accounts")}
+                      onClick={() => handleOpenWorkspace("/admin/accounts?action=new-account")}
                       disabled={isSwitchingWorkspace}
                     >
                       <Briefcase className="h-4 w-4" />
@@ -1054,7 +1054,7 @@ export default function CustomerOnboardingPage() {
                       size="sm"
                       variant="outline"
                       className="gap-2"
-                      onClick={() => handleOpenWorkspace("/admin/equipment")}
+                      onClick={() => handleOpenWorkspace("/admin/equipment?action=new-equipment")}
                       disabled={isSwitchingWorkspace}
                     >
                       <Wrench className="h-4 w-4" />

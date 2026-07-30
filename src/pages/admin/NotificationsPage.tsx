@@ -1,16 +1,34 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Bell, Send, History, Settings2 } from 'lucide-react';
-import { NotificationHistory } from '@/components/admin/NotificationHistory';
-import { SendNotificationForm } from '@/components/admin/SendNotificationForm';
-import { NotificationMandatorySettings } from '@/components/admin/NotificationMandatorySettings';
+
+const NotificationHistory = lazy(async () => {
+  const module = await import('@/components/admin/NotificationHistory');
+  return { default: module.NotificationHistory };
+});
+
+const SendNotificationForm = lazy(async () => {
+  const module = await import('@/components/admin/SendNotificationForm');
+  return { default: module.SendNotificationForm };
+});
+
+const NotificationMandatorySettings = lazy(async () => {
+  const module = await import('@/components/admin/NotificationMandatorySettings');
+  return { default: module.NotificationMandatorySettings };
+});
 
 export default function NotificationsPage() {
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabFromUrl || 'history');
+  const tabFallback = (
+    <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-card/40 p-4 text-sm text-muted-foreground">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+      Loading notification tools...
+    </div>
+  );
 
   // Sync tab from URL on mount or when URL changes
   useEffect(() => {
@@ -56,15 +74,21 @@ export default function NotificationsPage() {
         </TabsList>
 
         <TabsContent value="history">
-          <NotificationHistory />
+          <Suspense fallback={tabFallback}>
+            {activeTab === 'history' ? <NotificationHistory /> : null}
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="send">
-          <SendNotificationForm />
+          <Suspense fallback={tabFallback}>
+            {activeTab === 'send' ? <SendNotificationForm /> : null}
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="settings">
-          <NotificationMandatorySettings />
+          <Suspense fallback={tabFallback}>
+            {activeTab === 'settings' ? <NotificationMandatorySettings /> : null}
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

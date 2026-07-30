@@ -24,20 +24,41 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
 import { DEFAULT_VISIBLE_COLUMNS, type WorkLogColumn } from '@/lib/pdfExportConfig';
 import { toast } from 'sonner';
-import { ShiftDialog } from '@/components/reports/ShiftDialog';
-import { WorkLogDialog, WorkLogFormData } from '@/components/reports/WorkLogDialog';
-import { BulkEditWorkLogDialog, BulkEditFormData } from '@/components/reports/BulkEditWorkLogDialog';
-import { DeleteConfirmDialog } from '@/components/reports/DeleteConfirmDialog';
-import { PhotoThumbnails } from '@/components/reports/PhotoThumbnails';
+import type { WorkLogFormData } from '@/components/reports/WorkLogDialog';
+import type { BulkEditFormData } from '@/components/reports/BulkEditWorkLogDialog';
 import { useNativePlatform } from '@/hooks/useNativePlatform';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useGoogleDriveExport } from '@/hooks/useGoogleDriveExport';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 const PdfExportSettings = lazy(async () => {
   const module = await import('@/components/reports/PdfExportSettings');
   return { default: module.PdfExportSettings };
+});
+
+const ShiftDialog = lazy(async () => {
+  const module = await import('@/components/reports/ShiftDialog');
+  return { default: module.ShiftDialog };
+});
+
+const WorkLogDialog = lazy(async () => {
+  const module = await import('@/components/reports/WorkLogDialog');
+  return { default: module.WorkLogDialog };
+});
+
+const BulkEditWorkLogDialog = lazy(async () => {
+  const module = await import('@/components/reports/BulkEditWorkLogDialog');
+  return { default: module.BulkEditWorkLogDialog };
+});
+
+const DeleteConfirmDialog = lazy(async () => {
+  const module = await import('@/components/reports/DeleteConfirmDialog');
+  return { default: module.DeleteConfirmDialog };
+});
+
+const PhotoThumbnails = lazy(async () => {
+  const module = await import('@/components/reports/PhotoThumbnails');
+  return { default: module.PhotoThumbnails };
 });
 
 interface TimeClockEntry {
@@ -134,6 +155,7 @@ interface ShovelLogRow {
 }
 
 interface EmployeeNameRow {
+  id?: string;
   first_name: string;
   last_name: string;
 }
@@ -186,9 +208,9 @@ export default function ReportsPage() {
   const { activeOrganizationId } = useAuth();
   const { isNative } = useNativePlatform();
   const isMobile = useIsMobile();
-  const { isExporting, exportPdfToDrive } = useGoogleDriveExport();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -279,6 +301,12 @@ export default function ReportsPage() {
   const [viewingPhotos, setViewingPhotos] = useState<string[]>([]);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const reportsDialogFallback = (
+    <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      Loading…
+    </div>
+  );
 
   // Get signed URLs for photos from private bucket
   const getSignedUrls = async (filePaths: string[]): Promise<string[]> => {
@@ -409,19 +437,36 @@ export default function ReportsPage() {
         billing_status: (log.billing_status || 'current') as 'current' | 'billable' | 'completed',
       }));
 
-      // For shovel logs, fetch team member names if available
       const shovelLogsData = (shovelLogsRes.data as ShovelLogRow[] | null) || [];
+      const uniqueTeamMemberIds = Array.from(
+        new Set(
+          shovelLogsData.flatMap((log) => log.team_member_ids ?? []).filter(Boolean),
+        ),
+      );
+
+      const teamMembersById = new Map<string, string>();
+      if (uniqueTeamMemberIds.length > 0) {
+        const { data: teamMembers, error: teamMembersError } = await supabase
+          .from('employees')
+          .select('id, first_name, last_name')
+          .filter('organization_id', 'eq', activeOrganizationId)
+          .in('id', uniqueTeamMemberIds);
+
+        if (teamMembersError) throw teamMembersError;
+
+        for (const member of ((teamMembers as EmployeeNameRow[] | null) || [])) {
+          if (member.id) {
+            teamMembersById.set(member.id, `${member.first_name} ${member.last_name}`);
+          }
+        }
+      }
+
       const shovelLogs: WorkLogEntry[] = await Promise.all(
         shovelLogsData.map(async (log) => {
-          let teamMemberNames: string[] = [];
-          if (log.team_member_ids && log.team_member_ids.length > 0) {
-            const { data: teamMembers } = await supabase
-              .from('employees')
-              .select('first_name, last_name')
-              .filter('organization_id', 'eq', activeOrganizationId)
-              .in('id', log.team_member_ids);
-            teamMemberNames = ((teamMembers as EmployeeNameRow[] | null) || []).map((m) => `${m.first_name} ${m.last_name}`);
-          }
+          const teamMemberNames = (log.team_member_ids ?? [])
+            .map((memberId) => teamMembersById.get(memberId))
+            .filter((value): value is string => Boolean(value));
+
           return {
             id: log.id,
             type: 'shovel' as const,
@@ -589,15 +634,6 @@ export default function ReportsPage() {
     return new Date(year, month - 1, day);
   };
 
-  const escapePrintHtml = (value: string | undefined) =>
-    String(value ?? '-')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-      .replace(/\n/g, '<br />');
-
   const getWorkLogExportData = () => {
     const rawLogs = filteredWorkLogs.map((log) => {
       const employeeDisplay =
@@ -657,210 +693,21 @@ export default function ReportsPage() {
     };
   };
 
-  const handlePrintPDF = () => {
-    const printWindow = window.open('', '_blank', 'width=1200,height=800');
-
-    if (!printWindow) {
-      toast.error('Chrome blocked the print window. Please allow pop-ups and try again.');
-      return;
-    }
-
+  const handlePrintPDF = async () => {
     const { rawLogs, summary, generatedAt } = getWorkLogExportData();
-    const activeColumns = pdfVisibleColumns;
+    const { printWorkLogsReport } = await import('@/lib/reports/printWorkLogsReport');
+    const opened = printWorkLogsReport({
+      fontSize: pdfFontSize,
+      generatedAt,
+      rows: rawLogs,
+      summary,
+      visibleColumns: pdfVisibleColumns,
+      workLogColumnLabels,
+    });
 
-    const formatTypeLabel = (type: string) => type.toLowerCase() === 'shovel' ? 'Shovel' : 'Plow';
-    const getTypeClass = (type: string) => type.toLowerCase() === 'shovel' ? 'type-shovel' : 'type-plow';
-    const getServiceClass = (serviceType: string) => {
-      const normalized = serviceType.toLowerCase();
-      if (normalized === 'salt') return 'service-salt';
-      if (normalized === 'shovel') return 'service-shovel';
-      if (normalized === 'ice_melt' || normalized === 'ice melt') return 'service-ice-melt';
-      if (normalized === 'both') return 'service-both';
-      return 'service-plow';
-    };
-
-    const tableHeaderHtml = activeColumns
-      .map((column) => `<th>${escapePrintHtml(workLogColumnLabels[column])}</th>`)
-      .join('');
-
-    const tableBodyHtml = rawLogs.length > 0
-      ? rawLogs.map((log) => `
-          <tr>
-            ${activeColumns.map((column) => {
-              const value = log[column] ?? '-';
-
-              if (column === 'type') {
-                return `<td><span class="badge ${getTypeClass(String(value))}">${escapePrintHtml(formatTypeLabel(String(value)))}</span></td>`;
-              }
-
-              if (column === 'serviceType') {
-                return `<td><span class="badge ${getServiceClass(String(value))}">${escapePrintHtml(String(value))}</span></td>`;
-              }
-
-              return `<td>${escapePrintHtml(String(value))}</td>`;
-            }).join('')}
-          </tr>
-        `).join('')
-      : `<tr><td colspan="${activeColumns.length}" class="empty-state">No work logs found for this period.</td></tr>`;
-
-    printWindow.document.open();
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="en">
-        <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>Work Logs Report</title>
-          <style>
-            @page {
-              size: landscape;
-              margin: 12mm;
-            }
-
-            :root {
-              color-scheme: light;
-            }
-
-            * {
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-
-            body {
-              margin: 0;
-              font-family: Helvetica, Arial, sans-serif;
-              color: hsl(222 47% 11%);
-              background: hsl(0 0% 100%);
-              font-size: ${pdfFontSize}pt;
-            }
-
-            .report {
-              width: 100%;
-            }
-
-            .header {
-              margin-bottom: 12pt;
-            }
-
-            .title {
-              margin: 0 0 6pt;
-              font-size: 18pt;
-              font-weight: 700;
-              color: hsl(222 47% 11%);
-            }
-
-            .meta {
-              margin: 0;
-              color: hsl(215 16% 47%);
-              font-size: ${Math.max(pdfFontSize - 1, 5)}pt;
-              line-height: 1.5;
-            }
-
-            .summary {
-              margin: 10pt 0 12pt;
-              font-size: ${Math.max(pdfFontSize, 6)}pt;
-              font-weight: 600;
-            }
-
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              table-layout: fixed;
-            }
-
-            th,
-            td {
-              border: 1px solid hsl(214 32% 91%);
-              padding: 4pt;
-              text-align: left;
-              vertical-align: top;
-              word-break: break-word;
-            }
-
-            th {
-              background: hsl(200 90% 38%);
-              color: hsl(0 0% 100%);
-              font-weight: 700;
-            }
-
-            tbody tr:nth-child(even) {
-              background: hsl(210 40% 98%);
-            }
-
-            .badge {
-              display: inline-block;
-              padding: 2pt 5pt;
-              border-radius: 999px;
-              font-weight: 700;
-            }
-
-            .type-plow,
-            .service-plow {
-              background: hsl(200 90% 38%);
-              color: hsl(0 0% 100%);
-            }
-
-            .type-shovel,
-            .service-shovel {
-              background: hsl(262 83% 58%);
-              color: hsl(0 0% 100%);
-            }
-
-            .service-salt {
-              background: hsl(45 93% 47%);
-              color: hsl(222 47% 11%);
-            }
-
-            .service-ice-melt {
-              background: hsl(188 94% 43%);
-              color: hsl(0 0% 100%);
-            }
-
-            .service-both {
-              background: hsl(142 71% 45%);
-              color: hsl(0 0% 100%);
-            }
-
-            .empty-state {
-              text-align: center;
-              color: hsl(215 16% 47%);
-              padding: 18pt;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="report">
-            <header class="header">
-              <h1 class="title">Work Logs Report</h1>
-              <p class="meta">Generated: ${escapePrintHtml(generatedAt)}</p>
-              <p class="meta">Period: ${escapePrintHtml(summary.dateRange)}</p>
-              <p class="summary">Total Services: ${summary.totalJobs} | Plow: ${summary.plowCount} | Salt: ${summary.saltCount} | Properties: ${summary.propertyCount}</p>
-            </header>
-            <table>
-              <thead>
-                <tr>${tableHeaderHtml}</tr>
-              </thead>
-              <tbody>
-                ${tableBodyHtml}
-              </tbody>
-            </table>
-          </div>
-          <script>
-            window.onload = function () {
-              setTimeout(function () {
-                window.focus();
-                window.print();
-              }, 150);
-            };
-            window.onafterprint = function () {
-              window.close();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    if (!opened) {
+      toast.error('Chrome blocked the print window. Please allow pop-ups and try again.');
+    }
   };
 
   const handleExportPDF = async () => {
@@ -890,8 +737,10 @@ export default function ReportsPage() {
     }
 
     toast.loading('Uploading to Google Drive...', { id: 'drive-export' });
-
-    const result = await exportPdfToDrive(pdfBlob, fileName, 'WinterWatch Reports');
+    setIsExporting(true);
+    const { exportPdfBlobToDrive } = await import('@/lib/googleDriveExport');
+    const result = await exportPdfBlobToDrive(pdfBlob, fileName, 'WinterWatch Reports');
+    setIsExporting(false);
 
     if (result.success) {
       toast.success('Exported to Google Drive!', { id: 'drive-export' });
@@ -2134,10 +1983,12 @@ export default function ReportsPage() {
                           {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                         </TableCell>
                         <TableCell>
-                          <PhotoThumbnails 
-                            photoPaths={log.photo_urls || []} 
-                            onViewPhotos={openPhotoViewer}
-                          />
+                          <Suspense fallback={<span className="text-xs text-muted-foreground">Photos…</span>}>
+                            <PhotoThumbnails
+                              photoPaths={log.photo_urls || []}
+                              onViewPhotos={openPhotoViewer}
+                            />
+                          </Suspense>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -2253,10 +2104,12 @@ export default function ReportsPage() {
                           {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                         </TableCell>
                         <TableCell>
-                          <PhotoThumbnails 
-                            photoPaths={log.photo_urls || []} 
-                            onViewPhotos={openPhotoViewer}
-                          />
+                          <Suspense fallback={<span className="text-xs text-muted-foreground">Photos…</span>}>
+                            <PhotoThumbnails
+                              photoPaths={log.photo_urls || []}
+                              onViewPhotos={openPhotoViewer}
+                            />
+                          </Suspense>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -2382,10 +2235,12 @@ export default function ReportsPage() {
                           {log.team_member_names.length > 0 ? log.team_member_names.join(', ') : log.employee_name}
                         </TableCell>
                         <TableCell>
-                          <PhotoThumbnails 
-                            photoPaths={log.photo_urls || []} 
-                            onViewPhotos={openPhotoViewer}
-                          />
+                          <Suspense fallback={<span className="text-xs text-muted-foreground">Photos…</span>}>
+                            <PhotoThumbnails
+                              photoPaths={log.photo_urls || []}
+                              onViewPhotos={openPhotoViewer}
+                            />
+                          </Suspense>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -2425,73 +2280,93 @@ export default function ReportsPage() {
       </Card>
 
       {/* Shift Dialog */}
-      <ShiftDialog
-        open={shiftDialogOpen}
-        onOpenChange={setShiftDialogOpen}
-        employees={employees}
-        initialData={editingShift}
-        onSave={handleSaveShift}
-        isLoading={isSaving}
-      />
+      <Suspense fallback={shiftDialogOpen ? reportsDialogFallback : null}>
+        {shiftDialogOpen ? (
+          <ShiftDialog
+            open={shiftDialogOpen}
+            onOpenChange={setShiftDialogOpen}
+            employees={employees}
+            initialData={editingShift}
+            onSave={handleSaveShift}
+            isLoading={isSaving}
+          />
+        ) : null}
+      </Suspense>
 
       {/* Work Log Dialog */}
-      <WorkLogDialog
-        open={workLogDialogOpen}
-        onOpenChange={setWorkLogDialogOpen}
-        accounts={accounts}
-        employees={employees}
-        equipment={equipment}
-        initialData={editingWorkLog ? {
-          id: editingWorkLog.id,
-          type: editingWorkLog.type,
-          account_id: editingWorkLog.account_id,
-          employee_id: editingWorkLog.employee_id,
-          team_member_ids: editingWorkLog.team_member_ids,
-          equipment_id: editingWorkLog.equipment_id || undefined,
-          service_type: editingWorkLog.service_type,
-          check_in_time: editingWorkLog.check_in_time,
-          check_out_time: editingWorkLog.check_out_time,
-          snow_depth_inches: editingWorkLog.snow_depth_inches,
-          salt_used_lbs: editingWorkLog.salt_used_lbs,
-          ice_melt_used_lbs: editingWorkLog.ice_melt_used_lbs,
-          weather_conditions: editingWorkLog.weather_conditions,
-          notes: editingWorkLog.notes,
-        } : null}
-        onSave={handleSaveWorkLog}
-        isLoading={isSaving}
-      />
+      <Suspense fallback={workLogDialogOpen ? reportsDialogFallback : null}>
+        {workLogDialogOpen ? (
+          <WorkLogDialog
+            open={workLogDialogOpen}
+            onOpenChange={setWorkLogDialogOpen}
+            accounts={accounts}
+            employees={employees}
+            equipment={equipment}
+            initialData={editingWorkLog ? {
+              id: editingWorkLog.id,
+              type: editingWorkLog.type,
+              account_id: editingWorkLog.account_id,
+              employee_id: editingWorkLog.employee_id,
+              team_member_ids: editingWorkLog.team_member_ids,
+              equipment_id: editingWorkLog.equipment_id || undefined,
+              service_type: editingWorkLog.service_type,
+              check_in_time: editingWorkLog.check_in_time,
+              check_out_time: editingWorkLog.check_out_time,
+              snow_depth_inches: editingWorkLog.snow_depth_inches,
+              salt_used_lbs: editingWorkLog.salt_used_lbs,
+              ice_melt_used_lbs: editingWorkLog.ice_melt_used_lbs,
+              weather_conditions: editingWorkLog.weather_conditions,
+              notes: editingWorkLog.notes,
+            } : null}
+            onSave={handleSaveWorkLog}
+            isLoading={isSaving}
+          />
+        ) : null}
+      </Suspense>
 
       {/* Delete Confirmation Dialog */}
-      <DeleteConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        title={deleteTarget?.type === 'shift' ? 'Delete Shift' : 'Delete Work Log'}
-        description={`Are you sure you want to delete this ${deleteTarget?.type === 'shift' ? 'shift' : 'work log'} for "${deleteTarget?.name}"? This action cannot be undone.`}
-        onConfirm={handleDelete}
-        isLoading={isSaving}
-      />
+      <Suspense fallback={deleteDialogOpen ? reportsDialogFallback : null}>
+        {deleteDialogOpen ? (
+          <DeleteConfirmDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            title={deleteTarget?.type === 'shift' ? 'Delete Shift' : 'Delete Work Log'}
+            description={`Are you sure you want to delete this ${deleteTarget?.type === 'shift' ? 'shift' : 'work log'} for "${deleteTarget?.name}"? This action cannot be undone.`}
+            onConfirm={handleDelete}
+            isLoading={isSaving}
+          />
+        ) : null}
+      </Suspense>
 
       {/* Bulk Delete Confirmation Dialog */}
-      <DeleteConfirmDialog
-        open={bulkDeleteDialogOpen}
-        onOpenChange={setBulkDeleteDialogOpen}
-        title={bulkDeleteType === 'shifts' ? `Delete ${selectedShifts.size} Shifts` : `Delete ${selectedWorkLogs.size} Work Logs`}
-        description={`Are you sure you want to delete ${bulkDeleteType === 'shifts' ? selectedShifts.size : selectedWorkLogs.size} selected ${bulkDeleteType === 'shifts' ? 'shift(s)' : 'work log(s)'}? This action cannot be undone.`}
-        onConfirm={handleBulkDelete}
-        isLoading={isSaving}
-      />
+      <Suspense fallback={bulkDeleteDialogOpen ? reportsDialogFallback : null}>
+        {bulkDeleteDialogOpen ? (
+          <DeleteConfirmDialog
+            open={bulkDeleteDialogOpen}
+            onOpenChange={setBulkDeleteDialogOpen}
+            title={bulkDeleteType === 'shifts' ? `Delete ${selectedShifts.size} Shifts` : `Delete ${selectedWorkLogs.size} Work Logs`}
+            description={`Are you sure you want to delete ${bulkDeleteType === 'shifts' ? selectedShifts.size : selectedWorkLogs.size} selected ${bulkDeleteType === 'shifts' ? 'shift(s)' : 'work log(s)'}? This action cannot be undone.`}
+            onConfirm={handleBulkDelete}
+            isLoading={isSaving}
+          />
+        ) : null}
+      </Suspense>
 
       {/* Bulk Edit Work Logs Dialog */}
-      <BulkEditWorkLogDialog
-        open={bulkEditDialogOpen}
-        onOpenChange={setBulkEditDialogOpen}
-        accounts={accounts}
-        employees={employees}
-        equipment={equipment}
-        selectedCount={selectedWorkLogs.size}
-        onSave={handleBulkEditWorkLogs}
-        isLoading={isSaving}
-      />
+      <Suspense fallback={bulkEditDialogOpen ? reportsDialogFallback : null}>
+        {bulkEditDialogOpen ? (
+          <BulkEditWorkLogDialog
+            open={bulkEditDialogOpen}
+            onOpenChange={setBulkEditDialogOpen}
+            accounts={accounts}
+            employees={employees}
+            equipment={equipment}
+            selectedCount={selectedWorkLogs.size}
+            onSave={handleBulkEditWorkLogs}
+            isLoading={isSaving}
+          />
+        ) : null}
+      </Suspense>
 
       <Dialog open={photoViewerOpen} onOpenChange={setPhotoViewerOpen}>
         <DialogContent className="max-w-3xl">
