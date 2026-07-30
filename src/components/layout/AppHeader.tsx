@@ -343,6 +343,10 @@ export function AppHeader() {
                     <UserCog className="mr-2 h-4 w-4" />
                     Users & Roles
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/customer-setup')}>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Customer Setup
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/admin/employees')}>
                     <Users className="mr-2 h-4 w-4" />
                     Employees

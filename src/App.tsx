@@ -36,6 +36,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
+const CustomerOnboardingPage = lazy(() => import("./pages/admin/CustomerOnboardingPage"));
 const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
 const AccountsPage = lazy(() => import("./pages/admin/AccountsPage"));
 const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
@@ -211,6 +212,7 @@ const AppRoutes = () => (
               >
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<UsersPage />} />
+                <Route path="customer-setup" element={<CustomerOnboardingPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="equipment" element={<EquipmentPage />} />

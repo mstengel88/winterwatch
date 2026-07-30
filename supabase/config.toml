@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.home-assistant]
 verify_jwt = false
+
+[functions.onboard-customer]
+verify_jwt = true
