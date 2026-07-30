@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, CheckCircle2, Circle, Loader2, Plus } from 'lucide-react';
+import { Building2, CheckCircle2, Circle, Loader2, Plus, Users, Briefcase, Wrench, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,9 @@ export default function OrganizationsPage() {
       organization.plan.toLowerCase().includes(query)
     );
   }, [organizations, search]);
+
+  const activeOrganization =
+    organizations.find((organization) => organization.id === activeOrganizationId) ?? null;
 
   const handleSwitch = async (organizationId: string) => {
     setSwitchingId(organizationId);
@@ -78,6 +81,54 @@ export default function OrganizationsPage() {
           />
         </CardContent>
       </Card>
+
+      {activeOrganization && (
+        <Card className="bg-card/50 border-border/50">
+          <CardHeader className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg">Active Workspace</CardTitle>
+                <CardDescription>
+                  You are currently managing <span className="font-medium text-foreground">{activeOrganization.name}</span>.
+                </CardDescription>
+              </div>
+              <Badge className="gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Active
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{activeOrganization.slug}</Badge>
+              <Badge variant="outline">{activeOrganization.plan}</Badge>
+              <Badge variant="outline">{activeOrganization.status}</Badge>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin')}>
+                <Shield className="h-4 w-4" />
+                Admin Overview
+              </Button>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/users')}>
+                <Users className="h-4 w-4" />
+                Users & Roles
+              </Button>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/employees')}>
+                <Users className="h-4 w-4" />
+                Employees
+              </Button>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/accounts')}>
+                <Briefcase className="h-4 w-4" />
+                Accounts
+              </Button>
+              <Button variant="outline" className="justify-start gap-2" onClick={() => navigate('/admin/equipment')}>
+                <Wrench className="h-4 w-4" />
+                Equipment
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredOrganizations.map((organization) => {
