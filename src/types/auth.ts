@@ -19,6 +19,14 @@ export interface UserRole {
   created_by: string | null;
 }
 
+export interface OrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  status: string;
+}
+
 export interface Profile {
   active_organization_id: string | null;
   id: string;
@@ -39,6 +47,7 @@ export interface AuthContextType {
   profile: Profile | null;
   roles: AppRole[];
   activeOrganizationId: string | null;
+  organizations: OrganizationSummary[];
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
@@ -46,5 +55,6 @@ export interface AuthContextType {
   hasRole: (role: AppRole) => boolean;
   isAdminOrManager: () => boolean;
   isStaff: () => boolean;
+  switchOrganization: (organizationId: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }

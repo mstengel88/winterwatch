@@ -5,6 +5,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -45,10 +52,21 @@ const navItems: NavItem[] = [
 ];
 
 export function AppHeader() {
-  const { profile, roles, signOut, hasRole, isAdminOrManager, user } = useAuth();
+  const {
+    profile,
+    roles,
+    signOut,
+    hasRole,
+    isAdminOrManager,
+    user,
+    organizations,
+    activeOrganizationId,
+    switchOrganization,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSwitchingOrganization, setIsSwitchingOrganization] = useState(false);
   const { isNative } = useNativePlatform();
   const isMobile = useIsMobile();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -114,6 +132,23 @@ export function AppHeader() {
   const shortName = displayName.length > 12 ? displayName.slice(0, 12) + '...' : displayName;
   const mobilePrimaryNav = filteredNavItems.slice(0, 4);
   const isDispatchOnlyUser = roles.includes('dispatch_driver') && roles.length === 1;
+  const activeOrganization = organizations.find((organization) => organization.id === activeOrganizationId) ?? null;
+
+  const handleOrganizationSwitch = async (organizationId: string) => {
+    if (!organizationId || organizationId === activeOrganizationId) return;
+
+    setIsSwitchingOrganization(true);
+    try {
+      await switchOrganization(organizationId);
+      if (location.pathname.startsWith('/admin/customer-setup')) {
+        navigate('/admin/organizations');
+      }
+    } catch (error) {
+      console.error('Failed to switch organization:', error);
+    } finally {
+      setIsSwitchingOrganization(false);
+    }
+  };
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
@@ -170,6 +205,30 @@ export function AppHeader() {
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 p-4">
+                {!isDispatchOnlyUser && organizations.length > 1 && (
+                  <div className="mb-3 rounded-2xl border border-border/50 bg-muted/20 p-3">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Active workspace
+                    </p>
+                    <Select
+                      disabled={isSwitchingOrganization}
+                      value={activeOrganizationId ?? undefined}
+                      onValueChange={handleOrganizationSwitch}
+                    >
+                      <SelectTrigger className="h-10 rounded-xl border-border/50 bg-background/70 text-left">
+                        <SelectValue placeholder="Select organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizations.map((organization) => (
+                          <SelectItem key={organization.id} value={organization.id}>
+                            {organization.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {filteredNavItems.map((item) => {
                   const active = isActive(item.href);
                   return (
@@ -241,6 +300,11 @@ export function AppHeader() {
             <img src={APP_ICON} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
             <div className="flex flex-col">
               <span className="font-semibold text-foreground leading-none hidden sm:inline">WinterWatch-Pro</span>
+              {!isMobile && activeOrganization && !isDispatchOnlyUser && (
+                <span className="max-w-[180px] truncate text-[11px] leading-none text-muted-foreground">
+                  {activeOrganization.name}
+                </span>
+              )}
               <span className={cn(
                 "text-[10px] leading-none text-muted-foreground",
                 isMobile && "sm:hidden"
@@ -275,6 +339,25 @@ export function AppHeader() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {!isDispatchOnlyUser && organizations.length > 1 && (
+            <Select
+              disabled={isSwitchingOrganization}
+              value={activeOrganizationId ?? undefined}
+              onValueChange={handleOrganizationSwitch}
+            >
+              <SelectTrigger className="hidden h-9 w-[220px] rounded-full border-border/50 bg-background/70 md:flex">
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((organization) => (
+                  <SelectItem key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           {!isDispatchOnlyUser && (
             <Button
               variant="ghost"
@@ -346,6 +429,10 @@ export function AppHeader() {
                   <DropdownMenuItem onClick={() => navigate('/admin/customer-setup')}>
                     <Building2 className="mr-2 h-4 w-4" />
                     Customer Setup
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/admin/organizations')}>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Organizations
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/admin/employees')}>
                     <Users className="mr-2 h-4 w-4" />

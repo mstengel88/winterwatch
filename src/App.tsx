@@ -37,6 +37,7 @@ const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const UsersPage = lazy(() => import("./pages/admin/UsersPage"));
 const CustomerOnboardingPage = lazy(() => import("./pages/admin/CustomerOnboardingPage"));
+const OrganizationsPage = lazy(() => import("./pages/admin/OrganizationsPage"));
 const EmployeesPage = lazy(() => import("./pages/admin/EmployeesPage"));
 const AccountsPage = lazy(() => import("./pages/admin/AccountsPage"));
 const EquipmentPage = lazy(() => import("./pages/admin/EquipmentPage"));
@@ -213,6 +214,7 @@ const AppRoutes = () => (
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="customer-setup" element={<CustomerOnboardingPage />} />
+                <Route path="organizations" element={<OrganizationsPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="equipment" element={<EquipmentPage />} />
