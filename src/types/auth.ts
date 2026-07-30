@@ -14,11 +14,13 @@ export interface UserRole {
   id: string;
   user_id: string;
   role: AppRole;
+  organization_id: string;
   created_at: string;
   created_by: string | null;
 }
 
 export interface Profile {
+  active_organization_id: string | null;
   id: string;
   email: string | null;
   full_name: string | null;
@@ -36,6 +38,7 @@ export interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   roles: AppRole[];
+  activeOrganizationId: string | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;

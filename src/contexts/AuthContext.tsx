@@ -11,6 +11,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [initialized, setInitialized] = useState(false); // 🔥 important
 
@@ -29,24 +30,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (data as Profile | null) ?? null;
   }, []);
 
-  const fetchRoles = useCallback(async (userId: string): Promise<AppRole[]> => {
-    const { data, error } = await supabase
+  type RoleRow = {
+    organization_id: string | null;
+    role: AppRole;
+  };
+
+  const fetchRoles = useCallback(async (
+    userId: string,
+    organizationId?: string | null,
+  ): Promise<{ roles: AppRole[]; resolvedOrganizationId: string | null }> => {
+    let query = supabase
       .from('user_roles')
-      .select('role')
+      .select('role, organization_id')
       .eq('user_id', userId);
+
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.warn('fetchRoles error:', error.message);
-      return [];
+      return { roles: [], resolvedOrganizationId: organizationId ?? null };
     }
 
-    return (data as { role: AppRole }[] | null)?.map((r) => r.role) ?? [];
+    const roleRows = (data as RoleRow[] | null) ?? [];
+    const fallbackOrganizationId = organizationId ?? roleRows[0]?.organization_id ?? null;
+
+    const scopedRoles = fallbackOrganizationId
+      ? roleRows.filter((row) => row.organization_id === fallbackOrganizationId)
+      : roleRows;
+
+    return {
+      roles: scopedRoles.map((row) => row.role),
+      resolvedOrganizationId: fallbackOrganizationId,
+    };
   }, []);
 
   const loadUserData = useCallback(async (userId: string) => {
-    const [p, r] = await Promise.all([fetchProfile(userId), fetchRoles(userId)]);
-    setProfile(p);
-    setRoles(r);
+    const nextProfile = await fetchProfile(userId);
+    const nextOrganizationId = nextProfile?.active_organization_id ?? null;
+    const { roles: nextRoles, resolvedOrganizationId } = await fetchRoles(userId, nextOrganizationId);
+    const finalOrganizationId = nextOrganizationId ?? resolvedOrganizationId;
+
+    if (!nextOrganizationId && resolvedOrganizationId) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ active_organization_id: resolvedOrganizationId })
+        .eq('id', userId);
+
+      if (error) {
+        console.warn('Failed to backfill active organization:', error.message);
+      } else if (nextProfile) {
+        nextProfile.active_organization_id = resolvedOrganizationId;
+      }
+    }
+
+    setProfile(nextProfile);
+    setRoles(nextRoles);
+    setActiveOrganizationId(finalOrganizationId);
   }, [fetchProfile, fetchRoles]);
 
   useEffect(() => {
@@ -76,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setProfile(null);
         setRoles([]);
+        setActiveOrganizationId(null);
         setInitialized(true);
         setIsLoading(false);
       })
@@ -83,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         setProfile(null);
         setRoles([]);
+        setActiveOrganizationId(null);
         setInitialized(true);
         setIsLoading(false);
       });
@@ -112,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setProfile(null);
       setRoles([]);
+      setActiveOrganizationId(null);
       setInitialized(true);
       setIsLoading(false);
     });
@@ -151,6 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setActiveOrganizationId(null);
   };
 
   const value = useMemo<AuthContextType>(
@@ -159,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       roles,
+      activeOrganizationId,
       isLoading: isLoading || !initialized,
       signIn,
       signUp,
@@ -168,10 +216,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isStaff: () => roles.includes('driver') || roles.includes('dispatch_driver') || roles.includes('shovel_crew'),
       refreshProfile: async () => {
         if (!user) return;
-        setProfile(await fetchProfile(user.id));
+        const nextProfile = await fetchProfile(user.id);
+        setProfile(nextProfile);
+        setActiveOrganizationId(nextProfile?.active_organization_id ?? null);
       },
     }),
-    [user, session, profile, roles, isLoading, initialized, fetchProfile]
+    [user, session, profile, roles, activeOrganizationId, isLoading, initialized, fetchProfile]
   );
 
   return (

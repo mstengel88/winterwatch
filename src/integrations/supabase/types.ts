@@ -446,6 +446,36 @@ export type Database = {
         }
         Relationships: []
       }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          plan: string
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          plan?: string
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          plan?: string
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_types: {
         Row: {
           created_at: string
@@ -594,6 +624,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active_organization_id: string | null
           avatar_url: string | null
           created_at: string
           email: string | null
@@ -606,6 +637,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_organization_id?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -618,6 +650,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_organization_id?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -857,6 +890,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          organization_id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -864,6 +898,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          organization_id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -871,6 +906,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          organization_id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
