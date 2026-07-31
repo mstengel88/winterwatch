@@ -36,6 +36,26 @@ services:
     networks:
       - ghos-internal
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: winterwatch-pro-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    profiles:
+      - tunnel
+    networks:
+      - ghos-internal
+
 networks:
   ghos-internal:
     external: true

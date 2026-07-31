@@ -15,6 +15,7 @@ dist-ssr
 .env.*
 !.env.example
 !.env.ghos.example
+!.env.cloudflare.example
 
 # Editor directories and files
 .vscode/*

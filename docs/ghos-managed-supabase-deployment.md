@@ -74,6 +74,50 @@ http://GHOS-IP:8083
 Keep this port private to the LAN/Tailscale or place it behind the approved
 reverse proxy before changing public DNS.
 
+## Dedicated Cloudflare Tunnel
+
+WinterWatch uses its own remotely managed Cloudflare Tunnel container. The
+tunnel credential is separate from the browser-visible `.env.ghos` file:
+
+```bash
+cd /opt/ghos/apps/winterwatch-pro
+cp .env.cloudflare.example .env.cloudflare
+chmod 600 .env.cloudflare
+nano .env.cloudflare
+```
+
+Paste only the tunnel token issued for the dedicated WinterWatch tunnel. The
+token is a server credential: never commit it, print it in logs, or reuse a
+token belonging to another application.
+
+In Cloudflare, publish each approved WinterWatch hostname to this private
+Docker-network origin:
+
+```text
+http://winterwatch-pro-web:80
+```
+
+Start or update the connector without exposing the origin port publicly:
+
+```bash
+docker compose \
+  --env-file .env.ghos \
+  --env-file .env.cloudflare \
+  -f compose.ghos.yml \
+  --profile tunnel \
+  up -d cloudflared
+
+docker compose \
+  --env-file .env.ghos \
+  --env-file .env.cloudflare \
+  -f compose.ghos.yml \
+  --profile tunnel \
+  ps
+```
+
+Both containers use `restart: unless-stopped`, so Docker restores the web
+application and its dedicated connector after a GHOS VM restart.
+
 ## Routine deployment
 
 ```bash
