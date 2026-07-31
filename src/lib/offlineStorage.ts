@@ -13,6 +13,10 @@ const STORAGE_KEYS = {
   LAST_SYNC: 'winterwatch_last_sync',
 } as const;
 
+function getOrganizationScopedKey(baseKey: string, organizationId?: string | null): string {
+  return organizationId ? `${baseKey}:${organizationId}` : baseKey;
+}
+
 export interface PendingWorkLog {
   id: string;
   tempId: string;
@@ -117,18 +121,23 @@ export function incrementRetryCount(tempId: string, type: 'work' | 'shovel'): vo
 }
 
 // Cache accounts for offline access
-export function cacheAccounts(accounts: unknown[]): void {
+export function cacheAccounts(accounts: unknown[], organizationId?: string | null): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.CACHED_ACCOUNTS, JSON.stringify(accounts));
+    localStorage.setItem(
+      getOrganizationScopedKey(STORAGE_KEYS.CACHED_ACCOUNTS, organizationId),
+      JSON.stringify(accounts),
+    );
   } catch (error) {
     console.error('Error caching accounts:', error);
   }
 }
 
 // Get cached accounts
-export function getCachedAccounts<T>(): T[] {
+export function getCachedAccounts<T>(organizationId?: string | null): T[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEYS.CACHED_ACCOUNTS);
+    const stored = localStorage.getItem(
+      getOrganizationScopedKey(STORAGE_KEYS.CACHED_ACCOUNTS, organizationId),
+    );
     return stored ? JSON.parse(stored) : [];
   } catch (error) {
     console.error('Error reading cached accounts:', error);

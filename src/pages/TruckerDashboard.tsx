@@ -38,7 +38,7 @@ interface MaintenanceRequestInsert {
 }
 
 export default function TruckerDashboard() {
-  const { user } = useAuth();
+  const { user, activeOrganizationId } = useAuth();
   const { employee, isLoading: employeeLoading } = useEmployee();
   const { toast } = useToast();
 
@@ -53,26 +53,33 @@ export default function TruckerDashboard() {
   const [mileage, setMileage] = useState('');
 
   const fetchTrucks = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setTrucks([]);
+      return;
+    }
+
     const { data } = await supabase
       .from('equipment')
       .select('id, name, type, license_plate')
+      .eq('organization_id', activeOrganizationId)
       .eq('is_active', true)
       .order('name');
     setTrucks((data as Equipment[]) ?? []);
-  }, []);
+  }, [activeOrganizationId]);
 
   const fetchRequests = useCallback(async () => {
-    if (!employee) return;
+    if (!employee || !activeOrganizationId) return;
     setLoading(true);
     const { data } = await supabase
       .from('maintenance_requests')
       .select('id, problem_description, mileage, status, created_at, equipment:equipment_id(name)')
+      .eq('organization_id', activeOrganizationId)
       .eq('employee_id', employee.id)
       .order('created_at', { ascending: false })
       .limit(20);
     setRequests((data as MaintenanceRequest[]) ?? []);
     setLoading(false);
-  }, [employee]);
+  }, [activeOrganizationId, employee]);
 
   useEffect(() => {
     fetchTrucks();
@@ -98,6 +105,7 @@ export default function TruckerDashboard() {
     const { error } = await supabase
       .from('maintenance_requests')
       .insert({
+        organization_id: activeOrganizationId,
         employee_id: employee.id,
         equipment_id: selectedTruck,
         problem_description: problem.trim(),

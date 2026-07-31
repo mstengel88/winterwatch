@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from './useEmployee';
 import { useGeolocation } from './useGeolocation';
 import { WorkLog, Account, ServiceType } from '@/types/database';
@@ -41,6 +42,7 @@ interface CheckOutData {
 }
 
 export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLogsReturn {
+  const { activeOrganizationId } = useAuth();
   const { employee } = useEmployee();
   const { getCurrentLocation } = useGeolocation();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -52,10 +54,15 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
   const effectiveEmployeeId = options?.employeeId ?? employee?.id;
 
   const fetchAccounts = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setAccounts([]);
+      return;
+    }
+
     try {
       // If offline, use cached data
       if (!isOnline()) {
-        const cached = getCachedAccounts<Account>();
+        const cached = getCachedAccounts<Account>(activeOrganizationId);
         if (cached.length > 0) {
           setAccounts(cached);
           return;
@@ -65,6 +72,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
       const { data, error: fetchError } = await supabase
         .from('accounts')
         .select('*')
+        .eq('organization_id', activeOrganizationId)
         .eq('is_active', true)
         .in('service_type', ['plow', 'both'])
         .order('priority', { ascending: true })
@@ -76,21 +84,21 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
       setAccounts(accountsData);
       
       // Cache for offline use
-      cacheAccounts(accountsData);
+      cacheAccounts(accountsData, activeOrganizationId);
     } catch (err) {
       console.error('Error fetching accounts:', err);
       // Fallback to cached data on error
-      const cached = getCachedAccounts<Account>();
+      const cached = getCachedAccounts<Account>(activeOrganizationId);
       if (cached.length > 0) {
         setAccounts(cached);
       } else {
         setError('Failed to load accounts');
       }
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   const fetchActiveWorkLog = useCallback(async () => {
-    if (!effectiveEmployeeId) {
+    if (!effectiveEmployeeId || !activeOrganizationId) {
       setActiveWorkLog(null);
       return;
     }
@@ -103,6 +111,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
           account:accounts(*),
           equipment:equipment(*)
         `)
+        .eq('organization_id', activeOrganizationId)
         .eq('employee_id', effectiveEmployeeId)
         .eq('status', 'in_progress')
         .order('check_in_time', { ascending: false })
@@ -115,9 +124,14 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     } catch (err) {
       console.error('Error fetching active work log:', err);
     }
-  }, [effectiveEmployeeId]);
+  }, [activeOrganizationId, effectiveEmployeeId]);
 
   const fetchRecentWorkLogs = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setRecentWorkLogs([]);
+      return;
+    }
+
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -130,6 +144,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
           account:accounts(*),
           employee:employees(first_name, last_name)
         `)
+        .eq('organization_id', activeOrganizationId)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false })
         .limit(10);
@@ -140,7 +155,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     } catch (err) {
       console.error('Error fetching recent work logs:', err);
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -165,9 +180,14 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
       setError('No employee selected');
       return false;
     }
+    if (!activeOrganizationId) {
+      setError('No active organization selected');
+      return false;
+    }
 
     const location = await getCurrentLocation();
     const checkInData = {
+      organization_id: activeOrganizationId,
       account_id: accountId,
       employee_id: effectiveEmployeeId,
       equipment_id: equipmentId || null,
@@ -281,7 +301,8 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
       const { error: updateError } = await supabase
         .from('work_logs')
         .update(updatePayload)
-        .eq('id', activeWorkLog.id);
+        .eq('id', activeWorkLog.id)
+        .eq('organization_id', activeOrganizationId);
 
       if (updateError) throw updateError;
 
@@ -298,6 +319,10 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
   const updateActiveWorkLog = async (data: UpdateWorkLogData): Promise<boolean> => {
     if (!activeWorkLog) {
       setError('No active work log to update');
+      return false;
+    }
+    if (!activeOrganizationId) {
+      setError('No active organization selected');
       return false;
     }
 
@@ -320,7 +345,8 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
       const { error: updateError } = await supabase
         .from('work_logs')
         .update(updatePayload)
-        .eq('id', activeWorkLog.id);
+        .eq('id', activeWorkLog.id)
+        .eq('organization_id', activeOrganizationId);
 
       if (updateError) throw updateError;
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from './useEmployee';
 import { useGeolocation } from './useGeolocation';
 import { ShovelWorkLog, Account, ServiceType } from '@/types/database';
@@ -31,6 +32,7 @@ interface UpdateWorkLogData {
 }
 
 export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
+  const { activeOrganizationId } = useAuth();
   const { employee } = useEmployee();
   const { getCurrentLocation } = useGeolocation();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -40,10 +42,16 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
   const [error, setError] = useState<string | null>(null);
 
   const fetchAccounts = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setAccounts([]);
+      return;
+    }
+
     try {
       const { data, error: fetchError } = await supabase
         .from('accounts')
         .select('*')
+        .eq('organization_id', activeOrganizationId)
         .eq('is_active', true)
         .in('service_type', ['shovel', 'both'])
         .order('priority', { ascending: true })
@@ -56,10 +64,10 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
       console.error('Error fetching accounts:', err);
       setError('Failed to load accounts');
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   const fetchActiveWorkLog = useCallback(async () => {
-    if (!employee) {
+    if (!employee || !activeOrganizationId) {
       setActiveWorkLog(null);
       return;
     }
@@ -71,6 +79,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
           *,
           account:accounts(*)
         `)
+        .eq('organization_id', activeOrganizationId)
         .eq('employee_id', employee.id)
         .eq('status', 'in_progress')
         .order('check_in_time', { ascending: false })
@@ -85,10 +94,10 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
     } catch (err) {
       console.error('Error fetching active shovel work log:', err);
     }
-  }, [employee]);
+  }, [activeOrganizationId, employee]);
 
   const fetchRecentWorkLogs = useCallback(async () => {
-    if (!employee) {
+    if (!employee || !activeOrganizationId) {
       setRecentWorkLogs([]);
       return;
     }
@@ -103,6 +112,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
           *,
           account:accounts(*)
         `)
+        .eq('organization_id', activeOrganizationId)
         .eq('employee_id', employee.id)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false })
@@ -114,7 +124,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
     } catch (err) {
       console.error('Error fetching recent shovel work logs:', err);
     }
-  }, [employee]);
+  }, [activeOrganizationId, employee]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -137,6 +147,10 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
       setError('No employee record found');
       return false;
     }
+    if (!activeOrganizationId) {
+      setError('No active organization selected');
+      return false;
+    }
 
     const location = await getCurrentLocation();
 
@@ -144,6 +158,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
       const { data, error: insertError } = await supabase
         .from('shovel_work_logs')
         .insert({
+          organization_id: activeOrganizationId,
           account_id: accountId,
           employee_id: employee.id,
           service_type: serviceType,
@@ -194,7 +209,8 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
           notes: data.notes ?? null,
           photo_urls: data.photoUrls ?? null,
         })
-        .eq('id', activeWorkLog.id);
+        .eq('id', activeWorkLog.id)
+        .eq('organization_id', activeOrganizationId);
 
       if (updateError) throw updateError;
 
@@ -213,6 +229,10 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
       setError('No active work log found');
       return false;
     }
+    if (!activeOrganizationId) {
+      setError('No active organization selected');
+      return false;
+    }
 
     try {
       const updatePayload: Record<string, unknown> = {};
@@ -228,6 +248,7 @@ export function useShovelWorkLogs(): UseShovelWorkLogsReturn {
         .from('shovel_work_logs')
         .update(updatePayload)
         .eq('id', activeWorkLog.id)
+        .eq('organization_id', activeOrganizationId)
         .select(`
           *,
           account:accounts(*)

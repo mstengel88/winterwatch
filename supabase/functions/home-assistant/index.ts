@@ -28,6 +28,10 @@ type WorkLogSummaryRow = {
   employee: EmployeeName | null;
 };
 
+type RequesterProfile = {
+  active_organization_id: string | null;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,21 +57,60 @@ Deno.serve(async (req) => {
 
     const { data: userData, error: userError } = await anonClient.auth.getUser(token);
 
-    let supabase;
-    if (userData?.user) {
-      // Valid user JWT
-      console.log("[HA] Authenticated as user:", userData.user.email);
-      supabase = anonClient;
-    } else if (userError?.message?.includes("missing sub claim")) {
-      // This is a service_role key (no sub claim in JWT) — use it directly
-      console.log("[HA] Service role key detected, using as client key");
-      supabase = createClient(supabaseUrl, token, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-    } else {
+    if (!userData?.user) {
       console.log("[HA] Auth failed:", userError?.message);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("[HA] Authenticated as user:", userData.user.email);
+
+    const supabase = anonClient;
+    const { data: requesterProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("active_organization_id")
+      .eq("id", userData.user.id)
+      .maybeSingle() as { data: RequesterProfile | null; error: unknown };
+
+    if (profileError) {
+      console.log("[HA] Profile lookup failed:", profileError);
+      return new Response(JSON.stringify({ error: "Failed to load active organization" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const activeOrganizationId = requesterProfile?.active_organization_id;
+    if (!activeOrganizationId) {
+      return new Response(JSON.stringify({ error: "No active organization selected" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: requesterRoles, error: requesterRolesError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .eq("organization_id", activeOrganizationId);
+
+    if (requesterRolesError) {
+      console.log("[HA] Role lookup failed:", requesterRolesError);
+      return new Response(JSON.stringify({ error: "Failed to verify organization access" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const isAdminOrManager = (requesterRoles ?? []).some(
+      (role) => role.role === "admin" || role.role === "manager"
+    );
+
+    if (!isAdminOrManager) {
+      return new Response(JSON.stringify({ error: "Admin or manager access required" }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -86,11 +129,13 @@ Deno.serve(async (req) => {
       const { data: activeShifts } = await supabase
         .from("time_clock")
         .select("id, employee_id, clock_in_time, employee:employees(first_name, last_name)")
+        .eq("organization_id", activeOrganizationId)
         .is("clock_out_time", null);
 
       const { data: todayShifts } = await supabase
         .from("time_clock")
         .select("id, clock_in_time, clock_out_time")
+        .eq("organization_id", activeOrganizationId)
         .gte("clock_in_time", todayISO);
 
       let totalHoursToday = 0;
@@ -123,11 +168,13 @@ Deno.serve(async (req) => {
       const { data: plowLogs } = await supabase
         .from("work_logs")
         .select("id, status, service_type, billing_status, check_in_time, account:accounts(name), employee:employees(first_name, last_name)")
+        .eq("organization_id", activeOrganizationId)
         .gte("created_at", todayISO);
 
       const { data: shovelLogs } = await supabase
         .from("shovel_work_logs")
         .select("id, status, service_type, billing_status, check_in_time, account:accounts(name), employee:employees(first_name, last_name)")
+        .eq("organization_id", activeOrganizationId)
         .gte("created_at", todayISO);
 
       const allLogs = [...((plowLogs || []) as WorkLogSummaryRow[]), ...((shovelLogs || []) as WorkLogSummaryRow[])];
@@ -158,11 +205,13 @@ Deno.serve(async (req) => {
       const { count: plowCount } = await supabase
         .from("work_logs")
         .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
         .gte("created_at", todayISO);
 
       const { count: shovelCount } = await supabase
         .from("shovel_work_logs")
         .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
         .gte("created_at", todayISO);
 
       responseData.work_logs_today = (plowCount || 0) + (shovelCount || 0);
@@ -172,11 +221,13 @@ Deno.serve(async (req) => {
       const { count: allTimePlowCompleted } = await supabase
         .from("work_logs")
         .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
         .eq("status", "completed");
 
       const { count: allTimeShovelCompleted } = await supabase
         .from("shovel_work_logs")
         .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
         .eq("status", "completed");
 
       responseData.all_time_completed = (allTimePlowCompleted || 0) + (allTimeShovelCompleted || 0);

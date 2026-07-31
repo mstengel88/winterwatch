@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchRoles = useCallback(async (
     userId: string,
     organizationId?: string | null,
-  ): Promise<{ roles: AppRole[]; resolvedOrganizationId: string | null }> => {
+  ): Promise<{ roles: AppRole[]; resolvedOrganizationId: string | null; accessibleOrganizationIds: string[] }> => {
     const query = supabase
       .from('user_roles')
       .select('role, organization_id')
@@ -50,10 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.warn('fetchRoles error:', error.message);
-      return { roles: [], resolvedOrganizationId: organizationId ?? null };
+      return { roles: [], resolvedOrganizationId: organizationId ?? null, accessibleOrganizationIds: [] };
     }
 
     const roleRows = (data as RoleRow[] | null) ?? [];
+    const accessibleOrganizationIds = [...new Set(
+      roleRows
+        .map((row) => row.organization_id)
+        .filter((value): value is string => Boolean(value))
+    )];
     const preferredOrganizationId = organizationId ?? null;
     const preferredRoleRows = preferredOrganizationId
       ? roleRows.filter((row) => row.organization_id === preferredOrganizationId)
@@ -70,18 +75,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       roles: scopedRoles.map((row) => row.role),
       resolvedOrganizationId: fallbackOrganizationId,
+      accessibleOrganizationIds,
     };
   }, []);
 
   const loadUserData = useCallback(async (userId: string) => {
     const nextProfile = await fetchProfile(userId);
     const nextOrganizationId = nextProfile?.active_organization_id ?? null;
-    const { roles: nextRoles, resolvedOrganizationId } = await fetchRoles(userId, nextOrganizationId);
+    const {
+      roles: nextRoles,
+      resolvedOrganizationId,
+      accessibleOrganizationIds,
+    } = await fetchRoles(userId, nextOrganizationId);
     const finalOrganizationId = nextOrganizationId ?? resolvedOrganizationId;
-    const { data: organizationRows, error: organizationsError } = await supabase
-      .from('organizations')
-      .select('id, name, slug, plan, status')
-      .order('name');
+    let organizationRows: OrganizationSummary[] | null = [];
+    let organizationsError: { message: string } | null = null;
+
+    if (accessibleOrganizationIds.length > 0) {
+      const organizationsResult = await supabase
+        .from('organizations')
+        .select('id, name, slug, plan, status')
+        .in('id', accessibleOrganizationIds)
+        .order('name');
+
+      organizationRows = (organizationsResult.data as OrganizationSummary[] | null) ?? [];
+      organizationsError = organizationsResult.error;
+    }
 
     if (resolvedOrganizationId && nextOrganizationId !== resolvedOrganizationId) {
       const { error } = await supabase
@@ -103,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('Failed to load organizations:', organizationsError.message);
       setOrganizations([]);
     } else {
-      setOrganizations((organizationRows as OrganizationSummary[] | null) ?? []);
+      setOrganizations(organizationRows ?? []);
     }
   }, [fetchProfile, fetchRoles]);
 
@@ -220,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchOrganization = async (organizationId: string) => {
     if (!user) return;
+    if (!organizations.some((organization) => organization.id === organizationId)) return;
 
     const { error } = await supabase
       .from('profiles')

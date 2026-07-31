@@ -74,7 +74,7 @@ interface EquipmentOption {
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
-  const { profile, isAdminOrManager } = useAuth();
+  const { profile, isAdminOrManager, activeOrganizationId } = useAuth();
   const {
     employee,
     activeShift,
@@ -429,14 +429,28 @@ export default function DriverDashboard() {
 
   // Fetch equipment, plow employees, and on-shift status
   useEffect(() => {
-    supabase.from('equipment').select('*').eq('is_active', true).eq('status', 'available').then(({ data }) => {
-      if (data) setAllEquipment(data);
-    });
-    
-    // Fetch employees with plow or both category
+    if (!activeOrganizationId) {
+      setAllEquipment([]);
+      setPlowEmployees([]);
+      setOnShiftEmployeeIds(new Set());
+      return;
+    }
+
+    supabase
+      .from('equipment')
+      .select('*')
+      .eq('organization_id', activeOrganizationId)
+      .eq('is_active', true)
+      .eq('status', 'available')
+      .then(({ data }) => {
+        if (data) setAllEquipment(data);
+      });
+
+    // Fetch employees with plow or both category for the active organization only
     supabase
       .from('employees')
       .select('*')
+      .eq('organization_id', activeOrganizationId)
       .in('category', ['plow', 'both'])
       .eq('is_active', true)
       .order('first_name')
@@ -444,15 +458,18 @@ export default function DriverDashboard() {
         if (data) setPlowEmployees(data as Employee[]);
       });
 
-    // Fetch employees currently on shift
+    // Fetch employees currently on shift for the active organization only
     supabase
       .from('time_clock')
       .select('employee_id')
+      .eq('organization_id', activeOrganizationId)
       .is('clock_out_time', null)
       .then(({ data }) => {
-        if (data) setOnShiftEmployeeIds(new Set(data.map(d => d.employee_id)));
+        if (data) {
+          setOnShiftEmployeeIds(new Set(data.map((d) => d.employee_id)));
+        }
       });
-  }, []);
+  }, [activeOrganizationId]);
 
   // Auto-select employee matching logged-in user's email
   useEffect(() => {

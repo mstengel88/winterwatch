@@ -10,6 +10,9 @@ export default function AuthCallback() {
       const queryParams = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const getParam = (key: string) => queryParams.get(key) ?? hashParams.get(key);
+      const isPreviewSignIn = getParam("preview") === "1";
+      const nextPath = getParam("next");
+      const previewUserId = getParam("preview_user_id");
 
       const code = getParam("code");
       const accessToken = getParam("access_token");
@@ -25,6 +28,13 @@ export default function AuthCallback() {
       }
 
       try {
+        if (isPreviewSignIn) {
+          const { error } = await supabase.auth.signOut({ scope: "local" });
+          if (error) {
+            console.warn("Preview sign-in could not clear the current local session:", error);
+          }
+        }
+
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
@@ -60,7 +70,24 @@ export default function AuthCallback() {
         return;
       }
 
-      navigate(data.session ? "/app" : "/auth", { replace: true });
+      if (isPreviewSignIn && previewUserId && data.session?.user.id !== previewUserId) {
+        console.error("Preview auth resolved to the wrong user session.", {
+          expectedUserId: previewUserId,
+          actualUserId: data.session?.user.id ?? null,
+        });
+        await supabase.auth.signOut({ scope: "local" });
+        navigate("/auth", { replace: true });
+        return;
+      }
+
+      const destination =
+        data.session && nextPath?.startsWith("/")
+          ? nextPath
+          : data.session
+            ? "/app"
+            : "/auth";
+
+      navigate(destination, { replace: true });
     };
 
     run();

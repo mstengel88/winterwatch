@@ -48,6 +48,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    const { data: requesterProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('active_organization_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error loading active organization:', profileError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to load active organization' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const activeOrganizationId = requesterProfile?.active_organization_id;
+    if (!activeOrganizationId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'No active organization selected' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const payload: ActionPayload = await req.json();
     const { action, time_clock_id, employee_id } = payload;
 
@@ -71,8 +93,9 @@ Deno.serve(async (req) => {
     // Verify the employee belongs to the user
     const { data: employee, error: empError } = await supabase
       .from('employees')
-      .select('id, user_id, first_name, last_name')
+      .select('id, user_id, first_name, last_name, organization_id')
       .eq('id', employee_id)
+      .eq('organization_id', activeOrganizationId)
       .maybeSingle();
 
     if (empError || !employee) {
@@ -86,7 +109,8 @@ Deno.serve(async (req) => {
     const { data: userRoles } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('organization_id', activeOrganizationId);
 
     const isAdmin = userRoles?.some(r => r.role === 'admin' || r.role === 'manager');
     const isOwner = employee.user_id === user.id;
@@ -122,6 +146,8 @@ Deno.serve(async (req) => {
           clock_out_time: now,
         })
         .eq('id', time_clock_id)
+        .eq('employee_id', employee_id)
+        .eq('organization_id', activeOrganizationId)
         .is('clock_out_time', null)
         .select()
         .maybeSingle();

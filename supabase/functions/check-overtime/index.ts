@@ -32,6 +32,10 @@ interface DeviceToken {
   player_id: string;
 }
 
+interface RequesterProfile {
+  active_organization_id: string | null;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -71,10 +75,33 @@ Deno.serve(async (req) => {
       );
     }
 
+    const { data: requesterProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('active_organization_id')
+      .eq('id', user.id)
+      .maybeSingle() as { data: RequesterProfile | null; error: unknown };
+
+    if (profileError) {
+      console.error('Error fetching active organization:', profileError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to load active organization' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const activeOrganizationId = requesterProfile?.active_organization_id;
+    if (!activeOrganizationId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'No active organization selected' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { data: userRoles, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('organization_id', activeOrganizationId);
 
     if (roleError) {
       console.error('Error fetching user roles:', roleError);
@@ -98,6 +125,7 @@ Deno.serve(async (req) => {
     const { data: overtimeSettings, error: settingsError } = await supabase
       .from('overtime_notification_settings')
       .select('*')
+      .eq('organization_id', activeOrganizationId)
       .eq('is_enabled', true);
 
     if (settingsError) {
@@ -116,6 +144,7 @@ Deno.serve(async (req) => {
     const { data: activeClockEntries, error: clockError } = await supabase
       .from('time_clock')
       .select('id, employee_id, clock_in_time')
+      .eq('organization_id', activeOrganizationId)
       .is('clock_out_time', null);
 
     if (clockError) {
@@ -153,6 +182,7 @@ Deno.serve(async (req) => {
     const { data: employees, error: employeesError } = await supabase
       .from('employees')
       .select('id, first_name, last_name, user_id')
+      .eq('organization_id', activeOrganizationId)
       .in('id', employeeIds);
 
     if (employeesError) {
@@ -170,6 +200,7 @@ Deno.serve(async (req) => {
     const { data: sentNotifications, error: sentError } = await supabase
       .from('overtime_notifications_sent')
       .select('time_clock_id, threshold_hours')
+      .eq('organization_id', activeOrganizationId)
       .in('time_clock_id', clockEntryIds);
 
     if (sentError) {
@@ -186,6 +217,7 @@ Deno.serve(async (req) => {
     const { data: adminRoles, error: rolesError } = await supabase
       .from('user_roles')
       .select('user_id')
+      .eq('organization_id', activeOrganizationId)
       .in('role', ['admin', 'manager']);
 
     if (rolesError) {
@@ -273,6 +305,7 @@ Deno.serve(async (req) => {
             const { data: employeeTokens, error: empTokensError } = await supabase
               .from('push_device_tokens')
               .select('player_id')
+              .eq('organization_id', activeOrganizationId)
               .eq('user_id', employeeUserId)
               .eq('is_active', true);
 
@@ -309,6 +342,7 @@ Deno.serve(async (req) => {
                 console.log('Employee notification sent:', empData.id);
 
                 await supabase.from('notifications_log').insert({
+                  organization_id: activeOrganizationId,
                   user_id: employeeUserId,
                   notification_type: 'shift_status',
                   title,
@@ -331,6 +365,7 @@ Deno.serve(async (req) => {
             const { data: adminTokens, error: adminTokensError } = await supabase
               .from('push_device_tokens')
               .select('user_id, player_id')
+              .eq('organization_id', activeOrganizationId)
               .in('user_id', adminUserIdsToNotify)
               .eq('is_active', true);
 
@@ -364,6 +399,7 @@ Deno.serve(async (req) => {
                 // Log for each admin
                 for (const adminUserId of adminUserIdsToNotify) {
                   await supabase.from('notifications_log').insert({
+                    organization_id: activeOrganizationId,
                     user_id: adminUserId,
                     notification_type: 'shift_status',
                     title,
@@ -385,6 +421,7 @@ Deno.serve(async (req) => {
         const { error: insertError } = await supabase
           .from('overtime_notifications_sent')
           .insert({
+            organization_id: activeOrganizationId,
             time_clock_id: entry.id,
             employee_id: entry.employee_id,
             threshold_hours: setting.threshold_hours,

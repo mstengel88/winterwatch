@@ -64,7 +64,7 @@ interface AccountWithDistance {
 }
 
 export default function ShovelDashboard() {
-  const { profile } = useAuth();
+  const { profile, activeOrganizationId } = useAuth();
   const {
     employee,
     activeShift,
@@ -303,9 +303,15 @@ export default function ShovelDashboard() {
   // Fetch shovel employees from database
   useEffect(() => {
     const fetchShovelEmployees = async () => {
+      if (!activeOrganizationId) {
+        setShovelEmployees([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('employees')
         .select('*')
+        .eq('organization_id', activeOrganizationId)
         .in('category', ['shovel', 'both'])
         .eq('is_active', true)
         .order('first_name');
@@ -315,7 +321,7 @@ export default function ShovelDashboard() {
       }
     };
     fetchShovelEmployees();
-  }, []);
+  }, [activeOrganizationId]);
 
   // Shift timer
   useEffect(() => {

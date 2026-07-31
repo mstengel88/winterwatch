@@ -10,6 +10,47 @@ type PreviewRequest = {
   redirect_to?: string;
 };
 
+function normalizeActionLink(actionLink: string | undefined, redirectTo: string | undefined) {
+  if (!actionLink || !redirectTo) {
+    return actionLink ?? "";
+  }
+
+  try {
+    const url = new URL(actionLink);
+    url.searchParams.set("redirect_to", redirectTo);
+    return url.toString();
+  } catch {
+    return actionLink;
+  }
+}
+
+function buildDirectPreviewLink(params: {
+  redirectTo?: string;
+  tokenHash?: string;
+  verificationType?: string;
+  targetUserId: string;
+}) {
+  const { redirectTo, tokenHash, verificationType, targetUserId } = params;
+
+  if (!redirectTo || !tokenHash || !verificationType) {
+    return "";
+  }
+
+  try {
+    const url = new URL(redirectTo);
+    url.searchParams.set("token_hash", tokenHash);
+    url.searchParams.set("type", verificationType);
+    url.searchParams.set("preview", "1");
+    url.searchParams.set("preview_user_id", targetUserId);
+    if (!url.searchParams.get("next")) {
+      url.searchParams.set("next", "/app");
+    }
+    return url.toString();
+  } catch {
+    return redirectTo;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -103,6 +144,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: targetRoles, error: targetRolesError } = await adminClient
+      .from("user_roles")
+      .select("organization_id")
+      .eq("user_id", targetUserId);
+
+    if (targetRolesError) {
+      throw targetRolesError;
+    }
+
+    const requesterAdminOrgIds = new Set(
+      (requesterRoles ?? [])
+        .filter((row) => row.role === "admin" && row.organization_id)
+        .map((row) => row.organization_id as string),
+    );
+
+    const sharedAdminOrgId =
+      (targetRoles ?? [])
+        .map((row) => row.organization_id)
+        .find((organizationId) => organizationId && requesterAdminOrgIds.has(organizationId)) ?? null;
+
+    if (!sharedAdminOrgId) {
+      return new Response(JSON.stringify({
+        error: "You can only create preview links for users inside an organization where you are an admin.",
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "magiclink",
       email: targetProfile.email,
@@ -114,9 +184,6 @@ Deno.serve(async (req) => {
     if (linkError) {
       throw linkError;
     }
-
-    const requesterOrganizationId =
-      requesterRoles?.find((row) => row.role === "admin")?.organization_id ?? null;
 
     const { error: auditError } = await adminClient.from("audit_logs").insert({
       table_name: "user_preview_links",
@@ -133,17 +200,31 @@ Deno.serve(async (req) => {
         generated_at: new Date().toISOString(),
         generated_by: requester.id,
       },
-      organization_id: requesterOrganizationId,
+      organization_id: sharedAdminOrgId,
     });
 
     if (auditError) {
       console.error("Failed to write preview-link audit log:", auditError);
     }
 
+    const normalizedActionLink = normalizeActionLink(
+      linkData.properties.action_link,
+      redirectTo,
+    );
+    const directPreviewLink = buildDirectPreviewLink({
+      redirectTo: redirectTo ?? linkData.properties.redirect_to,
+      tokenHash: linkData.properties.hashed_token,
+      verificationType: linkData.properties.verification_type,
+      targetUserId,
+    });
+
     return new Response(JSON.stringify({
-      action_link: linkData.properties.action_link,
+      action_link: directPreviewLink || normalizedActionLink,
+      provider_action_link: normalizedActionLink,
       email_otp: linkData.properties.email_otp,
-      redirect_to: linkData.properties.redirect_to,
+      token_hash: linkData.properties.hashed_token,
+      verification_type: linkData.properties.verification_type,
+      redirect_to: redirectTo ?? linkData.properties.redirect_to,
       target_user: {
         id: targetProfile.id,
         email: targetProfile.email,

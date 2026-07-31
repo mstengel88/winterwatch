@@ -13,6 +13,7 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface WorkLog {
   id: string;
@@ -48,6 +49,7 @@ interface EmployeeNameRow {
 
 export default function WorkLogsPage() {
   const isMobile = useIsMobile();
+  const { activeOrganizationId } = useAuth();
   const [logs, setLogs] = useState<WorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -58,6 +60,11 @@ export default function WorkLogsPage() {
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (!activeOrganizationId) {
+        setLogs([]);
+        return;
+      }
+
       const days = parseInt(dateFilter);
       const startDate = startOfDay(subDays(new Date(), days - 1)).toISOString();
       const endDate = endOfDay(new Date()).toISOString();
@@ -66,6 +73,7 @@ export default function WorkLogsPage() {
         supabase
           .from('work_logs')
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address), equipment:equipment(name)')
+          .eq('organization_id', activeOrganizationId)
           .gte('created_at', startDate)
           .lte('created_at', endDate)
           .eq('billing_status', 'current')
@@ -73,6 +81,7 @@ export default function WorkLogsPage() {
         supabase
           .from('shovel_work_logs')
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address)')
+          .eq('organization_id', activeOrganizationId)
           .gte('created_at', startDate)
           .lte('created_at', endDate)
           .eq('billing_status', 'current')
@@ -91,6 +100,7 @@ export default function WorkLogsPage() {
         const { data: teamMembers, error: teamMembersError } = await supabase
           .from('employees')
           .select('id, first_name, last_name')
+          .eq('organization_id', activeOrganizationId)
           .in('id', shovelTeamIds);
 
         if (!teamMembersError && teamMembers) {
@@ -128,7 +138,7 @@ export default function WorkLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [dateFilter]);
+  }, [activeOrganizationId, dateFilter]);
 
   useEffect(() => {
     fetchLogs();

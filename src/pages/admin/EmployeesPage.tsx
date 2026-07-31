@@ -14,7 +14,7 @@ import { AppRole, Profile } from '@/types/auth';
 import { validateEmployeeForm } from '@/lib/validation/employee';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getCurrentWebAppUrl } from '@/lib/publicWebUrl';
+import { getCurrentWebAppUrl, getPublicWebAppUrl } from '@/lib/publicWebUrl';
 
 const OvertimeNotificationSettings = lazy(async () => {
   const module = await import('@/components/admin/OvertimeNotificationSettings');
@@ -396,7 +396,7 @@ export default function EmployeesPage() {
           create_employee: workspaceInviteForm.create_employee,
           employee_category: workspaceInviteForm.employee_category,
           employee_id: workspaceInviteForm.employee_id || undefined,
-          invite_redirect_to: getCurrentWebAppUrl('/auth/callback'),
+          invite_redirect_to: getPublicWebAppUrl('/auth/callback'),
         },
       });
 
@@ -513,7 +513,7 @@ export default function EmployeesPage() {
       const { data, error } = await supabase.functions.invoke('create-user-preview-link', {
         body: {
           target_user_id: user.id,
-          redirect_to: getCurrentWebAppUrl('/auth/callback?preview=1'),
+          redirect_to: getPublicWebAppUrl('/auth/callback?preview=1&next=/app'),
         },
       });
 

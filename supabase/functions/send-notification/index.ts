@@ -40,6 +40,14 @@ interface DeviceToken {
   platform: string;
 }
 
+interface RequesterProfile {
+  active_organization_id: string | null;
+}
+
+interface RequesterRole {
+  role: string;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -83,11 +91,42 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user is admin or manager
-    const { data: roles } = await supabase
+    const { data: requesterProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("active_organization_id")
+      .eq("id", user.id)
+      .maybeSingle() as { data: RequesterProfile | null; error: unknown };
+
+    if (profileError) {
+      console.error("Profile lookup error:", profileError);
+      return new Response(
+        JSON.stringify({ error: "Failed to load active organization" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const activeOrganizationId = requesterProfile?.active_organization_id;
+    if (!activeOrganizationId) {
+      return new Response(
+        JSON.stringify({ error: "No active organization selected" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if user is admin or manager in the active organization
+    const { data: roles, error: rolesError } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("organization_id", activeOrganizationId) as { data: RequesterRole[] | null; error: unknown };
+
+    if (rolesError) {
+      console.error("Role lookup error:", rolesError);
+      return new Response(
+        JSON.stringify({ error: "Failed to verify organization permissions" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const isAdminOrManager = roles?.some(r => r.role === "admin" || r.role === "manager");
     
@@ -151,11 +190,35 @@ Deno.serve(async (req) => {
       const { data: tokens } = await supabase
         .from("push_device_tokens")
         .select("user_id")
+        .eq("organization_id", activeOrganizationId)
         .eq("is_active", true);
       
       targetUserIds = [...new Set(tokens?.map(t => t.user_id) || [])];
     } else if (user_ids && user_ids.length > 0) {
-      targetUserIds = user_ids;
+      const { data: scopedUsers, error: scopedUsersError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("organization_id", activeOrganizationId)
+        .in("user_id", user_ids);
+
+      if (scopedUsersError) {
+        console.error("Scoped user lookup error:", scopedUsersError);
+        return new Response(
+          JSON.stringify({ error: "Failed to verify target users" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const allowedUserIds = new Set((scopedUsers ?? []).map((row) => row.user_id));
+      const invalidUserIds = user_ids.filter((id) => !allowedUserIds.has(id));
+      if (invalidUserIds.length > 0) {
+        return new Response(
+          JSON.stringify({ error: "Some target users are outside the active organization", invalid_user_ids: invalidUserIds }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      targetUserIds = [...allowedUserIds];
     } else {
       return new Response(
         JSON.stringify({ error: "No target users specified" }),
@@ -169,6 +232,7 @@ Deno.serve(async (req) => {
     const { data: preferences } = await supabase
       .from("notification_preferences")
       .select("*")
+      .eq("organization_id", activeOrganizationId)
       .in("user_id", targetUserIds) as { data: NotificationPreference[] | null };
 
     // Filter users based on their preferences
@@ -205,6 +269,7 @@ Deno.serve(async (req) => {
     const { data: deviceTokens } = await supabase
       .from("push_device_tokens")
       .select("*")
+      .eq("organization_id", activeOrganizationId)
       .in("user_id", eligibleUserIds)
       .eq("is_active", true) as { data: DeviceToken[] | null };
 
@@ -277,6 +342,7 @@ Deno.serve(async (req) => {
       const { error: deactivateError } = await supabase
         .from("push_device_tokens")
         .update({ is_active: false })
+        .eq("organization_id", activeOrganizationId)
         .in("player_id", invalidIds);
       
       if (deactivateError) {
@@ -314,6 +380,7 @@ Deno.serve(async (req) => {
 
     // Log notifications for each user
     const notificationLogs = eligibleUserIds.map(userId => ({
+      organization_id: activeOrganizationId,
       user_id: userId,
       notification_type,
       title,

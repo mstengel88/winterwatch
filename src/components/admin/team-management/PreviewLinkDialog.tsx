@@ -15,6 +15,16 @@ interface PreviewLinkDialogProps {
 }
 
 export default function PreviewLinkDialog({ previewLink, onCopy, onClose }: PreviewLinkDialogProps) {
+  const openPreviewLink = () => {
+    if (!previewLink) return;
+
+    const anchor = document.createElement('a');
+    anchor.href = previewLink.actionLink;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.click();
+  };
+
   return (
     <Dialog open={Boolean(previewLink)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
@@ -46,7 +56,7 @@ export default function PreviewLinkDialog({ previewLink, onCopy, onClose }: Prev
           <Button
             type="button"
             className="gap-2"
-            onClick={() => previewLink && window.open(previewLink.actionLink, '_blank', 'noopener,noreferrer')}
+            onClick={openPreviewLink}
           >
             <ExternalLink className="h-4 w-4" />
             Open Preview Link

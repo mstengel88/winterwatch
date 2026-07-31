@@ -11,6 +11,7 @@ import { Clock, Search, Calendar, Users, Loader2 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInMinutes, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { TimeClockEntriesTable } from '@/components/timeclock/TimeClockEntriesTable';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TimeClockEntry {
   id: string;
@@ -65,6 +66,7 @@ function ElapsedTime({ clockInTime }: { clockInTime: string }) {
 }
 
 export default function TimeClockPage() {
+  const { activeOrganizationId } = useAuth();
   const [entries, setEntries] = useState<TimeClockEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -76,6 +78,11 @@ export default function TimeClockPage() {
   const fetchEntries = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (!activeOrganizationId) {
+        setEntries([]);
+        return;
+      }
+
       const days = parseInt(dateFilter);
       const startDate = startOfDay(subDays(new Date(), days - 1)).toISOString();
       const endDate = endOfDay(new Date()).toISOString();
@@ -83,6 +90,7 @@ export default function TimeClockPage() {
       const { data, error } = await supabase
         .from('time_clock')
         .select('*, employee:employees(first_name, last_name), created_at, updated_at')
+        .eq('organization_id', activeOrganizationId)
         .gte('clock_in_time', startDate)
         .lte('clock_in_time', endDate)
         .order('clock_in_time', { ascending: false });
@@ -95,7 +103,7 @@ export default function TimeClockPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [dateFilter]);
+  }, [activeOrganizationId, dateFilter]);
 
   useEffect(() => {
     fetchEntries();
@@ -146,6 +154,7 @@ export default function TimeClockPage() {
       const { error } = await supabase
         .from('time_clock')
         .update(updateData)
+        .eq('organization_id', activeOrganizationId)
         .eq('id', entryId);
 
       if (error) throw error;

@@ -36,6 +36,42 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: requesterProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("active_organization_id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Profile lookup error:", profileError);
+      return new Response(JSON.stringify({ error: "Failed to load active organization" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const activeOrganizationId = requesterProfile?.active_organization_id;
+    if (!activeOrganizationId) {
+      return new Response(JSON.stringify({ error: "No active organization selected" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: requesterRoles, error: requesterRolesError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("organization_id", activeOrganizationId);
+
+    if (requesterRolesError || !requesterRoles?.length) {
+      console.error("Requester role lookup error:", requesterRolesError);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { equipment_name, problem_description, driver_name } = await req.json();
     console.log(`Maintenance request from ${driver_name} for ${equipment_name}`);
 
@@ -46,6 +82,7 @@ Deno.serve(async (req) => {
     const { data: adminRoles } = await supabase
       .from("user_roles")
       .select("user_id")
+      .eq("organization_id", activeOrganizationId)
       .in("role", ["admin", "manager"]);
 
     const allAdminUserIds = [...new Set(adminRoles?.map((r) => r.user_id) || [])];
@@ -55,6 +92,7 @@ Deno.serve(async (req) => {
     const { data: disabledSettings } = await supabase
       .from("maintenance_notification_settings")
       .select("user_id")
+      .eq("organization_id", activeOrganizationId)
       .in("user_id", allAdminUserIds)
       .eq("enabled", false);
 
@@ -71,6 +109,7 @@ Deno.serve(async (req) => {
 
     // Log notifications for bell icon (in-app)
     const notificationLogs = adminUserIds.map((userId) => ({
+      organization_id: activeOrganizationId,
       user_id: userId,
       notification_type: "admin_announcement" as const,
       title,
@@ -97,6 +136,7 @@ Deno.serve(async (req) => {
     const { data: deviceTokens } = await supabase
       .from("push_device_tokens")
       .select("player_id")
+      .eq("organization_id", activeOrganizationId)
       .in("user_id", adminUserIds)
       .eq("is_active", true);
 
@@ -137,6 +177,7 @@ Deno.serve(async (req) => {
       await supabase
         .from("push_device_tokens")
         .update({ is_active: false })
+        .eq("organization_id", activeOrganizationId)
         .in("player_id", invalidIds);
       console.log(`Deactivated ${invalidIds.length} invalid tokens`);
     }
