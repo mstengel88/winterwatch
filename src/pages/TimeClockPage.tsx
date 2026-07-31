@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Clock, Search, Calendar, Users, Timer, Loader2, MapPin, Play, Square, LogOut, Pencil } from 'lucide-react';
+import { ClockOutConfirmDialog } from '@/components/ClockOutConfirmDialog';
+import { Clock, Search, Calendar, Users, Loader2 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInMinutes, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
+import { TimeClockEntriesTable } from '@/components/timeclock/TimeClockEntriesTable';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TimeClockEntry {
   id: string;
@@ -64,15 +66,23 @@ function ElapsedTime({ clockInTime }: { clockInTime: string }) {
 }
 
 export default function TimeClockPage() {
+  const { activeOrganizationId } = useAuth();
   const [entries, setEntries] = useState<TimeClockEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('7');
   const [clockingOut, setClockingOut] = useState<string | null>(null);
+  const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
+  const [pendingClockOut, setPendingClockOut] = useState<{ entryId: string; employeeName: string } | null>(null);
 
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (!activeOrganizationId) {
+        setEntries([]);
+        return;
+      }
+
       const days = parseInt(dateFilter);
       const startDate = startOfDay(subDays(new Date(), days - 1)).toISOString();
       const endDate = endOfDay(new Date()).toISOString();
@@ -80,6 +90,7 @@ export default function TimeClockPage() {
       const { data, error } = await supabase
         .from('time_clock')
         .select('*, employee:employees(first_name, last_name), created_at, updated_at')
+        .eq('organization_id', activeOrganizationId)
         .gte('clock_in_time', startDate)
         .lte('clock_in_time', endDate)
         .order('clock_in_time', { ascending: false });
@@ -92,14 +103,23 @@ export default function TimeClockPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeOrganizationId, dateFilter]);
 
   useEffect(() => {
     fetchEntries();
-  }, [dateFilter]);
+  }, [fetchEntries]);
 
-  const handleClockOut = async (entryId: string) => {
+  const handleClockOutClick = (entryId: string, employeeName: string) => {
+    setPendingClockOut({ entryId, employeeName });
+    setShowClockOutConfirm(true);
+  };
+
+  const handleClockOutConfirm = async () => {
+    if (!pendingClockOut) return;
+    
+    const { entryId } = pendingClockOut;
     setClockingOut(entryId);
+    
     try {
       // Capture GPS location
       let clockOutLocation: { latitude: number; longitude: number } | null = null;
@@ -134,6 +154,7 @@ export default function TimeClockPage() {
       const { error } = await supabase
         .from('time_clock')
         .update(updateData)
+        .eq('organization_id', activeOrganizationId)
         .eq('id', entryId);
 
       if (error) throw error;
@@ -145,6 +166,7 @@ export default function TimeClockPage() {
       toast.error('Failed to clock out employee');
     } finally {
       setClockingOut(null);
+      setPendingClockOut(null);
     }
   };
 
@@ -227,7 +249,7 @@ export default function TimeClockPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Hours</CardTitle>
@@ -316,7 +338,7 @@ export default function TimeClockPage() {
             <CardHeader className="pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <CardTitle className="text-base">Time Entries</CardTitle>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:flex">
                   <div className="relative flex-1 sm:w-[200px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -327,7 +349,7 @@ export default function TimeClockPage() {
                     />
                   </div>
                   <Select value={dateFilter} onValueChange={setDateFilter}>
-                    <SelectTrigger className="w-[130px] bg-background/50">
+                    <SelectTrigger className="w-full sm:w-[130px] bg-background/50">
                       <Calendar className="h-4 w-4 mr-2" />
                       <SelectValue />
                     </SelectTrigger>
@@ -350,110 +372,27 @@ export default function TimeClockPage() {
                   No time entries found.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-border/50 hover:bg-transparent">
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Clock In</TableHead>
-                        <TableHead>Clock Out</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEntries.slice(0, 15).map((entry) => (
-                        <TableRow key={entry.id} className={`border-border/50 ${isEdited(entry) ? 'bg-destructive/10' : ''}`}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {entry.employee
-                                ? `${entry.employee.first_name} ${entry.employee.last_name}`
-                                : '-'}
-                              {isEdited(entry) && (
-                                <Badge variant="outline" className="text-destructive border-destructive/50 gap-1 text-xs">
-                                  <Pencil className="h-3 w-3" />
-                                  Edited
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(entry.clock_in_time), 'MM/dd/yy')}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Play className="h-3 w-3 text-green-500" />
-                              {formatTime(entry.clock_in_time)}
-                            </div>
-                            {entry.clock_in_latitude && (
-                              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                GPS recorded
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {entry.clock_out_time ? (
-                              <div className="flex items-center gap-1">
-                                <Square className="h-3 w-3 text-red-500" />
-                                {formatTime(entry.clock_out_time)}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1 text-sm">
-                              <Timer className="h-3 w-3 text-muted-foreground" />
-                              {entry.clock_out_time ? (
-                                getDuration(entry.clock_in_time, entry.clock_out_time)
-                              ) : (
-                                <ElapsedTime clockInTime={entry.clock_in_time} />
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {entry.clock_out_time ? (
-                              <Badge variant="outline">Completed</Badge>
-                            ) : (
-                              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                                <span className="h-1.5 w-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse" />
-                                Active
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {!entry.clock_out_time && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleClockOut(entry.id)}
-                                disabled={clockingOut === entry.id}
-                                className="h-7 px-2"
-                              >
-                                {clockingOut === entry.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <>
-                                    <LogOut className="h-3 w-3 mr-1" />
-                                    Clock Out
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <TimeClockEntriesTable
+                  entries={filteredEntries}
+                  clockingOut={clockingOut}
+                  onClockOutClick={handleClockOutClick}
+                  isEdited={isEdited}
+                  formatTime={formatTime}
+                  getDuration={getDuration}
+                  renderElapsedTime={(clockInTime) => <ElapsedTime clockInTime={clockInTime} />}
+                />
               )}
             </CardContent>
           </Card>
         </div>
       </div>
+      
+      <ClockOutConfirmDialog
+        open={showClockOutConfirm}
+        onOpenChange={setShowClockOutConfirm}
+        onConfirm={handleClockOutConfirm}
+        employeeName={pendingClockOut?.employeeName}
+      />
     </AppLayout>
   );
 }

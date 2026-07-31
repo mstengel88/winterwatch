@@ -1,47 +1,69 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState, type ElementType } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import { Home, Shovel, ClipboardList, BarChart3, Bell, ChevronDown, LogOut, User, Settings, Clock, Menu, Shield, Truck, Users, Building2, Wrench, UserCog } from 'lucide-react';
+import { Shovel, ClipboardList, BarChart3, Menu, Shield, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import logo from '@/assets/logo.png';
+import { useNativePlatform } from '@/hooks/useNativePlatform';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { AppRole, OrganizationSummary } from '@/types/auth';
+
+const AppHeaderNotificationBell = lazy(async () => {
+  const module = await import('@/components/layout/AppHeaderNotificationBell');
+  return { default: module.AppHeaderNotificationBell };
+});
+
+const AppHeaderWorkspaceSelector = lazy(async () => {
+  const module = await import('@/components/layout/AppHeaderMenus');
+  return { default: module.AppHeaderWorkspaceSelector };
+});
+
+const AppHeaderAccountMenu = lazy(async () => {
+  const module = await import('@/components/layout/AppHeaderMenus');
+  return { default: module.AppHeaderAccountMenu };
+});
+
+const AppHeaderMobileMenu = lazy(async () => {
+  const module = await import('@/components/layout/AppHeaderMenus');
+  return { default: module.AppHeaderMobileMenu };
+});
+
+const APP_VERSION = '4.2';
+const APP_ICON = '/favicon.png';
 
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ElementType;
+  icon: ElementType;
   roles?: string[];
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['driver', 'admin', 'manager'] },
-  { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['shovel_crew', 'admin', 'manager'] },
-  { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager'] },
+  { href: '/dashboard', label: 'Dashboard', icon: Truck, roles: ['admin', 'manager', 'driver', 'dispatch_driver', 'trucker'] },
+  { href: '/shovel', label: 'Shovel Crew', icon: Shovel, roles: ['admin', 'manager', 'shovel_crew'] },
+  { href: '/work-logs', label: 'Work Logs', icon: ClipboardList, roles: ['admin', 'manager', 'work_log_viewer'] },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'manager'] },
   { href: '/admin', label: 'Admin', icon: Shield, roles: ['admin', 'manager'] },
 ];
 
 export function AppHeader() {
-  const { profile, signOut, hasRole, isAdminOrManager } = useAuth();
+  const {
+    profile,
+    roles,
+    signOut,
+    hasRole,
+    isAdminOrManager,
+    user,
+    organizations,
+    activeOrganizationId,
+    switchOrganization,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSwitchingOrganization, setIsSwitchingOrganization] = useState(false);
+  const { isNative } = useNativePlatform();
+  const isMobile = useIsMobile();
 
   const handleSignOut = async () => {
     await signOut();
@@ -57,7 +79,7 @@ export function AppHeader() {
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
     // Check if user has any of the required roles
-    return item.roles.some((role) => hasRole(role as any));
+    return item.roles.some((role) => hasRole(role as AppRole));
   });
 
   const initials = profile?.full_name
@@ -68,7 +90,26 @@ export function AppHeader() {
     .toUpperCase() || 'U';
 
   const displayName = profile?.full_name || profile?.email || 'User';
-  const shortName = displayName.length > 12 ? displayName.slice(0, 12) + '...' : displayName;
+  const mobilePrimaryNav = filteredNavItems.slice(0, 4);
+  const isDispatchOnlyUser = false;
+  const activeOrganization = organizations.find((organization) => organization.id === activeOrganizationId) ?? null;
+  const headerMenuFallback = <div className="h-10 w-10" />;
+
+  const handleOrganizationSwitch = async (organizationId: string) => {
+    if (!organizationId || organizationId === activeOrganizationId) return;
+
+    setIsSwitchingOrganization(true);
+    try {
+      await switchOrganization(organizationId);
+      if (location.pathname.startsWith('/admin/customer-setup')) {
+        navigate('/admin/organizations');
+      }
+    } catch (error) {
+      console.error('Failed to switch organization:', error);
+    } finally {
+      setIsSwitchingOrganization(false);
+    }
+  };
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return location.pathname === href;
@@ -78,7 +119,10 @@ export function AppHeader() {
 
   // Determine home route based on role
   const getHomeRoute = () => {
-    if (isAdminOrManager() || hasRole('driver')) {
+    if (isAdminOrManager()) {
+      return '/admin';
+    }
+    if (hasRole('driver') || hasRole('dispatch_driver') || hasRole('trucker')) {
       return '/dashboard';
     }
     if (hasRole('shovel_crew')) {
@@ -88,74 +132,54 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-      <div className="container flex h-14 items-center justify-between px-4">
+    <>
+      <header className={cn(
+        "sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60",
+        isNative && "pt-[env(safe-area-inset-top)]"
+      )}>
+        <div className={cn(
+          "mx-auto flex items-center justify-between px-4",
+          isMobile ? "h-16 max-w-full" : "h-14 max-w-6xl"
+        )}>
         {/* Left: Mobile Menu + Logo */}
         <div className="flex items-center gap-3">
-          {/* Mobile Hamburger Menu */}
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden h-8 w-8">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0">
-              <SheetHeader className="border-b border-border/40 p-4">
-                <SheetTitle className="flex items-center gap-2">
-                  <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
-                  <span className="font-semibold">WinterWatch-Pro</span>
-                </SheetTitle>
-              </SheetHeader>
-              <nav className="flex flex-col p-4 space-y-1">
-                {filteredNavItems.map((item) => {
-                  const active = isActive(item.href);
-                  return (
-                    <Button
-                      key={item.href}
-                      variant={active ? 'secondary' : 'ghost'}
-                      className={cn(
-                        'justify-start gap-3 h-11',
-                        active && 'bg-primary/10 text-primary border border-primary/30'
-                      )}
-                      onClick={() => handleNavigate(item.href)}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      {item.label}
-                    </Button>
-                  );
-                })}
-              </nav>
-              <div className="absolute bottom-0 left-0 right-0 border-t border-border/40 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-primary/20 text-primary">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{displayName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
-                  </div>
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
-                  onClick={handleSignOut}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
+          <Suspense fallback={headerMenuFallback}>
+            <AppHeaderMobileMenu
+              activeOrganizationId={activeOrganizationId}
+              displayName={displayName}
+              email={profile?.email}
+              filteredNavItems={filteredNavItems}
+              initials={initials}
+              isOpen={mobileMenuOpen}
+              isSwitchingOrganization={isSwitchingOrganization}
+              organizations={organizations as OrganizationSummary[]}
+              onNavigate={handleNavigate}
+              onOpenChange={setMobileMenuOpen}
+              onOrganizationSwitch={handleOrganizationSwitch}
+              onSignOut={handleSignOut}
+            />
+          </Suspense>
 
           {/* Logo */}
           <div 
             className="flex items-center gap-2 cursor-pointer" 
             onClick={() => navigate(getHomeRoute())}
           >
-            <img src={logo} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
-            <span className="font-semibold text-foreground hidden sm:inline">WinterWatch-Pro</span>
+            <img src={APP_ICON} alt="WinterWatch-Pro" className="h-8 w-8 rounded-full object-cover" />
+            <div className="flex flex-col">
+              <span className="font-semibold text-foreground leading-none hidden sm:inline">WinterWatch-Pro</span>
+              {!isMobile && activeOrganization && !isDispatchOnlyUser && (
+                <span className="max-w-[180px] truncate text-[11px] leading-none text-muted-foreground">
+                  {activeOrganization.name}
+                </span>
+              )}
+              <span className={cn(
+                "text-[10px] leading-none text-muted-foreground",
+                isMobile && "sm:hidden"
+              )}>
+                v{APP_VERSION}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -183,67 +207,72 @@ export function AppHeader() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-            <Bell className="h-4 w-4" />
-          </Button>
+          {!isDispatchOnlyUser && organizations.length > 1 && (
+            <Suspense fallback={<div className="hidden h-9 w-[220px] md:block" />}>
+              <AppHeaderWorkspaceSelector
+                activeOrganizationId={activeOrganizationId}
+                disabled={isSwitchingOrganization}
+                organizations={organizations as OrganizationSummary[]}
+                onValueChange={handleOrganizationSwitch}
+                triggerClassName="hidden h-9 w-[220px] rounded-full border-border/50 bg-background/70 md:flex"
+              />
+            </Suspense>
+          )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 gap-2 px-2">
-                <Avatar className="h-6 w-6">
-                  <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden sm:inline text-sm text-foreground">{shortName}</span>
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/settings')}>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-              {isAdminOrManager() && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/admin/users')}>
-                    <UserCog className="mr-2 h-4 w-4" />
-                    Users & Roles
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/admin/employees')}>
-                    <Users className="mr-2 h-4 w-4" />
-                    Employees
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/admin/accounts')}>
-                    <Building2 className="mr-2 h-4 w-4" />
-                    Accounts
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/admin/equipment')}>
-                    <Wrench className="mr-2 h-4 w-4" />
-                    Equipment
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/time-clock')}>
-                    <Clock className="mr-2 h-4 w-4" />
-                    Time Clock
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {!isDispatchOnlyUser && (
+            <Suspense fallback={<div className="h-10 w-10" />}>
+              <AppHeaderNotificationBell userId={user?.id} />
+            </Suspense>
+          )}
+
+          <Suspense fallback={headerMenuFallback}>
+            <AppHeaderAccountMenu
+              displayName={displayName}
+              initials={initials}
+              isAdminOrManager={isAdminOrManager()}
+              isMobile={isMobile}
+              onNavigate={(href) => navigate(href)}
+              onSignOut={handleSignOut}
+            />
+          </Suspense>
         </div>
-      </div>
-    </header>
+        </div>
+      </header>
+
+      {isMobile && (
+        <div className="ios-bottom-nav md:hidden">
+          <div className="grid grid-cols-5 gap-1 px-2 py-2">
+            {mobilePrimaryNav.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => handleNavigate(item.href)}
+                  className={cn(
+                    "flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium transition-colors",
+                    active
+                      ? "bg-primary/12 text-primary"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+            >
+              <Menu className="h-4 w-4" />
+              <span>More</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

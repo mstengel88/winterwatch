@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+!.env.ghos.example
+!.env.cloudflare.example
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +27,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.xcworkspacedata
+*.resolved
+*.xcworkspace/
+**/xcshareddata/swiftpm/Package.resolved
+supabase/.temp/

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, Search, Filter, Truck, Shovel, Clock, MapPin, Calendar, FileDown } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { Loader2 } from 'lucide-react';
-import { generateWorkLogsPDF } from '@/lib/pdfExport';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface WorkLog {
   id: string;
@@ -36,7 +37,19 @@ interface WorkLog {
   teamMemberNames?: string[];
 }
 
+interface ShovelTeamLogRow {
+  team_member_ids?: string[] | null;
+}
+
+interface EmployeeNameRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
 export default function WorkLogsPage() {
+  const isMobile = useIsMobile();
+  const { activeOrganizationId } = useAuth();
   const [logs, setLogs] = useState<WorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -44,9 +57,14 @@ export default function WorkLogsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('all');
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (!activeOrganizationId) {
+        setLogs([]);
+        return;
+      }
+
       const days = parseInt(dateFilter);
       const startDate = startOfDay(subDays(new Date(), days - 1)).toISOString();
       const endDate = endOfDay(new Date()).toISOString();
@@ -55,21 +73,25 @@ export default function WorkLogsPage() {
         supabase
           .from('work_logs')
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address), equipment:equipment(name)')
+          .eq('organization_id', activeOrganizationId)
           .gte('created_at', startDate)
           .lte('created_at', endDate)
+          .eq('billing_status', 'current')
           .order('created_at', { ascending: false }),
         supabase
           .from('shovel_work_logs')
           .select('*, employee:employees(first_name, last_name), account:accounts(name, address)')
+          .eq('organization_id', activeOrganizationId)
           .gte('created_at', startDate)
           .lte('created_at', endDate)
+          .eq('billing_status', 'current')
           .order('created_at', { ascending: false }),
       ]);
 
       // Resolve shovel team member names in one query (avoid N+1).
       const shovelTeamIds = Array.from(
         new Set(
-          (shovelLogsRes.data || []).flatMap((l: any) => (l.team_member_ids as string[] | null) || [])
+          ((shovelLogsRes.data as ShovelTeamLogRow[] | null) || []).flatMap((l) => l.team_member_ids || [])
         )
       );
 
@@ -78,10 +100,11 @@ export default function WorkLogsPage() {
         const { data: teamMembers, error: teamMembersError } = await supabase
           .from('employees')
           .select('id, first_name, last_name')
+          .eq('organization_id', activeOrganizationId)
           .in('id', shovelTeamIds);
 
         if (!teamMembersError && teamMembers) {
-          for (const m of teamMembers as any[]) {
+          for (const m of teamMembers as EmployeeNameRow[]) {
             teamMemberNameById.set(m.id, `${m.first_name} ${m.last_name}`);
           }
         }
@@ -93,7 +116,7 @@ export default function WorkLogsPage() {
         equipment: log.equipment,
       }));
 
-      const shovelLogs: WorkLog[] = (shovelLogsRes.data || []).map((log: any) => ({
+      const shovelLogs: WorkLog[] = ((shovelLogsRes.data as WorkLog[] | null) || []).map((log) => ({
         ...log,
         type: 'shovel' as const,
         equipment: null,
@@ -115,11 +138,11 @@ export default function WorkLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeOrganizationId, dateFilter]);
 
   useEffect(() => {
     fetchLogs();
-  }, [dateFilter]);
+  }, [fetchLogs]);
 
   const filteredLogs = logs.filter((log) => {
     // Tab filter
@@ -203,7 +226,7 @@ export default function WorkLogsPage() {
     );
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const rawLogs = filteredLogs.map((log) => ({
       id: log.id,
       type: log.type,
@@ -241,7 +264,9 @@ export default function WorkLogsPage() {
     const plowCount = filteredLogs.filter(log => log.service_type === 'plow' || log.service_type === 'both').length;
     const saltCount = filteredLogs.filter(log => log.service_type === 'salt' || log.service_type === 'ice_melt' || log.service_type === 'both').length;
 
-    generateWorkLogsPDF(rawLogs, {
+    const { generateWorkLogsPDF } = await import('@/lib/pdfExport');
+
+    await generateWorkLogsPDF(rawLogs, {
       totalJobs: filteredLogs.length,
       totalHours,
       totalSaltLbs: filteredLogs.reduce((sum, log) => sum + (log.salt_used_lbs || 0), 0),
@@ -256,8 +281,13 @@ export default function WorkLogsPage() {
   };
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
+    <AppLayout variant="wide">
+      <div 
+        className="
+          space-y-6
+          w-full max-w-full
+          px-0 sm:px-2
+        ">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -267,7 +297,12 @@ export default function WorkLogsPage() {
             </h1>
             <p className="text-muted-foreground">View and manage all service records</p>
           </div>
-          <Button variant="outline" onClick={handleExportPDF} disabled={filteredLogs.length === 0}>
+          <Button
+            variant="outline"
+            onClick={handleExportPDF}
+            disabled={filteredLogs.length === 0}
+            className="w-full sm:w-auto"
+          >
             <FileDown className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
@@ -276,7 +311,7 @@ export default function WorkLogsPage() {
         {/* Filters */}
         <Card className="bg-card/50 border-border/50">
           <CardContent className="pt-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -286,9 +321,9 @@ export default function WorkLogsPage() {
                   className="pl-9 bg-background/50"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex">
                 <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="w-[140px] bg-background/50">
+                  <SelectTrigger className="w-full sm:w-[140px] bg-background/50">
                     <Calendar className="h-4 w-4 mr-2" />
                     <SelectValue />
                   </SelectTrigger>
@@ -300,7 +335,7 @@ export default function WorkLogsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[130px] bg-background/50">
+                  <SelectTrigger className="w-full sm:w-[130px] bg-background/50">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue />
                   </SelectTrigger>
@@ -319,7 +354,7 @@ export default function WorkLogsPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-muted/50">
+          <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto rounded-2xl bg-muted/50 p-1">
             <TabsTrigger value="all" className="data-[state=active]:bg-background">
               All Logs ({logs.length})
             </TabsTrigger>
@@ -349,9 +384,66 @@ export default function WorkLogsPage() {
                   <div className="text-center py-12 text-muted-foreground">
                     No work logs found matching your criteria.
                   </div>
+                ) : isMobile ? (
+                  <div className="space-y-3">
+                    {filteredLogs.map((log) => (
+                      <div key={log.id} className="rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold leading-tight">{log.account?.name || 'Unknown account'}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {format(new Date(log.created_at), 'MMM d, yyyy h:mm a')}
+                            </p>
+                          </div>
+                          {getStatusBadge(log.status)}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {getServiceTypeBadge(log)}
+                          <Badge variant="outline" className="gap-1">
+                            <Clock className="h-3 w-3" />
+                            {getDuration(log.check_in_time, log.check_out_time)}
+                          </Badge>
+                        </div>
+
+                        <div className="mt-4 space-y-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Employee: </span>
+                            <span>
+                              {log.type === 'shovel' && log.teamMemberNames && log.teamMemberNames.length > 0
+                                ? log.teamMemberNames.join(', ')
+                                : log.employee
+                                  ? `${log.employee.first_name} ${log.employee.last_name}`
+                                  : '-'}
+                            </span>
+                          </div>
+
+                          {log.account?.address && (
+                            <div className="flex items-start gap-2 text-muted-foreground">
+                              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                              <span>{log.account.address}</span>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                            {log.type === 'plow' && log.salt_used_lbs && (
+                              <span>Salt: {log.salt_used_lbs} lbs</span>
+                            )}
+                            {log.type === 'plow' && log.snow_depth_inches && (
+                              <span>Snow: {log.snow_depth_inches}"</span>
+                            )}
+                            {log.type === 'shovel' && log.ice_melt_used_lbs && (
+                              <span>Ice Melt: {log.ice_melt_used_lbs} lbs</span>
+                            )}
+                            {log.equipment?.name && <span>Equip: {log.equipment.name}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
+                  <div className="w-full max-w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                    <Table className="min-w-[900px]">
                       <TableHeader>
                         <TableRow className="border-border/50 hover:bg-transparent">
                           <TableHead>Date</TableHead>

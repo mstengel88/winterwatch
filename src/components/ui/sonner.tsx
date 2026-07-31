@@ -1,14 +1,48 @@
-import { useTheme } from "next-themes";
+/* eslint-disable react-refresh/only-export-components */
+import { useEffect, useState } from "react";
 import { Toaster as Sonner, toast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
+  const [theme, setTheme] = useState<ToasterProps["theme"]>("dark");
+
+  useEffect(() => {
+    const updateTheme = () => {
+      const root = document.documentElement;
+      const savedTheme = localStorage.getItem("theme");
+
+      if (savedTheme === "light" || savedTheme === "dark") {
+        setTheme(savedTheme);
+        return;
+      }
+
+      if (savedTheme === "system") {
+        setTheme(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        return;
+      }
+
+      setTheme(root.classList.contains("dark") ? "dark" : "light");
+    };
+
+    updateTheme();
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleMediaChange = () => updateTheme();
+    const observer = new MutationObserver(() => updateTheme());
+
+    mediaQuery.addEventListener("change", handleMediaChange);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleMediaChange);
+      observer.disconnect();
+    };
+  }, []);
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={theme}
       className="toaster group"
       toastOptions={{
         classNames: {

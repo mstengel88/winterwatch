@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEmployee } from './useEmployee';
 import { useGeolocation } from './useGeolocation';
 import { WorkLog, Account, ServiceType } from '@/types/database';
+import {
+  isOnline,
+  addPendingWorkLog,
+  generateTempId,
+  cacheAccounts,
+  getCachedAccounts,
+} from '@/lib/offlineStorage';
 
 interface UseWorkLogsReturn {
   accounts: Account[];
@@ -34,6 +42,7 @@ interface CheckOutData {
 }
 
 export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLogsReturn {
+  const { activeOrganizationId } = useAuth();
   const { employee } = useEmployee();
   const { getCurrentLocation } = useGeolocation();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -45,10 +54,25 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
   const effectiveEmployeeId = options?.employeeId ?? employee?.id;
 
   const fetchAccounts = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setAccounts([]);
+      return;
+    }
+
     try {
+      // If offline, use cached data
+      if (!isOnline()) {
+        const cached = getCachedAccounts<Account>(activeOrganizationId);
+        if (cached.length > 0) {
+          setAccounts(cached);
+          return;
+        }
+      }
+
       const { data, error: fetchError } = await supabase
         .from('accounts')
         .select('*')
+        .eq('organization_id', activeOrganizationId)
         .eq('is_active', true)
         .in('service_type', ['plow', 'both'])
         .order('priority', { ascending: true })
@@ -56,15 +80,25 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
 
       if (fetchError) throw fetchError;
 
-      setAccounts((data || []) as Account[]);
+      const accountsData = (data || []) as Account[];
+      setAccounts(accountsData);
+      
+      // Cache for offline use
+      cacheAccounts(accountsData, activeOrganizationId);
     } catch (err) {
       console.error('Error fetching accounts:', err);
-      setError('Failed to load accounts');
+      // Fallback to cached data on error
+      const cached = getCachedAccounts<Account>(activeOrganizationId);
+      if (cached.length > 0) {
+        setAccounts(cached);
+      } else {
+        setError('Failed to load accounts');
+      }
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   const fetchActiveWorkLog = useCallback(async () => {
-    if (!effectiveEmployeeId) {
+    if (!effectiveEmployeeId || !activeOrganizationId) {
       setActiveWorkLog(null);
       return;
     }
@@ -77,6 +111,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
           account:accounts(*),
           equipment:equipment(*)
         `)
+        .eq('organization_id', activeOrganizationId)
         .eq('employee_id', effectiveEmployeeId)
         .eq('status', 'in_progress')
         .order('check_in_time', { ascending: false })
@@ -89,9 +124,14 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     } catch (err) {
       console.error('Error fetching active work log:', err);
     }
-  }, [effectiveEmployeeId]);
+  }, [activeOrganizationId, effectiveEmployeeId]);
 
   const fetchRecentWorkLogs = useCallback(async () => {
+    if (!activeOrganizationId) {
+      setRecentWorkLogs([]);
+      return;
+    }
+
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -104,6 +144,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
           account:accounts(*),
           employee:employees(first_name, last_name)
         `)
+        .eq('organization_id', activeOrganizationId)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false })
         .limit(10);
@@ -114,7 +155,7 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
     } catch (err) {
       console.error('Error fetching recent work logs:', err);
     }
-  }, []);
+  }, [activeOrganizationId]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -139,22 +180,59 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
       setError('No employee selected');
       return false;
     }
+    if (!activeOrganizationId) {
+      setError('No active organization selected');
+      return false;
+    }
 
     const location = await getCurrentLocation();
+    const checkInData = {
+      organization_id: activeOrganizationId,
+      account_id: accountId,
+      employee_id: effectiveEmployeeId,
+      equipment_id: equipmentId || null,
+      service_type: serviceType,
+      status: 'in_progress' as const,
+      check_in_time: new Date().toISOString(),
+      check_in_latitude: location?.latitude ?? null,
+      check_in_longitude: location?.longitude ?? null,
+    };
+
+    // If offline, save locally
+    if (!isOnline()) {
+      const tempId = generateTempId();
+      addPendingWorkLog({
+        id: tempId,
+        tempId,
+        action: 'check_in',
+        data: checkInData,
+        timestamp: Date.now(),
+      });
+      
+      // Create optimistic local work log
+      const optimisticLog: WorkLog = {
+        ...checkInData,
+        id: tempId,
+        check_out_time: null,
+        check_out_latitude: null,
+        check_out_longitude: null,
+        snow_depth_inches: null,
+        salt_used_lbs: null,
+        weather_conditions: null,
+        notes: null,
+        photo_urls: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        account: accounts.find(a => a.id === accountId),
+      };
+      setActiveWorkLog(optimisticLog);
+      return true;
+    }
 
     try {
       const { data, error: insertError } = await supabase
         .from('work_logs')
-        .insert({
-          account_id: accountId,
-          employee_id: effectiveEmployeeId,
-          equipment_id: equipmentId || null,
-          service_type: serviceType,
-          status: 'in_progress',
-          check_in_time: new Date().toISOString(),
-          check_in_latitude: location?.latitude ?? null,
-          check_in_longitude: location?.longitude ?? null,
-        })
+        .insert(checkInData)
         .select(`
           *,
           account:accounts(*),
@@ -182,34 +260,49 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
 
     const location = await getCurrentLocation();
 
+    const updatePayload: Record<string, unknown> = {
+      status: 'completed',
+      check_out_time: new Date().toISOString(),
+      check_out_latitude: location?.latitude ?? null,
+      check_out_longitude: location?.longitude ?? null,
+      snow_depth_inches: data.snowDepthInches ?? null,
+      salt_used_lbs: data.saltUsedLbs ?? null,
+      weather_conditions: data.weatherConditions ?? null,
+      notes: data.notes ?? null,
+      photo_urls: data.photoUrls ?? null,
+    };
+
+    // Update equipment/employee/service type if provided
+    if (data.equipmentId !== undefined) {
+      updatePayload.equipment_id = data.equipmentId || null;
+    }
+    if (data.employeeId !== undefined) {
+      updatePayload.employee_id = data.employeeId;
+    }
+    if (data.serviceType !== undefined) {
+      updatePayload.service_type = data.serviceType;
+    }
+
+    // If offline, save locally
+    if (!isOnline()) {
+      const tempId = generateTempId();
+      addPendingWorkLog({
+        id: activeWorkLog.id,
+        tempId,
+        action: 'check_out',
+        data: updatePayload,
+        timestamp: Date.now(),
+      });
+      setActiveWorkLog(null);
+      return true;
+    }
+
     try {
-      const updatePayload: Record<string, unknown> = {
-        status: 'completed',
-        check_out_time: new Date().toISOString(),
-        check_out_latitude: location?.latitude ?? null,
-        check_out_longitude: location?.longitude ?? null,
-        snow_depth_inches: data.snowDepthInches ?? null,
-        salt_used_lbs: data.saltUsedLbs ?? null,
-        weather_conditions: data.weatherConditions ?? null,
-        notes: data.notes ?? null,
-        photo_urls: data.photoUrls ?? null,
-      };
-
-      // Update equipment/employee/service type if provided
-      if (data.equipmentId !== undefined) {
-        updatePayload.equipment_id = data.equipmentId || null;
-      }
-      if (data.employeeId !== undefined) {
-        updatePayload.employee_id = data.employeeId;
-      }
-      if (data.serviceType !== undefined) {
-        updatePayload.service_type = data.serviceType;
-      }
-
       const { error: updateError } = await supabase
         .from('work_logs')
         .update(updatePayload)
-        .eq('id', activeWorkLog.id);
+        .eq('id', activeWorkLog.id)
+        .eq('organization_id', activeOrganizationId);
 
       if (updateError) throw updateError;
 
@@ -226,6 +319,10 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
   const updateActiveWorkLog = async (data: UpdateWorkLogData): Promise<boolean> => {
     if (!activeWorkLog) {
       setError('No active work log to update');
+      return false;
+    }
+    if (!activeOrganizationId) {
+      setError('No active organization selected');
       return false;
     }
 
@@ -248,7 +345,8 @@ export function useWorkLogs(options?: { employeeId?: string | null }): UseWorkLo
       const { error: updateError } = await supabase
         .from('work_logs')
         .update(updatePayload)
-        .eq('id', activeWorkLog.id);
+        .eq('id', activeWorkLog.id)
+        .eq('organization_id', activeOrganizationId);
 
       if (updateError) throw updateError;
 

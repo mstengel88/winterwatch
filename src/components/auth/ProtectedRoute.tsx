@@ -34,10 +34,19 @@ export function ProtectedRoute({
     const hasAllowedRole = allowedRoles.some(role => roles.includes(role));
     if (!hasAllowedRole) {
       // Redirect to appropriate dashboard based on user's actual role
+      if (roles.includes('admin') || roles.includes('manager')) {
+        return <Navigate to="/admin/organizations" replace />;
+      }
       if (roles.includes('shovel_crew')) {
         return <Navigate to="/shovel" replace />;
       }
+      if (roles.includes('dispatch_driver')) {
+        return <Navigate to="/dashboard" replace />;
+      }
       if (roles.includes('driver')) {
+        return <Navigate to="/dashboard" replace />;
+      }
+      if (roles.includes('trucker')) {
         return <Navigate to="/dashboard" replace />;
       }
       // Default fallback for users without specific dashboard roles

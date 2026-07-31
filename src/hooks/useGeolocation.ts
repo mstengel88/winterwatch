@@ -1,69 +1,237 @@
-import { useState, useCallback } from 'react';
-import { GeoLocation } from '@/types/database';
+import { useState, useCallback, useRef } from "react";
+import { Geolocation } from "@capacitor/geolocation";
+import { Capacitor } from "@capacitor/core";
 
-interface UseGeolocationReturn {
-  location: GeoLocation | null;
-  error: string | null;
-  isLoading: boolean;
-  getCurrentLocation: () => Promise<GeoLocation | null>;
+// Cache location for 30 seconds to reduce GPS calls (saves battery on iOS)
+const LOCATION_CACHE_MS = 30000;
+const PERSISTED_LOCATION_KEY = "winterwatch_last_location";
+
+type LocationCoords = {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+};
+
+function requestBrowserPosition(
+  options: PositionOptions,
+  unavailableMessage: string,
+): Promise<GeolocationPosition> {
+  return new Promise<GeolocationPosition>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      (error) => {
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            reject(new Error("Browser location access was denied. Allow location for this site to use nearby-account detection."));
+            return;
+          case error.POSITION_UNAVAILABLE:
+            reject(new Error(unavailableMessage));
+            return;
+          case error.TIMEOUT:
+            reject(new Error("Location lookup timed out. Try again in a spot with better signal."));
+            return;
+          default:
+            reject(new Error("Unable to get browser location right now."));
+        }
+      },
+      options,
+    );
+  });
 }
 
-export function useGeolocation(): UseGeolocationReturn {
-  const [location, setLocation] = useState<GeoLocation | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+async function getBrowserLocation(timeout: number, maximumAge: number): Promise<LocationCoords> {
+  if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    throw new Error("Browser location requires HTTPS. You can still use the app and select accounts manually.");
+  }
 
-  const getCurrentLocation = useCallback(async (): Promise<GeoLocation | null> => {
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
-      return null;
+  if ("permissions" in navigator && "query" in navigator.permissions) {
+    let permissionStatus: PermissionStatus | null = null;
+    try {
+      permissionStatus = await navigator.permissions.query({ name: "geolocation" });
+    } catch {
+      // Ignore unsupported permissions API behavior and fall back to a direct geolocation attempt.
     }
 
-    setIsLoading(true);
-    setError(null);
+    if (permissionStatus?.state === "denied") {
+      throw new Error("Browser location access is blocked. Enable location permission for this site to auto-detect nearby accounts.");
+    }
+  }
 
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const loc: GeoLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          };
-          setLocation(loc);
-          setIsLoading(false);
-          resolve(loc);
-        },
-        (err) => {
-          let errorMessage = 'Failed to get location';
-          switch (err.code) {
-            case err.PERMISSION_DENIED:
-              errorMessage = 'Location permission denied. Please enable location access.';
-              break;
-            case err.POSITION_UNAVAILABLE:
-              errorMessage = 'Location information unavailable.';
-              break;
-            case err.TIMEOUT:
-              errorMessage = 'Location request timed out.';
-              break;
-          }
-          setError(errorMessage);
-          setIsLoading(false);
-          resolve(null);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000,
-        }
-      );
-    });
+  if (!("geolocation" in navigator)) {
+    throw new Error("Geolocation is not available on this device.");
+  }
+
+  try {
+    const position = await requestBrowserPosition(
+      {
+        enableHighAccuracy: true,
+        timeout,
+        maximumAge,
+      },
+      "Location is temporarily unavailable in this browser. Check device location services and try again.",
+    );
+
+    return {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const shouldRetryWithLowAccuracy =
+      message.includes("temporarily unavailable") || message.includes("timed out");
+
+    if (!shouldRetryWithLowAccuracy) {
+      throw error;
+    }
+
+    const fallbackPosition = await requestBrowserPosition(
+      {
+        enableHighAccuracy: false,
+        timeout: Math.max(8000, Math.floor(timeout / 2)),
+        maximumAge: Math.max(maximumAge, 5 * 60 * 1000),
+      },
+      "Location is unavailable in this browser right now. You can still select the account manually.",
+    );
+
+    return {
+      latitude: fallbackPosition.coords.latitude,
+      longitude: fallbackPosition.coords.longitude,
+      accuracy: fallbackPosition.coords.accuracy,
+    };
+  }
+}
+
+export function useGeolocation() {
+  const [location, setLocation] = useState<LocationCoords | null>(null);
+
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Cache to prevent excessive GPS calls
+  const lastFetchRef = useRef<number>(0);
+  const cachedLocationRef = useRef<typeof location>(null);
+
+  const persistLocation = useCallback((value: LocationCoords) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(PERSISTED_LOCATION_KEY, JSON.stringify({
+        ...value,
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // ignore persistence failures
+    }
   }, []);
+
+  const readPersistedLocation = useCallback((): LocationCoords | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(PERSISTED_LOCATION_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as LocationCoords & { savedAt?: number };
+      if (
+        typeof parsed?.latitude !== "number" ||
+        typeof parsed?.longitude !== "number" ||
+        typeof parsed?.accuracy !== "number"
+      ) {
+        return null;
+      }
+      return {
+        latitude: parsed.latitude,
+        longitude: parsed.longitude,
+        accuracy: parsed.accuracy,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const refreshOnce = useCallback(async (forceRefresh = false) => {
+    // Return cached location if still fresh (unless force refresh)
+    const now = Date.now();
+    if (!forceRefresh && cachedLocationRef.current && (now - lastFetchRef.current) < LOCATION_CACHE_MS) {
+      console.log("📍 Using cached location");
+      return cachedLocationRef.current;
+    }
+    
+    try {
+      setIsLoading(true);
+      const maximumAge = forceRefresh ? 0 : LOCATION_CACHE_MS;
+      let loc: LocationCoords;
+
+      if (Capacitor.isNativePlatform()) {
+        const permission = await Geolocation.checkPermissions();
+
+        const hasPermission =
+          permission.location === "granted" || permission.coarseLocation === "granted";
+
+        if (!hasPermission) {
+          const requested = await Geolocation.requestPermissions({
+            permissions: ["location"],
+          });
+          const granted =
+            requested.location === "granted" || requested.coarseLocation === "granted";
+
+          if (!granted) {
+            throw new Error("Location permission is denied. Enable it in Settings and try again.");
+          }
+        }
+
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge,
+        });
+
+        loc = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+      } else {
+        loc = await getBrowserLocation(15000, maximumAge);
+      }
+
+      console.log("📍 refreshOnce location:", loc);
+
+      // Update cache
+      lastFetchRef.current = now;
+      cachedLocationRef.current = loc;
+      persistLocation(loc);
+      
+      setLocation(loc);
+      setError(null);
+      return loc;
+    } catch (err: unknown) {
+      console.error("❌ Geolocation error:", err);
+
+      const fallbackLocation = cachedLocationRef.current ?? readPersistedLocation();
+      if (fallbackLocation) {
+        cachedLocationRef.current = fallbackLocation;
+        setLocation(fallbackLocation);
+      }
+
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Unable to get current location right now.";
+
+      setError(message);
+      return fallbackLocation; // Return cached on error
+    } finally {
+      setIsLoading(false);
+    }
+  }, [persistLocation, readPersistedLocation]);
+
+  // Keep old name for compatibility if anything else uses it
+  const getCurrentLocation = refreshOnce;
 
   return {
     location,
     error,
     isLoading,
     getCurrentLocation,
+    refreshOnce,
   };
 }

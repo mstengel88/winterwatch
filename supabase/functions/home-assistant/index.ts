@@ -1,0 +1,246 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+type EmployeeName = {
+  first_name: string;
+  last_name: string;
+};
+
+type ActiveShiftRow = {
+  id: string;
+  employee_id: string;
+  clock_in_time: string;
+  employee: EmployeeName | null;
+};
+
+type WorkLogSummaryRow = {
+  id: string;
+  status: string;
+  service_type: string;
+  billing_status: string | null;
+  check_in_time: string | null;
+  account: { name: string } | null;
+  employee: EmployeeName | null;
+};
+
+type RequesterProfile = {
+  active_organization_id: string | null;
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const token = authHeader.replace("Bearer ", "").trim();
+
+    // Try to validate as user JWT first
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: userData, error: userError } = await anonClient.auth.getUser(token);
+
+    if (!userData?.user) {
+      console.log("[HA] Auth failed:", userError?.message);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("[HA] Authenticated as user:", userData.user.email);
+
+    const supabase = anonClient;
+    const { data: requesterProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("active_organization_id")
+      .eq("id", userData.user.id)
+      .maybeSingle() as { data: RequesterProfile | null; error: unknown };
+
+    if (profileError) {
+      console.log("[HA] Profile lookup failed:", profileError);
+      return new Response(JSON.stringify({ error: "Failed to load active organization" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const activeOrganizationId = requesterProfile?.active_organization_id;
+    if (!activeOrganizationId) {
+      return new Response(JSON.stringify({ error: "No active organization selected" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: requesterRoles, error: requesterRolesError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .eq("organization_id", activeOrganizationId);
+
+    if (requesterRolesError) {
+      console.log("[HA] Role lookup failed:", requesterRolesError);
+      return new Response(JSON.stringify({ error: "Failed to verify organization access" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const isAdminOrManager = (requesterRoles ?? []).some(
+      (role) => role.role === "admin" || role.role === "manager"
+    );
+
+    if (!isAdminOrManager) {
+      return new Response(JSON.stringify({ error: "Admin or manager access required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const url = new URL(req.url);
+    const endpoint = url.searchParams.get("endpoint") || "summary";
+    console.log("[HA] Endpoint:", endpoint);
+
+    const responseData: Record<string, unknown> = {};
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
+
+    if (endpoint === "summary" || endpoint === "all") {
+      const { data: activeShifts } = await supabase
+        .from("time_clock")
+        .select("id, employee_id, clock_in_time, employee:employees(first_name, last_name)")
+        .eq("organization_id", activeOrganizationId)
+        .is("clock_out_time", null);
+
+      const { data: todayShifts } = await supabase
+        .from("time_clock")
+        .select("id, clock_in_time, clock_out_time")
+        .eq("organization_id", activeOrganizationId)
+        .gte("clock_in_time", todayISO);
+
+      let totalHoursToday = 0;
+      (todayShifts || []).forEach((s) => {
+        const start = new Date(s.clock_in_time).getTime();
+        const end = s.clock_out_time ? new Date(s.clock_out_time).getTime() : Date.now();
+        totalHoursToday += (end - start) / (1000 * 60 * 60);
+      });
+
+      const typedActiveShifts = (activeShifts || []) as ActiveShiftRow[];
+
+      responseData.time_clock = {
+        active_shifts: typedActiveShifts.length,
+        active_employees: typedActiveShifts.map((s) => ({
+          name: s.employee
+            ? `${s.employee.first_name} ${s.employee.last_name}`
+            : "Unknown",
+          employee_id: s.employee_id,
+          clock_in_time: s.clock_in_time,
+          hours_elapsed: parseFloat(
+            ((Date.now() - new Date(s.clock_in_time).getTime()) / (1000 * 60 * 60)).toFixed(2)
+          ),
+        })),
+        total_shifts_today: (todayShifts || []).length,
+        total_hours_today: parseFloat(totalHoursToday.toFixed(2)),
+      };
+    }
+
+    if (endpoint === "work_logs" || endpoint === "all") {
+      const { data: plowLogs } = await supabase
+        .from("work_logs")
+        .select("id, status, service_type, billing_status, check_in_time, account:accounts(name), employee:employees(first_name, last_name)")
+        .eq("organization_id", activeOrganizationId)
+        .gte("created_at", todayISO);
+
+      const { data: shovelLogs } = await supabase
+        .from("shovel_work_logs")
+        .select("id, status, service_type, billing_status, check_in_time, account:accounts(name), employee:employees(first_name, last_name)")
+        .eq("organization_id", activeOrganizationId)
+        .gte("created_at", todayISO);
+
+      const allLogs = [...((plowLogs || []) as WorkLogSummaryRow[]), ...((shovelLogs || []) as WorkLogSummaryRow[])];
+      const inProgressLogs = allLogs.filter((l) => l.status === "in_progress");
+
+      responseData.work_logs = {
+        total_today: allLogs.length,
+        plow_today: (plowLogs || []).length,
+        shovel_today: (shovelLogs || []).length,
+        in_progress: inProgressLogs.length,
+        in_progress_details: inProgressLogs.map((l) => ({
+          id: l.id,
+          service_type: l.service_type,
+          account: l.account?.name || "Unknown",
+          employee: l.employee
+            ? `${l.employee.first_name} ${l.employee.last_name}`
+            : "Unassigned",
+          started: l.check_in_time,
+        })),
+        completed: allLogs.filter((l) => l.status === "completed").length,
+        pending: allLogs.filter((l) => l.status === "pending").length,
+        current: allLogs.filter((l) => l.billing_status === "current").length,
+        billable: allLogs.filter((l) => l.billing_status === "billable").length,
+      };
+    }
+
+    if (endpoint === "summary") {
+      const { count: plowCount } = await supabase
+        .from("work_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
+        .gte("created_at", todayISO);
+
+      const { count: shovelCount } = await supabase
+        .from("shovel_work_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
+        .gte("created_at", todayISO);
+
+      responseData.work_logs_today = (plowCount || 0) + (shovelCount || 0);
+    }
+
+    if (endpoint === "summary" || endpoint === "all") {
+      const { count: allTimePlowCompleted } = await supabase
+        .from("work_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
+        .eq("status", "completed");
+
+      const { count: allTimeShovelCompleted } = await supabase
+        .from("shovel_work_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", activeOrganizationId)
+        .eq("status", "completed");
+
+      responseData.all_time_completed = (allTimePlowCompleted || 0) + (allTimeShovelCompleted || 0);
+    }
+
+    return new Response(JSON.stringify(responseData), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("[HA] Error:", (err as Error).message);
+    return new Response(
+      JSON.stringify({ error: (err as Error).message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

@@ -1,16 +1,34 @@
 import { User, Session } from '@supabase/supabase-js';
 
-export type AppRole = 'admin' | 'manager' | 'driver' | 'shovel_crew' | 'client';
+export type AppRole =
+  | 'admin'
+  | 'manager'
+  | 'driver'
+  | 'dispatch_driver'
+  | 'shovel_crew'
+  | 'client'
+  | 'work_log_viewer'
+  | 'trucker';
 
 export interface UserRole {
   id: string;
   user_id: string;
   role: AppRole;
+  organization_id: string;
   created_at: string;
   created_by: string | null;
 }
 
+export interface OrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  status: string;
+}
+
 export interface Profile {
+  active_organization_id: string | null;
   id: string;
   email: string | null;
   full_name: string | null;
@@ -28,6 +46,8 @@ export interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   roles: AppRole[];
+  activeOrganizationId: string | null;
+  organizations: OrganizationSummary[];
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
@@ -35,5 +55,6 @@ export interface AuthContextType {
   hasRole: (role: AppRole) => boolean;
   isAdminOrManager: () => boolean;
   isStaff: () => boolean;
+  switchOrganization: (organizationId: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }

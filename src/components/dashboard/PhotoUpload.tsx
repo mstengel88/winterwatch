@@ -2,7 +2,6 @@ import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Camera, X, Plus, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface PhotoUploadProps {
   photos: File[];
@@ -10,9 +9,11 @@ interface PhotoUploadProps {
   isUploading: boolean;
   uploadProgress: number;
   canAddMore: boolean;
-  onAddPhotos: (files: FileList | File[]) => void;
+  // Some callers (native persistence) return the updated preview list.
+  onAddPhotos: (files: FileList | File[]) => void | Promise<unknown>;
   onRemovePhoto: (index: number) => void;
   maxPhotos?: number;
+  hasRestoredPreviews?: boolean; // Kept for backwards compatibility but no longer used
 }
 
 export function PhotoUpload({
@@ -30,24 +31,28 @@ export function PhotoUpload({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onAddPhotos(e.target.files);
+      void onAddPhotos(e.target.files);
       e.target.value = '';
     }
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <label className="text-sm font-medium">
           Photos ({photos.length}/{maxPhotos})
         </label>
-        {isUploading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Uploading...
-          </div>
-        )}
+        <p className="text-xs text-muted-foreground">
+          Add before/after shots from the job site.
+        </p>
       </div>
+
+      {isUploading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Uploading...
+        </div>
+      )}
 
       {isUploading && (
         <Progress value={uploadProgress} className="h-2" />
@@ -55,7 +60,7 @@ export function PhotoUpload({
 
       {/* Photo previews */}
       {previews.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {previews.map((preview, index) => (
             <div key={index} className="relative aspect-square">
               <img
@@ -66,10 +71,10 @@ export function PhotoUpload({
               <button
                 type="button"
                 onClick={() => onRemovePhoto(index)}
-                className="absolute -right-1 -top-1 rounded-full bg-destructive p-1 text-destructive-foreground shadow-md"
+                className="absolute -right-1 -top-1 rounded-full bg-destructive p-1.5 text-destructive-foreground shadow-md"
                 disabled={isUploading}
               >
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}
@@ -78,29 +83,27 @@ export function PhotoUpload({
 
       {/* Add photo buttons */}
       {canAddMore && !isUploading && (
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {/* Camera button (mobile) */}
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={() => cameraInputRef.current?.click()}
-            className="flex-1"
+            className="h-12 justify-center rounded-xl"
           >
             <Camera className="mr-2 h-4 w-4" />
-            Camera
+            Take Photo
           </Button>
 
           {/* Gallery button */}
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={() => fileInputRef.current?.click()}
-            className="flex-1"
+            className="h-12 justify-center rounded-xl"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Gallery
+            Choose Photos
           </Button>
 
           {/* Hidden file inputs */}
@@ -124,8 +127,8 @@ export function PhotoUpload({
       )}
 
       {photos.length === 0 && !isUploading && (
-        <p className="text-xs text-muted-foreground text-center py-2">
-          Add before/after photos of the completed work
+        <p className="py-1 text-center text-xs text-muted-foreground">
+          No photos added yet
         </p>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,11 +15,24 @@ import { toast } from 'sonner';
 import { Building2, Plus, Loader2, MapPin, Search, Upload, MoreHorizontal, Pencil, Trash2, CheckSquare, Square } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Account } from '@/types/database';
-import { accountSchema, getValidationError } from '@/lib/validations';
+import { validateAccountForm } from '@/lib/validation/account';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SERVICE_TYPE_OPTIONS = ['plow', 'shovel', 'both'];
 
+type AccountWithServiceType = Account & {
+  service_type?: 'plow' | 'shovel' | 'both';
+};
+
+type BulkAccountUpdates = {
+  service_type?: string;
+  priority?: number;
+  is_active?: boolean;
+};
+
 export default function AccountsPage() {
+  const { activeOrganizationId } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -52,10 +66,16 @@ export default function AccountsPage() {
 
   const fetchAccounts = async () => {
     setIsLoading(true);
+    if (!activeOrganizationId) {
+      setAccounts([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('accounts')
         .select('*')
+        .filter('organization_id', 'eq', activeOrganizationId)
         .order('priority')
         .order('name');
 
@@ -71,7 +91,19 @@ export default function AccountsPage() {
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+  }, [activeOrganizationId]);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action !== 'new-account') {
+      return;
+    }
+
+    openDialog();
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('action');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const openDialog = (account?: Account) => {
     if (account) {
@@ -89,7 +121,7 @@ export default function AccountsPage() {
         longitude: account.longitude?.toString() || '',
         geofence_radius: account.geofence_radius?.toString() || '100',
         priority: account.priority?.toString() || '5',
-        service_type: (account as any).service_type || 'both',
+        service_type: (account as AccountWithServiceType).service_type || 'both',
         notes: account.notes || '',
         is_active: account.is_active,
       });
@@ -117,10 +149,9 @@ export default function AccountsPage() {
   };
 
   const handleSave = async () => {
-    // Validate form data with zod schema
-    const validationResult = accountSchema.safeParse(formData);
+    const validationResult = validateAccountForm(formData);
     if (!validationResult.success) {
-      toast.error(getValidationError(validationResult.error));
+      toast.error(validationResult.error);
       return;
     }
 
@@ -128,6 +159,7 @@ export default function AccountsPage() {
     try {
       const validated = validationResult.data;
       const accountData = {
+        organization_id: activeOrganizationId,
         name: validated.name,
         address: validated.address,
         city: validated.city || null,
@@ -149,7 +181,8 @@ export default function AccountsPage() {
         const { error } = await supabase
           .from('accounts')
           .update(accountData)
-          .eq('id', editingAccount.id);
+          .eq('id', editingAccount.id)
+          .filter('organization_id', 'eq', activeOrganizationId!);
         if (error) throw error;
         toast.success('Account updated');
       } else {
@@ -172,7 +205,11 @@ export default function AccountsPage() {
     if (!confirm('Are you sure you want to delete this account?')) return;
 
     try {
-      const { error } = await supabase.from('accounts').delete().eq('id', id);
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .eq('id', id)
+        .filter('organization_id', 'eq', activeOrganizationId!);
       if (error) throw error;
       toast.success('Account deleted');
       fetchAccounts();
@@ -211,7 +248,7 @@ export default function AccountsPage() {
 
     setIsSaving(true);
     try {
-      const updates: Record<string, any> = {};
+      const updates: BulkAccountUpdates = {};
       if (bulkFormData.service_type) updates.service_type = bulkFormData.service_type;
       if (bulkFormData.priority) updates.priority = parseInt(bulkFormData.priority);
       if (bulkFormData.is_active !== '') updates.is_active = bulkFormData.is_active === 'true';
@@ -225,6 +262,7 @@ export default function AccountsPage() {
       const { error } = await supabase
         .from('accounts')
         .update(updates)
+        .filter('organization_id', 'eq', activeOrganizationId!)
         .in('id', Array.from(selectedIds));
 
       if (error) throw error;
@@ -249,6 +287,7 @@ export default function AccountsPage() {
       const { error } = await supabase
         .from('accounts')
         .delete()
+        .filter('organization_id', 'eq', activeOrganizationId!)
         .in('id', Array.from(selectedIds));
 
       if (error) throw error;
@@ -288,7 +327,7 @@ export default function AccountsPage() {
   };
 
   const getServiceBadge = (account: Account) => {
-    const serviceType = (account as any).service_type || 'both';
+    const serviceType = (account as AccountWithServiceType).service_type || 'both';
     if (serviceType === 'plow') {
       return <Badge className="bg-primary/20 text-primary border-primary/30">Plow</Badge>;
     }
@@ -387,8 +426,8 @@ export default function AccountsPage() {
           )}
 
           {/* Accounts Table */}
-          <div className="rounded-lg border border-border/50 overflow-hidden">
-            <table className="w-full">
+          <div className="rounded-lg border border-border/50 overflow-x-auto">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-muted/30">
                 <tr className="text-left text-sm text-muted-foreground">
                   <th className="px-4 py-3 font-medium w-10">
@@ -619,7 +658,7 @@ export default function AccountsPage() {
                   <SelectTrigger className="bg-card">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card">
+                  <SelectContent position="popper" className="bg-card z-[200]">
                     {SERVICE_TYPE_OPTIONS.map((service) => (
                       <SelectItem key={service} value={service}>
                         <span className="capitalize">{service}</span>
@@ -678,7 +717,7 @@ export default function AccountsPage() {
                 <SelectTrigger className="bg-card">
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
-                <SelectContent className="bg-card">
+                <SelectContent position="popper" className="bg-card z-[200]">
                   <SelectItem value="plow">Plow</SelectItem>
                   <SelectItem value="shovel">Shovel</SelectItem>
                   <SelectItem value="both">Both</SelectItem>
@@ -705,7 +744,7 @@ export default function AccountsPage() {
                 <SelectTrigger className="bg-card">
                   <SelectValue placeholder="No change" />
                 </SelectTrigger>
-                <SelectContent className="bg-card">
+                <SelectContent position="popper" className="bg-card z-[200]">
                   <SelectItem value="true">Active</SelectItem>
                   <SelectItem value="false">Inactive</SelectItem>
                 </SelectContent>

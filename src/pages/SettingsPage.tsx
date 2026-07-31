@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Settings, Sun, Moon, Monitor } from 'lucide-react';
+import { NotificationSettings } from '@/components/notifications/NotificationSettings';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -124,6 +125,9 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Push Notification Settings */}
+        <NotificationSettings />
       </div>
     </AppLayout>
   );
